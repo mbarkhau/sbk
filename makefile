@@ -72,7 +72,7 @@ DEV_ENV_PY := $(DEV_ENV)/bin/python
 
 RSA_KEY_PATH := $(HOME)/.ssh/$(PKG_NAME)_gitlab_runner_id_rsa
 
-DOCKER_BASE_IMAGE := registry.gitlab.com/mbarkhau/ssbs/base
+DOCKER_BASE_IMAGE := registry.gitlab.com/mbarkhau/ssk/base
 
 GIT_HEAD_REV = $(shell git rev-parse --short HEAD)
 DOCKER_IMAGE_VERSION = $(shell date -u +'%Y%m%dt%H%M%S')_$(GIT_HEAD_REV)
@@ -376,7 +376,7 @@ fmt:
 	@$(DEV_ENV)/bin/sjfmt \
 		--target-version py36 \
 		--skip-string-normalization \
-		--line-length=100 \
+		--line-length=80 \
 		src/ test/
 
 

@@ -1,4 +1,4 @@
-FROM registry.gitlab.com/mbarkhau/ssbs/base
+FROM registry.gitlab.com/mbarkhau/ssk/base
 
 ADD src/ src/
 ADD stubs/ stubs/

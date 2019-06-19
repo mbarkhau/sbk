@@ -1,5 +1,5 @@
-# This file is part of the ssbs project
-# https://gitlab.com/mbarkhau/ssbs
+# This file is part of the ssk project
+# https://gitlab.com/mbarkhau/ssk
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT

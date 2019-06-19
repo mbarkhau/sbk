@@ -20,8 +20,8 @@ DESCRIPTION="Wallet seed generation from a brainkey that is backed up using the 
 
 GIT_REPO_DOMAIN="gitlab.com"
 GIT_REPO_NAMESPACE="mbarkhau"
-PACKAGE_NAME="ssbs"
-MODULE_NAME="ssbs"
+PACKAGE_NAME="ssk"
+MODULE_NAME="ssk"
 
 # PACKAGE_VERSION="v201908.0001-alpha"
 # PACKAGE_VERSION="v0.1.0"

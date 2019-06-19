@@ -35,3 +35,4 @@ argon2_cffi
 
 # needed for mypy coverage report
 lxml
+

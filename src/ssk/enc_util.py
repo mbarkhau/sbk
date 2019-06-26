@@ -3,6 +3,8 @@
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
+"""Helper functions related to data/type encoding/decoding."""
+
 import struct
 import base64
 import typing as typ
@@ -10,7 +12,7 @@ import itertools as it
 
 from . import params
 
-adjectives = [
+ADJECTIVES = [
     "black",
     "blue",
     "dark",
@@ -29,7 +31,7 @@ adjectives = [
     "wise",
 ]
 
-titles = [
+TITLES = [
     "cook",
     "doctor",
     "elder",
@@ -48,7 +50,7 @@ titles = [
     "uncle",
 ]
 
-places = [
+PLACES = [
     "beach",
     "bridge",
     "castle",
@@ -68,7 +70,7 @@ places = [
 ]
 
 
-cities = [
+CITIES = [
     "athens",
     "berlin",
     "cairo",
@@ -87,16 +89,19 @@ cities = [
     "york",
 ]
 
+ADJ_LEN    = max(map(len, ADJECTIVES))
+TITLE_LEN  = max(map(len, TITLES    ))
+PLACES_LEN = max(map(len, PLACES    ))
 
 PERSON_PARTS = [
-    f"The {adj.upper()} {title.upper()}"
-    for adj, title in it.product(adjectives, titles)
+    f"The {adj.upper():<{ADJ_LEN}} {title.upper():<{TITLE_LEN}}"
+    for adj, title in it.product(ADJECTIVES, TITLES)
 ]
 
 
 PLACE_PARTS = [
-    f" of the {place.upper()} in {city.upper()}.\n"
-    for place, city in it.product(places, cities)
+    f" of the {place.upper():<{PLACES_LEN}} in {city.upper()}.\n"
+    for place, city in it.product(PLACES, CITIES)
 ]
 
 assert len(PERSON_PARTS) == 2 ** 8
@@ -105,10 +110,24 @@ assert len(PLACE_PARTS ) == 2 ** 8
 
 Phrase = str
 
+TEST_PHRASE = "\n".join(
+    [
+        "The LIGHT GIRL   of the GARDEN in DUBLIN.",
+        "The LIGHT FATHER of the GHETTO in DUBAI.",
+        "The DARK  COOK   of the GARDEN in DUBAI.",
+        "The GREEN DOCTOR of the GHETTO in DUBAI.",
+        "The GREEN DOCTOR.",
+    ]
+)
 
-def encode(data: bytes) -> Phrase:
-    if len(data) % 2 != 0:
-        raise ValueError("len(data) must be divisible by 2.")
+
+def bytes2phrase(data: bytes) -> Phrase:
+    r"""Encode data as a human readable phrases.
+
+    >>> expected = TEST_PHRASE
+    >>> bytes2phrase(b"test data") == expected
+    True
+    """
 
     corpus = [PERSON_PARTS, PLACE_PARTS]
     parts  = []
@@ -118,14 +137,23 @@ def encode(data: bytes) -> Phrase:
         part      = corpus[i % 2][part_idx]
         parts.append(part)
 
-    return "".join(parts)
+    phrase = "".join(parts)
+    if len(data) % 2 != 0:
+        phrase += "."
+
+    return phrase.strip()
 
 
-def decode(phrase: Phrase) -> bytes:
+def phrase2bytes(phrase: Phrase) -> bytes:
+    """Decode human readable phrases to bytes.
+
+    >>> phrase2bytes(TEST_PHRASE)
+    b'test data'
+    """
     filler = {"the", "of", "in", ""}
     parts  = phrase.replace(".", "").lower().split()
     parts  = [p for p in parts if p not in filler]
-    corpus = [adjectives, titles, places, cities]
+    corpus = [ADJECTIVES, TITLES, PLACES, CITIES]
 
     data: typ.List[int] = []
 
@@ -237,24 +265,24 @@ def params2bytes(p: params.Params) -> bytes:
     >>> params2bytes(p)
     b'\x0c\x10'
     """
-    assert p.config_id in params.PARAMS_CONFIGS_BY_ID
-    return struct.pack("BB", p.threshold, p.config_id)
+    assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
+    return struct.pack("BB", p.threshold, p.kdf_param_id)
 
 
-def bytes2params(data: bytes) -> params.Params:
+def bytes2param_cfg(data: bytes) -> params.Params:
     r"""Deserialize Params.
 
-    >>> p = bytes2params(b'\x0C\x10')
+    >>> p = bytes2param_cfg(b'\x0C\x10')
     >>> p.threshold
     12
-    >>> p.config_id
+    >>> p.param_id
     16
     """
-    threshold, config_id = struct.unpack("BB", data)
+    threshold, param_id = struct.unpack("BB", data)
 
     num_parts = threshold
-    config    = params.PARAMS_CONFIGS_BY_ID[config_id]
+    config    = params.PARAM_CONFIGS_BY_ID[param_id]
 
     return params.Params(
-        threshold=threshold, num_parts=num_parts, config_id=config_id, **config
+        threshold=threshold, num_parts=num_parts, param_id=param_id, **config
     )

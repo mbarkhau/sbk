@@ -45,3 +45,7 @@ ipython     # nuff said
 pipdeptree
 graphviz
 
+# These get rid of some warnings related to 
+# collections -> collections.abc deprication
+git+https://github.com/mcmtroffaes/pathlib2.git@develop#egg=pathlib2
+

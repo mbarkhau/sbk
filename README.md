@@ -1,9 +1,11 @@
 # [Shamir Split Keys][repo_ref]
 
-With SSK you can split a secret key (eg. for a Bitcoin wallet) into multiple redundant pieces wich you can later join back together again to recover the original secret key. This protects your keys from:
+With SSK you can split a determanistically generated key (eg. for a Bitcoin wallet) into multiple pieces. You can later join these pieces back together again to recover the original secret key. This protects your keys from:
 
- 1. Theft: Any individual piece can be stolen as it is useless by itself. Your secret is secure even if individual pieces fall into the wrong hands, be it through theft, hacking, extortion or bad security practices of a trustee (though you should rotate your secret keys as soon as possible if this happens).
- 2. Loss: Any individual piece can be lost as more pieces are generated than are required to recover the original secret. Individual pieces can be lost or destroyed and you can still recover your secret as long as you can still access enough other pieces to recover your original secret keys.
+ 1. Loss: Any individual piece can be lost as more pieces are generated than are required to recover the original secret. Individual pieces can be lost or destroyed and you can still recover your secret as long as you can still access enough other pieces to recover your original secret keys.
+ 2. Theft: Any individual piece can be stolen as it is useless by itself. Your secret is secure even if individual pieces fall into the wrong hands, be it through theft, hacking, extortion or bad security practices.
+
+If a piece is either lost or stolen, you should create a new key as soon as possible (and move your coins to a new wallet).
 
 
 Project/Repo:

@@ -1,5 +1,5 @@
-import os
-import binascii
+"""An initial attempt at porting ssss to python."""
+# import binascii
 import typing as typ
 
 
@@ -39,7 +39,10 @@ def ssss_split(
     token        : str,
     secret_is_hex: bool = False,
 ) -> typ.List[Share]:
-    if secret_is_hex:
-        secret_data = binascii.dehexlify(secret)
-    else:
-        secret_data = None
+
+    # if secret_is_hex:
+    #     secret_data = binascii.unhexlify(secret)
+    # else:
+    #     secret_data = b""
+
+    return []

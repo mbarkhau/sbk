@@ -1,5 +1,5 @@
-# This file is part of the ssk project
-# https://gitlab.com/mbarkhau/ssk
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
@@ -54,6 +54,22 @@ class Params(typ.NamedTuple):
     parallelism   : int
 
 
+def init_params(
+    threshold: int, num_pieces: int, kdf_param_id: KDFParamId
+) -> Params:
+    param_cfg = PARAM_CONFIGS_BY_ID[kdf_param_id]
+    return Params(
+        threshold,
+        num_pieces,
+        kdf_param_id,
+        hash_algo=param_cfg['hash_algo'],
+        hash_len_bytes=param_cfg['hash_len_bytes'],
+        memory_cost=param_cfg['memory_cost'],
+        time_cost=param_cfg['time_cost'],
+        parallelism=param_cfg['parallelism'],
+    )
+
+
 INSECURE: KDFParamId = 1
 INSECURE_PARAM_CONFIG = {
     'hash_algo'     : HashAlgo.ARGON2_V19_ID.value,
@@ -67,11 +83,11 @@ INSECURE_PARAM_CONFIG = {
 # https://tools.ietf.org/html/draft-irtf-cfrg-argon2-04#section-4
 #
 # time_cost: As the time constraint is not such an issue for the
-# intended use cases of SSK, you should be able to dedicate a few
+# intended use cases of SBK, you should be able to dedicate a few
 # minutes of computation time to derive a secure key from relativly
 # low amount of secret entropy (the brainkey).
 #
-# hash_type: Theroetically you should only use SSK on a trusted system
+# hash_type: Theroetically you should only use SBK on a trusted system
 # in a trusted environment, so side channel attacks shouldn't be an
 # issue and the benefits of using the argon2id are questionable.
 # But the argument is similar to with time_cost, even if the extra time
@@ -284,17 +300,20 @@ def estimate_config_cost(sys_info: SystemInfo) -> SecondsByConfigId:
     return time_costs
 
 
-def new_params(threshold: int, num_pieces: int, param_id: int) -> Params:
+def new_params(threshold: int, num_pieces: int, kdf_param_id: int) -> Params:
     if threshold > num_pieces:
         err_msg = (
             f"threshold must be <= num_pieces, got {threshold} > {num_pieces}"
         )
         raise ValueError(err_msg)
 
-    config = PARAM_CONFIGS_BY_ID[param_id]
+    config = PARAM_CONFIGS_BY_ID[kdf_param_id]
 
     return Params(
-        threshold=threshold, num_pieces=num_pieces, param_id=param_id, **config
+        threshold=threshold,
+        num_pieces=num_pieces,
+        kdf_param_id=kdf_param_id,
+        **config,
     )
 
 
@@ -323,7 +342,7 @@ XDG_CONFIG_HOME         = pl.Path(
     os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME)
 )
 
-SSK_APP_DIR         = XDG_CONFIG_HOME / "ssk"
+SBK_APP_DIR         = XDG_CONFIG_HOME / "sbk"
 SYSINFO_CACHE_FNAME = "sys_info_cache.json"
 
 
@@ -355,7 +374,7 @@ def eval_sys_info() -> SystemInfo:
     return SystemInfo(total_kb, 1, [Measurement(m, t, d)])
 
 
-def dump_sys_info(sys_info: SystemInfo, app_dir: pl.Path = SSK_APP_DIR) -> None:
+def dump_sys_info(sys_info: SystemInfo, app_dir: pl.Path = SBK_APP_DIR) -> None:
     try:
         app_dir.mkdir(exist_ok=True)
     except Exception:
@@ -381,7 +400,7 @@ _SYS_INFO: typ.Optional[SystemInfo] = None
 
 
 def load_sys_info(
-    app_dir: pl.Path = SSK_APP_DIR, ignore_cache: bool = False
+    app_dir: pl.Path = SBK_APP_DIR, ignore_cache: bool = False
 ) -> SystemInfo:
     global _SYS_INFO
     if _SYS_INFO:

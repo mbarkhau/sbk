@@ -1,5 +1,5 @@
-# This file is part of the ssk project
-# https://gitlab.com/mbarkhau/ssk
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
@@ -18,28 +18,27 @@ ADJECTIVES = [
     "dark",
     "evil",
     "fresh",
-    "good",
-    "green",
-    "light",
-    "new",
+    "honest",
+    "skinny",
+    "ugly",
+    "brave",
     "nobel",
-    "old",
+    "young",
     "poor",
-    "red",
+    "happy",
     "rich",
     "white",
     "wise",
 ]
 
 TITLES = [
-    "cook",
+    "baker",
+    "child",
     "doctor",
-    "elder",
-    "father",
-    "girl",
+    "driver",
     "king",
+    "lady",
     "leader",
-    "maid",
     "mayor",
     "mother",
     "nurse",
@@ -47,7 +46,27 @@ TITLES = [
     "prince",
     "queen",
     "sister",
-    "uncle",
+    "waiter",
+    "worker",
+]
+
+CITIES = [
+    "berlin",
+    "cairo",
+    "chicago",
+    "delhi",
+    "dubai",
+    "dublin",
+    "lagos",
+    "london",
+    "madrid",
+    "miami",
+    "moscow",
+    "paris",
+    "prague",
+    "sparta",
+    "tokyo",
+    "vienna",
 ]
 
 PLACES = [
@@ -70,28 +89,15 @@ PLACES = [
 ]
 
 
-CITIES = [
-    "athens",
-    "berlin",
-    "cairo",
-    "delhi",
-    "dubai",
-    "dublin",
-    "lagos",
-    "london",
-    "madrid",
-    "moscow",
-    "paris",
-    "prague",
-    "rome",
-    "tokyo",
-    "vienna",
-    "york",
-]
+ADJECTIVES.sort()
+TITLES.sort()
+CITIES.sort()
+PLACES.sort()
 
 ADJ_LEN    = max(map(len, ADJECTIVES))
 TITLE_LEN  = max(map(len, TITLES    ))
 PLACES_LEN = max(map(len, PLACES    ))
+CITIES_LEN = max(map(len, CITIES    ))
 
 PERSON_PARTS = [
     f"The {adj.upper():<{ADJ_LEN}} {title.upper():<{TITLE_LEN}}"
@@ -100,8 +106,8 @@ PERSON_PARTS = [
 
 
 PLACE_PARTS = [
-    f" of the {place.upper():<{PLACES_LEN}} in {city.upper()}.\n"
-    for place, city in it.product(PLACES, CITIES)
+    f" at the {city.upper():<{CITIES_LEN}} {place.upper()}.\n"
+    for city, place in it.product(CITIES, PLACES)
 ]
 
 assert len(PERSON_PARTS) == 2 ** 8
@@ -110,15 +116,15 @@ assert len(PLACE_PARTS ) == 2 ** 8
 
 Phrase = str
 
-TEST_PHRASE = "\n".join(
-    [
-        "The LIGHT GIRL   of the GARDEN in DUBLIN.",
-        "The LIGHT FATHER of the GHETTO in DUBAI.",
-        "The DARK  COOK   of the GARDEN in DUBAI.",
-        "The GREEN DOCTOR of the GHETTO in DUBAI.",
-        "The GREEN DOCTOR.",
-    ]
-)
+TEST_PHRASE_LINES = [
+    "The HONEST KING   at the LAGOS   FOREST.",
+    "The HONEST DRIVER at the LONDON  FARM.",
+    "The BRAVE  BAKER  at the LAGOS   FARM.",
+    "The HAPPY  CHILD  at the LONDON  FARM.",
+    "The HAPPY  CHILD.",
+]
+
+TEST_PHRASE = "\n".join(TEST_PHRASE_LINES)
 
 
 def bytes2phrase(data: bytes) -> Phrase:
@@ -139,7 +145,7 @@ def bytes2phrase(data: bytes) -> Phrase:
 
     phrase = "".join(parts)
     if len(data) % 2 != 0:
-        phrase += "."
+        phrase = phrase.strip() + "."
 
     return phrase.strip()
 
@@ -150,15 +156,16 @@ def phrase2bytes(phrase: Phrase) -> bytes:
     >>> phrase2bytes(TEST_PHRASE)
     b'test data'
     """
-    filler = {"the", "of", "in", ""}
+    filler = {"the", "at", ""}
     parts  = phrase.replace(".", "").lower().split()
     parts  = [p for p in parts if p not in filler]
-    corpus = [ADJECTIVES, TITLES, PLACES, CITIES]
+    corpus = [ADJECTIVES, TITLES, CITIES, PLACES]
 
     data: typ.List[int] = []
 
     for i, part in enumerate(parts):
-        part_idx = corpus[i % 4].index(part)
+        corpus_words = corpus[i % 4]
+        part_idx     = corpus_words.index(part)
         if i % 2 == 0:
             data.append(part_idx << 4)
         else:
@@ -173,9 +180,9 @@ def bytes2hex(data: bytes) -> str:
     >>> bytes2hex('test data'.encode('ascii'))
     '746573742064617461'
     >>> bytes2hex(b'\x01\x23\x45\x67\x89\xAB\xCD\xEF')
-    '0123456789ABCDEF'
+    '0123456789abcdef'
     """
-    return base64.b16encode(data).decode('ascii')
+    return base64.b16encode(data).decode('ascii').lower()
 
 
 def hex2bytes(hex_str: str) -> bytes:
@@ -185,6 +192,8 @@ def hex2bytes(hex_str: str) -> bytes:
     b'test data'
     >>> expected = b'\x01\x23\x45\x67\x89\xAB\xCD\xEF'
     >>> hex2bytes("0123456789ABCDEF") == expected
+    True
+    >>> hex2bytes("0123456789abcdef") == expected
     True
     """
     hex_str = hex_str.upper().zfill(2 * ((len(hex_str) + 1) // 2))
@@ -275,14 +284,17 @@ def bytes2param_cfg(data: bytes) -> params.Params:
     >>> p = bytes2param_cfg(b'\x0C\x10')
     >>> p.threshold
     12
-    >>> p.param_id
+    >>> p.kdf_param_id
     16
     """
-    threshold, param_id = struct.unpack("BB", data)
+    threshold, kdf_param_id = struct.unpack("BB", data)
 
-    num_parts = threshold
-    config    = params.PARAM_CONFIGS_BY_ID[param_id]
+    num_pieces = threshold
+    config     = params.PARAM_CONFIGS_BY_ID[kdf_param_id]
 
     return params.Params(
-        threshold=threshold, num_parts=num_parts, param_id=param_id, **config
+        threshold=threshold,
+        num_pieces=num_pieces,
+        kdf_param_id=kdf_param_id,
+        **config,
     )

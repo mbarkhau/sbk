@@ -1,5 +1,5 @@
-# This file is part of the ssk project
-# https://gitlab.com/mbarkhau/ssk
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
@@ -29,22 +29,22 @@ long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
 
 
 setuptools.setup(
-    name="ssk",
+    name="sbk",
     license="MIT",
     author="Manuel Barkhau",
     author_email="mbarkhau@gmail.com",
-    url="https://gitlab.com/mbarkhau/ssk",
+    url="https://gitlab.com/mbarkhau/sbk",
     version="201906.1a0",
     keywords="ssss shamir split share secret bitcoin electrum seed brainkey crypto",
-    description="Wallet seed generation from a brainkey that is backed up using the Shamir Secret Sharing Scheme.",
+    description="Wallet seed generation from a brainkey with Shamir Secret Shares as Backup.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=["ssk"],
+    packages=["sbk"],
     package_dir={"": "src"},
     install_requires=install_requires,
     entry_points="""
         [console_scripts]
-        ssk=ssk.cli:cli
+        sbk=sbk.cli:cli
     """,
     python_requires=">=3.6",
     zip_safe=True,

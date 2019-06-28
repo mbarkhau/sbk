@@ -1,6 +1,6 @@
-# [Shamir Split Keys][repo_ref]
+# [Split Bitcoin Keys][repo_ref]
 
-With SSK you can split a determanistically generated key (eg. for a Bitcoin wallet) into multiple pieces. You can later join these pieces back together again to recover the original secret key. This protects your keys from:
+With SBK you can split a determanistically generated key into multiple pieces. You can later join these pieces back together again to recover the original secret key. This protects your keys from:
 
  1. Loss: Any individual piece can be lost as more pieces are generated than are required to recover the original secret. Individual pieces can be lost or destroyed and you can still recover your secret as long as you can still access enough other pieces to recover your original secret keys.
  2. Theft: Any individual piece can be stolen as it is useless by itself. Your secret is secure even if individual pieces fall into the wrong hands, be it through theft, hacking, extortion or bad security practices.
@@ -80,32 +80,32 @@ concerned.
 [href_pai_ssss]: http://point-at-infinity.org/ssss/)
 [href_ssss_js]: https://github.com/gburca/ssss-js
 
-[repo_ref]: https://gitlab.com/mbarkhau/ssk
+[repo_ref]: https://gitlab.com/mbarkhau/sbk
 
-[build_img]: https://gitlab.com/mbarkhau/ssk/badges/master/pipeline.svg
-[build_ref]: https://gitlab.com/mbarkhau/ssk/pipelines
+[build_img]: https://gitlab.com/mbarkhau/sbk/badges/master/pipeline.svg
+[build_ref]: https://gitlab.com/mbarkhau/sbk/pipelines
 
-[codecov_img]: https://gitlab.com/mbarkhau/ssk/badges/master/coverage.svg
-[codecov_ref]: https://mbarkhau.gitlab.io/ssk/cov
+[codecov_img]: https://gitlab.com/mbarkhau/sbk/badges/master/coverage.svg
+[codecov_ref]: https://mbarkhau.gitlab.io/sbk/cov
 
 [license_img]: https://img.shields.io/badge/License-MIT-blue.svg
-[license_ref]: https://gitlab.com/mbarkhau/ssk/blob/master/LICENSE
+[license_ref]: https://gitlab.com/mbarkhau/sbk/blob/master/LICENSE
 
 [mypy_img]: https://img.shields.io/badge/mypy-checked-green.svg
-[mypy_ref]: https://mbarkhau.gitlab.io/ssk/mypycov
+[mypy_ref]: https://mbarkhau.gitlab.io/sbk/mypycov
 
 [style_img]: https://img.shields.io/badge/code%20style-%20sjfmt-f71.svg
 [style_ref]: https://gitlab.com/mbarkhau/straitjacket/
 
 [pypi_img]: https://img.shields.io/badge/PyPI-wheels-green.svg
-[pypi_ref]: https://pypi.org/project/ssk/#files
+[pypi_ref]: https://pypi.org/project/sbk/#files
 
-[downloads_img]: https://pepy.tech/badge/ssk/month
-[downloads_ref]: https://pepy.tech/project/ssk
+[downloads_img]: https://pepy.tech/badge/sbk/month
+[downloads_ref]: https://pepy.tech/project/sbk
 
 [version_img]: https://img.shields.io/static/v1.svg?label=PyCalVer&message=v201906.0001-alpha&color=blue
 [version_ref]: https://pypi.org/project/pycalver/
 
-[pyversions_img]: https://img.shields.io/pypi/pyversions/ssk.svg
-[pyversions_ref]: https://pypi.python.org/pypi/ssk
+[pyversions_img]: https://img.shields.io/pypi/pyversions/sbk.svg
+[pyversions_ref]: https://pypi.python.org/pypi/sbk
 

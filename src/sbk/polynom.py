@@ -1,5 +1,5 @@
-# This file is part of the ssk project
-# https://gitlab.com/mbarkhau/ssk
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
@@ -41,11 +41,11 @@ def egcd(a: int, b: int) -> EGCDResult:
     """
 
     >>> egcd(252, 105)
-    (21, -2, 5)
+    EGCDResult(g=21, s=-2, t=5)
     >>> egcd(105, 252)
-    (21, 5, -2)
+    EGCDResult(g=21, s=5, t=-2)
     >>> egcd(240, 46)
-    (2, -9, 47)
+    EGCDResult(g=2, s=-9, t=47)
     """
     if a == 0:
         return EGCDResult(b, 0, 1)
@@ -166,6 +166,10 @@ class Point(typ.Generic[Num]):
 
     def __repr__(self) -> str:
         return f"Point(x={self.x}, y={self.y})"
+
+    def __iter__(self) -> typ.Iterable[Num]:
+        yield self.x
+        yield self.y
 
 
 def addititve_identity(n: Num) -> Num:

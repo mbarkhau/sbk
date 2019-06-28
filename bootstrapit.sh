@@ -16,12 +16,12 @@ AUTHOR_NAME="Manuel Barkhau"
 AUTHOR_EMAIL="mbarkhau@gmail.com"
 
 KEYWORDS="ssss shamir split share secret bitcoin electrum seed brainkey crypto"
-DESCRIPTION="Wallet seed generation from a brainkey that is backed up using the Shamir Secret Sharing Scheme."
+DESCRIPTION="Electrum wallet created using a brainkey with Shamir Secret Shares as backup."
 
 GIT_REPO_DOMAIN="gitlab.com"
 GIT_REPO_NAMESPACE="mbarkhau"
-PACKAGE_NAME="ssk"
-MODULE_NAME="ssk"
+PACKAGE_NAME="sbk"
+MODULE_NAME="sbk"
 
 # PACKAGE_VERSION="v201908.0001-alpha"
 # PACKAGE_VERSION="v0.1.0"

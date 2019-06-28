@@ -1,5 +1,5 @@
 
-PACKAGE_NAME := ssk
+PACKAGE_NAME := sbk
 
 # This is the python version that is used for:
 # - `make fmt`

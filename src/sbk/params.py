@@ -52,21 +52,26 @@ class Params(typ.NamedTuple):
     memory_cost   : KibiBytes
     time_cost     : Iterations
     parallelism   : int
+    ecc_len       : int
 
 
 def init_params(
     threshold: int, num_pieces: int, kdf_param_id: KDFParamId
 ) -> Params:
+    if threshold > num_pieces:
+        err_msg = (
+            f"threshold must be <= num_pieces, got {threshold} > {num_pieces}"
+        )
+        raise ValueError(err_msg)
+
     param_cfg = PARAM_CONFIGS_BY_ID[kdf_param_id]
+    ecc_len   = 5
     return Params(
-        threshold,
-        num_pieces,
-        kdf_param_id,
-        hash_algo=param_cfg['hash_algo'],
-        hash_len_bytes=param_cfg['hash_len_bytes'],
-        memory_cost=param_cfg['memory_cost'],
-        time_cost=param_cfg['time_cost'],
-        parallelism=param_cfg['parallelism'],
+        threshold=threshold,
+        num_pieces=num_pieces,
+        kdf_param_id=kdf_param_id,
+        ecc_len=ecc_len,
+        **param_cfg,
     )
 
 
@@ -298,23 +303,6 @@ def estimate_config_cost(sys_info: SystemInfo) -> SecondsByConfigId:
         assert config['parallelism'] == 32, err_msg
 
     return time_costs
-
-
-def new_params(threshold: int, num_pieces: int, kdf_param_id: int) -> Params:
-    if threshold > num_pieces:
-        err_msg = (
-            f"threshold must be <= num_pieces, got {threshold} > {num_pieces}"
-        )
-        raise ValueError(err_msg)
-
-    config = PARAM_CONFIGS_BY_ID[kdf_param_id]
-
-    return Params(
-        threshold=threshold,
-        num_pieces=num_pieces,
-        kdf_param_id=kdf_param_id,
-        **config,
-    )
 
 
 def parse_algo_type(hash_algo: int) -> int:

@@ -270,24 +270,33 @@ def bytes_repr(data: bytes) -> str:
 def params2bytes(p: params.Params) -> bytes:
     r"""Serialize Params.
 
-    >>> p = params.new_params(12, 13, 16)
+    >>> p = params.init_params(12, 13, 16)
     >>> params2bytes(p)
-    b'\x0c\x10'
+    b'\x05\x0c\x10'
     """
     assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
-    return struct.pack("BB", p.threshold, p.kdf_param_id)
+    assert p.ecc_len < 16
+    sbk_version = 0
+    ver_and_ecc = (sbk_version << 4) | p.ecc_len
+    args        = (ver_and_ecc, p.threshold, p.kdf_param_id)
+    return struct.pack("BBB", *args)
 
 
-def bytes2param_cfg(data: bytes) -> params.Params:
+def bytes2params(data: bytes) -> params.Params:
     r"""Deserialize Params.
 
-    >>> p = bytes2param_cfg(b'\x0C\x10')
+    >>> p = bytes2params(b'\x05\x0C\x10')
     >>> p.threshold
     12
     >>> p.kdf_param_id
     16
+    >>> p.ecc_len
+    5
     """
-    threshold, kdf_param_id = struct.unpack("BB", data)
+    ver_and_ecc, threshold, kdf_param_id = struct.unpack("BBB", data)
+    ecc_len = ver_and_ecc & 0xF
+    version = (ver_and_ecc >> 4) & 0xF
+    assert version == 0
 
     num_pieces = threshold
     config     = params.PARAM_CONFIGS_BY_ID[kdf_param_id]
@@ -296,5 +305,6 @@ def bytes2param_cfg(data: bytes) -> params.Params:
         threshold=threshold,
         num_pieces=num_pieces,
         kdf_param_id=kdf_param_id,
+        ecc_len=ecc_len,
         **config,
     )

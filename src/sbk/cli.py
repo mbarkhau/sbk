@@ -427,8 +427,8 @@ def new_key(
     _show_secret("Salt", salt_data)
     yes_all or anykey_confirm("Press enter when you have written down the salt")
 
-    hasher.update(os.urandom(6))
-    brainkey_data = hasher.digest()[:6]
+    hasher.update(os.urandom(4))
+    brainkey_data = hasher.digest()[:4]
 
     split_key_warning_text = SPLIT_KEY_WARNING_TEXT.format(
         piece_no=1, threshold=threshold, num_pieces=num_pieces

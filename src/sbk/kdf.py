@@ -4,8 +4,6 @@
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 """Logic related to KDF derivation."""
-import hashlib
-
 import argon2
 
 from . import params

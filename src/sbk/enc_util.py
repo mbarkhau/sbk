@@ -256,6 +256,18 @@ def int2bytes(num: int) -> bytes:
     return b"".join(reversed(parts))
 
 
+def bytes_hex(data: bytes) -> str:
+    r"""Display bytes data in hex form, rather than with glyphs.
+
+    Random data lines up nicer with this.
+    """
+    chars    = (data[i : i + 1] for i in range(len(data)))
+    char_hex = [bytes2hex(c).lower() for c in chars]
+    return "".join(
+        c if i % 2 == 0 else c + " " for i, c in enumerate(char_hex)
+    ).strip()
+
+
 def bytes_repr(data: bytes) -> str:
     r"""Display bytes data in the \x00 form, rather than with glyphs.
 

@@ -8,6 +8,5 @@
 # should see if there is a conda package that suits your needs.
 
 click
-
 pathlib2
-
+prompt_toolkit

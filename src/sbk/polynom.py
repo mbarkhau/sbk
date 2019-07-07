@@ -38,15 +38,7 @@ class EGCDResult(typ.NamedTuple):
 
 
 def egcd(a: int, b: int) -> EGCDResult:
-    """
-
-    >>> egcd(252, 105)
-    EGCDResult(g=21, s=-2, t=5)
-    >>> egcd(105, 252)
-    EGCDResult(g=21, s=5, t=-2)
-    >>> egcd(240, 46)
-    EGCDResult(g=2, s=-9, t=47)
-    """
+    """Extended euclidien greatest common denominator."""
     if a == 0:
         return EGCDResult(b, 0, 1)
 
@@ -59,25 +51,13 @@ def egcd(a: int, b: int) -> EGCDResult:
     return res
 
 
-# Case 3 from docstring egcd(240, 46)
-# | i |     qi−1     |         ri        |        si       |          ti         |
-# |---|--------------|-------------------|-----------------|---------------------|
-# | 0 |              | 240               | 1               | 0                   |
-# | 1 |              | 46                | 0               | 1                   |
-# | 2 | 240 ÷ 46 = 5 | 240 − 5 × 46 = 10 | 1 − 5 × 0 = 1   | 0 − 5 × 1 = −5      |
-# | 3 | 46 ÷ 10 = 4  | 46 − 4 × 10 = 6   | 0 − 4 × 1 = −4  | 1 − 4 × −5 = 21     |
-# | 4 | 10 ÷ 6 = 1   | 10 − 1 × 6 = 4    | 1 − 1 × −4 = 5  | −5 − 1 × 21 = −26   |
-# | 5 | 6 ÷ 4 = 1    | 6 − 1 × 4 = 2     | −4 − 1 × 5 = −9 | 21 − 1 × −26 = 47   |
-# | 6 | 4 ÷ 2 = 2    | 4 − 2 × 2 = 0     | 5 − 2 × −9 = 23 | −26 − 2 × 47 = −120 |
-
-
-def mod_inverse(k, prime):
-    k = k % prime
-    if k < 0:
-        t = egcd(prime, -k).t
-    else:
-        t = egcd(prime, k).t
-    return (prime + t) % prime
+# def mod_inverse(k, prime):
+#     k = k % prime
+#     if k < 0:
+#         t = egcd(prime, -k).t
+#     else:
+#         t = egcd(prime, k).t
+#     return (prime + t) % prime
 
 
 FFPolyArithmeticMethod = typ.Callable[['FFPoly', 'FFPoly'], 'FFPoly']
@@ -94,15 +74,7 @@ def check_arithmetic_args(fn: FFPolyArithmeticMethod) -> FFPolyArithmeticMethod:
 
 
 class FFPoly:
-    """Polynomial in a finite field.
-
-    >>> a = FFPoly(2.0, 2.0, p=3)
-    >>> b = FFPoly(1.0, 2.0, p=3)
-    >>> (a + b) - b == a
-    True
-    >>> -a + b == b - a
-    True
-    """
+    """Polynomial in a finite field."""
 
     coeffs: typ.Tuple[float, ...]
     p     : int
@@ -127,17 +99,17 @@ class FFPoly:
 
     @check_arithmetic_args
     def __mul__(self, other: 'FFPoly') -> 'FFPoly':
-        assert False
+        raise NotImplementedError
         return FFPoly(*[], p=self.p)
 
     @check_arithmetic_args
     def __div__(self, other: 'FFPoly') -> 'FFPoly':
-        assert False
+        raise NotImplementedError
         return FFPoly(*[], p=self.p)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FFPoly):
-            raise NotImplemented
+            raise NotImplementedError
 
         return self.p == other.p and self.coeffs == other.coeffs
 
@@ -160,7 +132,7 @@ class Point(typ.Generic[Num]):
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Point):
-            raise NotImplemented
+            raise NotImplementedError
 
         return self.x == other.x and self.y == other.y
 
@@ -172,79 +144,53 @@ class Point(typ.Generic[Num]):
         yield self.y
 
 
-def addititve_identity(n: Num) -> Num:
-    return n - n
-
-
-def multiplicative_identity(n: Num) -> Num:
-    if isinstance(n, int):
-        return 1
-    elif isinstance(n, float):
-        return 1.0
-    elif isinstance(n, FFPoly):
-        coeffs = [1.0] * len(n.coeffs)
-        return FFPoly(*coeffs, p=n.p)
-    else:
-        raise NotImplemented
-
-
 def prod(vals: typ.Sequence[Num]) -> Num:
-    assert len(vals) > 0
+    """Product of numbers.
 
-    accu = multiplicative_identity(vals[0])
-    for val in vals:
+    This is sometimes also denoted by Π (upper case PI).
+    """
+    if len(vals) == 0:
+        raise ValueError("prod requires at least one value")
+
+    val_iter = iter(vals)
+    accu     = next(val_iter)
+    for val in val_iter:
         accu *= val
     return accu
 
 
-PointNum = typ.TypeVar
+Points = typ.Sequence[Point[Num]]
 
 
-def interpolate(points: typ.Sequence[Point[Num]], at_x=0) -> Num:
-    """Interpolate y value at x for a polynomial.
+def interpolate(points: Points, at_x: Num) -> Num:
+    r"""Interpolate y value at x for a polynomial.
 
-    >>> # test polynomials are overspecified
-    >>> deg1_points = [
-    ...     Point(0.0, 0.0),
-    ...     Point(1.0, 2.0),
-    ...     Point(2.0, 4.0),
-    ... ]
-    >>> at_x, at_y = deg1_points[-1]
-    >>> interp_y = interpolate(deg1_points[:-1], at_x)
-    >>> (at_y, interp_y)
-    (4.0, 4.0)
-
-    >>> deg2_points = [
-    ...     Point(0.0, 0.0),
-    ...     Point(1.0, 1.0),
-    ...     Point(2.0, 4.0),
-    ...     Point(3.0, 9.0),
-    ... ]
-    >>> at_x, at_y = deg2_points[-1]
-    >>> interp_y = interpolate(deg2_points[:-1], at_x)
-    >>> (at_y, interp_y)
-    (9.0, 9.0)
-
-    >>> interpolate(deg2_points[:-1], at_x=0.5)
-    0.25
-    """
     # \delta_i(x) = \prod{ \frac{x - j}{i - j} }
     # \space
     # \text{for} \space j \in C, j \not= i
+    """
+
+    if len(points) < 2:
+        raise ValueError("Cannot interpolate with fewer than two points")
 
     x_vals = [p.x for p in points]
     if len(x_vals) != len(set(x_vals)):
         raise ValueError("Points must be distinct {points}")
 
-    numer = []
-    denum = []
+    def sum_parts() -> typ.Iterable[Num]:
+        for p in points:
+            other_points = list(points)
+            other_points.remove(p)
 
-    for cur_point in points:
-        other_points = list(points)
-        other_points.remove(cur_point)
+            cur_x = p.x
+            numer = prod([at_x  - o.x for o in other_points])
+            denum = prod([cur_x - o.x for o in other_points])
 
-        cur_x = cur_point.x
-        numer.append(prod([at_x  - o.x for o in other_points]))
-        denum.append(prod([cur_x - o.x for o in other_points]))
+            yield (p.y * numer) / denum
 
-    return sum([(p.y * numer[i]) / denum[i] for i, p in enumerate(points)])
+    parts = iter(sum_parts())
+    rv    = next(parts)
+
+    for p in parts:
+        rv += p
+    return rv

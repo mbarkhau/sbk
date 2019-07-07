@@ -5,15 +5,12 @@
 # SPDX-License-Identifier: MIT
 """Logic related to KDF parameters."""
 import os
-import math
 import time
 import enum
 import json
 import logging
-import hashlib
 import typing as typ
 import pathlib2 as pl
-import itertools as it
 
 import argon2
 
@@ -52,7 +49,6 @@ class Params(typ.NamedTuple):
     memory_cost   : KibiBytes
     time_cost     : Iterations
     parallelism   : int
-    ecc_len       : int
 
 
 def init_params(
@@ -65,12 +61,10 @@ def init_params(
         raise ValueError(err_msg)
 
     param_cfg = PARAM_CONFIGS_BY_ID[kdf_param_id]
-    ecc_len   = 5
     return Params(
         threshold=threshold,
         num_pieces=num_pieces,
         kdf_param_id=kdf_param_id,
-        ecc_len=ecc_len,
         **param_cfg,
     )
 
@@ -147,6 +141,8 @@ def _init_configs() -> ParamsByConfigId:
 
             param_configs_by_id[m_idx * 5 + t_idx] = params
 
+    # import hashlib
+    #
     # debug_bitfield = sum(
     #     1 << param_id for param_id in param_configs_by_id.keys()
     # )
@@ -182,11 +178,7 @@ PARAM_CONFIGS_BY_ID = _init_configs()
 
 
 def mem_total() -> KibiBytes:
-    """Get total memory (linux only).
-
-    >>> mem_total() > 0
-    True
-    """
+    """Get total memory (linux only)."""
     # TODO: compat with macos?
 
     with open("/proc/meminfo", mode="rb") as fobj:
@@ -199,12 +191,7 @@ def mem_total() -> KibiBytes:
 
 
 def get_avail_config_ids() -> KDFParamIds:
-    """Get config_ids that can be used on the curren machine.
-
-    >>> avail_config_ids = get_avail_config_ids()
-    >>> len(avail_config_ids) > 4
-    True
-    """
+    """Get config_ids that can be used on the curren machine."""
     total_kb         = mem_total()
     config_ids       = []
     uniq_mem_configs = set()
@@ -240,12 +227,6 @@ def estimate_config_cost(sys_info: SystemInfo) -> SecondsByConfigId:
 
     This extrapolates based on a single short measurement
     and is very imprecise.
-
-    >>> sys_info = load_sys_info()
-    >>> costs = estimate_config_cost(sys_info)
-    >>> assert costs.keys() == PARAM_CONFIGS_BY_ID.keys()
-    >>> assert set(map(type, costs.values())) == {float}
-    >>> assert round(costs[INSECURE]) == 0
     """
     time_costs: SecondsByConfigId = {}
 
@@ -276,9 +257,6 @@ def estimate_config_cost(sys_info: SystemInfo) -> SecondsByConfigId:
     # Bilinear Interpolation
     # https://stackoverflow.com/a/8662355/62997
     # https://en.wikipedia.org/wiki/Bilinear_interpolation#Algorithm
-
-    m_costs = sorted(set(m for m, t, d in measurements))
-    t_costs = sorted(set(t for m, t, d in measurements))
 
     m0 , _  , _  , m1  = [m for m, t, d in measurements]
     t0 , _  , _  , t1  = [t for m, t, d in measurements]
@@ -362,14 +340,13 @@ def eval_sys_info() -> SystemInfo:
     return SystemInfo(total_kb, 1, [Measurement(m, t, d)])
 
 
-def dump_sys_info(sys_info: SystemInfo, app_dir: pl.Path = SBK_APP_DIR) -> None:
+def dump_sys_info(sys_info: SystemInfo, cache_path: pl.Path) -> None:
     try:
-        app_dir.mkdir(exist_ok=True)
+        cache_path.parent.mkdir(exist_ok=True)
     except Exception:
-        log.warning(f"Unable to create cache dir {app_dir}")
+        log.warning(f"Unable to create cache dir {cache_path.parent}")
         return
 
-    cache_path    = app_dir / SYSINFO_CACHE_FNAME
     sys_info_data = {
         'total_kb'        : sys_info.total_kb,
         'measurements'    : [m._asdict() for m in sys_info.measurements],
@@ -387,6 +364,59 @@ def dump_sys_info(sys_info: SystemInfo, app_dir: pl.Path = SBK_APP_DIR) -> None:
 _SYS_INFO: typ.Optional[SystemInfo] = None
 
 
+def _load_cached_sys_info(cache_path: pl.Path) -> SystemInfo:
+    try:
+        with cache_path.open(mode="rb") as fobj:
+            sys_info_data = json.load(fobj)
+
+        measurement_data = sys_info_data['measurements']
+
+        md = measurement_data[0]
+        n  = sys_info_data.get('num_measurements', len(measurement_data))
+
+        if n < 10:
+            if n == 1:
+                m = md['m'] * 2
+                t = md['t']
+            elif n == 2:
+                m = md['m']
+                t = md['t'] * 2
+            elif n == 3:
+                m = md['m'] * 2
+                t = md['t'] * 2
+            else:
+                md = measurement_data[n % 4]
+                m  = md['m']
+                t  = md['t']
+
+            md = {'m': m, 't': t, 'd': measure(m, t)}
+            measurement_data.append(md)
+            n += 1
+
+        MeasurementKey = typ.Tuple[KibiBytes, Iterations]
+        min_measurements: typ.Dict[MeasurementKey, float] = {}
+        for md in measurement_data:
+            key = (md['m'], md['t'])
+            if key in min_measurements:
+                val = min_measurements[key]
+                min_measurements[key] = min(md['d'], val)
+            else:
+                min_measurements[key] = md['d']
+
+        measurements = [
+            Measurement(m, t, d) for (m, t), d in min_measurements.items()
+        ]
+        total_kb = typ.cast(KibiBytes, sys_info_data['total_kb'])
+        sys_info = SystemInfo(total_kb, n, measurements)
+        dump_sys_info(sys_info, cache_path)
+    except Exception as ex:
+        log.warning(f"Error reading cache file {cache_path}: {ex}")
+        sys_info = eval_sys_info()
+        dump_sys_info(sys_info, cache_path)
+
+    return sys_info
+
+
 def load_sys_info(
     app_dir: pl.Path = SBK_APP_DIR, ignore_cache: bool = False
 ) -> SystemInfo:
@@ -399,57 +429,10 @@ def load_sys_info(
     if ignore_cache:
         sys_info = eval_sys_info()
     elif cache_path.exists():
-        try:
-            with cache_path.open(mode="rb") as fobj:
-                sys_info_data = json.load(fobj)
-
-            measurement_data = sys_info_data['measurements']
-
-            md = measurement_data[0]
-            n  = sys_info_data.get('num_measurements', len(measurement_data))
-
-            if n < 10:
-                if n == 1:
-                    m = md['m'] * 2
-                    t = md['t']
-                elif n == 2:
-                    m = md['m']
-                    t = md['t'] * 2
-                elif n == 3:
-                    m = md['m'] * 2
-                    t = md['t'] * 2
-                else:
-                    md = measurement_data[n % 4]
-                    m  = md['m']
-                    t  = md['t']
-
-                md = {'m': m, 't': t, 'd': measure(m, t)}
-                measurement_data.append(md)
-                n += 1
-                print("+++", n, md)
-
-            min_measurements = {}
-            for md in measurement_data:
-                key = (md['m'], md['t'])
-                if key in min_measurements:
-                    val = min_measurements[key]
-                    min_measurements[key] = min(md['d'], val)
-                else:
-                    min_measurements[key] = md['d']
-
-            measurements = [
-                Measurement(m, t, d) for (m, t), d in min_measurements.items()
-            ]
-            total_kb = typ.cast(KibiBytes, sys_info_data['total_kb'])
-            sys_info = SystemInfo(total_kb, n, measurements)
-            dump_sys_info(sys_info, app_dir)
-        except Exception as ex:
-            log.warning(f"Error reading cache file {cache_path}: {ex}")
-            sys_info = eval_sys_info()
-            dump_sys_info(sys_info, app_dir)
+        sys_info = _load_cached_sys_info(cache_path)
     else:
         sys_info = eval_sys_info()
-        dump_sys_info(sys_info, app_dir)
+        dump_sys_info(sys_info, cache_path)
 
     _SYS_INFO = sys_info
     return sys_info
@@ -459,7 +442,7 @@ class ParamContext(typ.NamedTuple):
 
     sys_info        : SystemInfo
     avail_configs   : ParamsByConfigId
-    default_param_id: KDFParamId
+    param_id_default: KDFParamId
     est_times_by_id : SecondsByConfigId
 
 
@@ -471,7 +454,7 @@ def get_param_ctx(app_dir: pl.Path) -> ParamContext:
         for param_id in get_avail_config_ids()
     }
 
-    default_param_id = 1
+    param_id_default = 1
 
     max_mem_kb = sys_info.total_kb * DEFAULT_PARAM_MEM_RATIO_THRESHOLD
 
@@ -479,15 +462,15 @@ def get_param_ctx(app_dir: pl.Path) -> ParamContext:
 
     for current_config_id in sorted(avail_configs):
         current_config       = avail_configs[current_config_id]
-        default_config       = avail_configs[default_param_id]
+        default_config       = avail_configs[param_id_default]
         current_est_time_sec = est_times_by_id[current_config_id]
-        default_est_time_sec = est_times_by_id[default_param_id]
+        default_est_time_sec = est_times_by_id[param_id_default]
 
         if current_config['memory_cost'] > max_mem_kb:
             continue
 
         if current_config['memory_cost'] > default_config['memory_cost']:
-            default_param_id = current_config_id
+            param_id_default = current_config_id
         else:
             if current_est_time_sec < default_est_time_sec:
                 continue
@@ -495,8 +478,8 @@ def get_param_ctx(app_dir: pl.Path) -> ParamContext:
             if current_est_time_sec > DEFAULT_PARAM_TIME_SEC_THRESHOLD:
                 continue
 
-            default_param_id = current_config_id
+            param_id_default = current_config_id
 
     return ParamContext(
-        sys_info, avail_configs, default_param_id, est_times_by_id
+        sys_info, avail_configs, param_id_default, est_times_by_id
     )

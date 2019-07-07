@@ -13,22 +13,22 @@ import itertools as it
 from . import params
 
 ADJECTIVES = [
-    "black",
-    "blue",
-    "dark",
-    "evil",
-    "fresh",
-    "honest",
-    "skinny",
-    "ugly",
     "brave",
-    "nobel",
-    "young",
-    "poor",
+    "crazy",
+    "dirty",
+    "evil",
+    "fancy",
+    "funny",
+    "guilty",
     "happy",
-    "rich",
-    "white",
-    "wise",
+    "heavy",
+    "honest",
+    "lonely",
+    "nobel",
+    "polite",
+    "pretty",
+    "scary",
+    "ugly",
 ]
 
 TITLES = [
@@ -53,7 +53,7 @@ TITLES = [
 CITIES = [
     "berlin",
     "cairo",
-    "chicago",
+    "oslo",
     "delhi",
     "dubai",
     "dublin",
@@ -84,8 +84,8 @@ PLACES = [
     "opera",
     "river",
     "school",
+    "stage",
     "temple",
-    "zoo",
 ]
 
 
@@ -94,49 +94,39 @@ TITLES.sort()
 CITIES.sort()
 PLACES.sort()
 
-ADJ_LEN    = max(map(len, ADJECTIVES))
-TITLE_LEN  = max(map(len, TITLES    ))
-PLACES_LEN = max(map(len, PLACES    ))
-CITIES_LEN = max(map(len, CITIES    ))
+assert max(map(len, ADJECTIVES)) == 6
+assert max(map(len, TITLES    )) == 6
+assert max(map(len, PLACES    )) == 6
+assert max(map(len, CITIES    )) == 6
+
 
 PERSON_PARTS = [
-    f"The {adj.upper():<{ADJ_LEN}} {title.upper():<{TITLE_LEN}}"
+    f"The {adj.upper():<6} {title.upper():<6}"
     for adj, title in it.product(ADJECTIVES, TITLES)
 ]
 
 
 PLACE_PARTS = [
-    f" at the {city.upper():<{CITIES_LEN}} {place.upper()}.\n"
+    f" at the {city.upper():<6} {place.upper()}.\n"
     for city, place in it.product(CITIES, PLACES)
 ]
 
 assert len(PERSON_PARTS) == 2 ** 8
 assert len(PLACE_PARTS ) == 2 ** 8
 
+# Generate output for test/test_enc_util.py
+# for person, place in zip(PERSON_PARTS, PLACE_PARTS):
+#     print(person, place, end="")
 
-Phrase = str
-
-TEST_PHRASE_LINES = [
-    "The HONEST KING   at the LAGOS   FOREST.",
-    "The HONEST DRIVER at the LONDON  FARM.",
-    "The BRAVE  BAKER  at the LAGOS   FARM.",
-    "The HAPPY  CHILD  at the LONDON  FARM.",
-    "The HAPPY  CHILD.",
-]
-
-TEST_PHRASE = "\n".join(TEST_PHRASE_LINES)
+PhraseStr = str
 
 
-def bytes2phrase(data: bytes) -> Phrase:
-    r"""Encode data as a human readable phrases.
-
-    >>> expected = TEST_PHRASE
-    >>> bytes2phrase(b"test data") == expected
-    True
-    """
+def bytes2phrase(data: bytes) -> PhraseStr:
+    r"""Encode data as a human readable phrases."""
 
     corpus = [PERSON_PARTS, PLACE_PARTS]
     parts  = []
+
     for i in range(len(data)):
         part_char = data[i : i + 1]
         part_idx  = ord(part_char)
@@ -150,12 +140,8 @@ def bytes2phrase(data: bytes) -> Phrase:
     return phrase.strip()
 
 
-def phrase2bytes(phrase: Phrase) -> bytes:
-    """Decode human readable phrases to bytes.
-
-    >>> phrase2bytes(TEST_PHRASE)
-    b'test data'
-    """
+def phrase2bytes(phrase: PhraseStr) -> bytes:
+    """Decode human readable phrases to bytes."""
     filler = {"the", "at", ""}
     parts  = phrase.replace(".", "").lower().split()
     parts  = [p for p in parts if p not in filler]
@@ -175,27 +161,12 @@ def phrase2bytes(phrase: Phrase) -> bytes:
 
 
 def bytes2hex(data: bytes) -> str:
-    r"""Convert bytes to a hex string.
-
-    >>> bytes2hex('test data'.encode('ascii'))
-    '746573742064617461'
-    >>> bytes2hex(b'\x01\x23\x45\x67\x89\xAB\xCD\xEF')
-    '0123456789abcdef'
-    """
+    """Convert bytes to a hex string."""
     return base64.b16encode(data).decode('ascii').lower()
 
 
 def hex2bytes(hex_str: str) -> bytes:
-    r"""Convert bytes to a hex string.
-
-    >>> hex2bytes('746573742064617461')
-    b'test data'
-    >>> expected = b'\x01\x23\x45\x67\x89\xAB\xCD\xEF'
-    >>> hex2bytes("0123456789ABCDEF") == expected
-    True
-    >>> hex2bytes("0123456789abcdef") == expected
-    True
-    """
+    """Convert bytes to a hex string."""
     hex_str = hex_str.upper().zfill(2 * ((len(hex_str) + 1) // 2))
     return base64.b16decode(hex_str.encode('ascii'))
 
@@ -204,23 +175,10 @@ def bytes2int(data: bytes) -> int:
     r"""Convert bytes to (arbitrary sized) integers.
 
     Parsed in big-endian order.
-
-    >>> bytes2int(b"")
-    0
-    >>> bytes2int(b"\x01")
-    1
-    >>> bytes2int(b"\xff")
-    255
-    >>> bytes2int(b"\x12\x34") == 0x1234
-    True
-    >>> num = 2**(128 + 8) - 2
-    >>> data = b"\xff" * 16 + b"\xfe"
-    >>> bytes2int(data) == num
-    True
     """
-    # NOTE: ord(data[i:i+1]) is done for python2 compatability as
-    #   data[i] and iteration over bytes has different semantics
-    #   depending on the version of python.
+    # NOTE: ord(data[i : i + 1]) is done for backward compatability
+    #   with python2. This is because data[i] and iteration over bytes
+    #   has different semantics depending on the version of python.
     num = 0
     for i in range(len(data)):
         num = num << 8
@@ -229,23 +187,10 @@ def bytes2int(data: bytes) -> int:
 
 
 def int2bytes(num: int) -> bytes:
-    r"""Convert (arbitrary sized) int to bytes.
+    """Convert (arbitrary sized) int to bytes.
 
     Serialized in big-endian order.
-    Only positive integers can be encoded.
-
-    >>> int2bytes(0)
-    b''
-    >>> int2bytes(1)
-    b'\x01'
-    >>> int2bytes(255)
-    b'\xff'
-    >>> int2bytes(0x1234) == b'\x12\x34'
-    True
-    >>> num = 2**(128 + 8) - 2
-    >>> data = b"\xff" * 16 + b"\xfe"
-    >>> int2bytes(num) == data
-    True
+    Only positive integers are encoded.
     """
     assert num >= 0
 
@@ -257,15 +202,16 @@ def int2bytes(num: int) -> bytes:
 
 
 def bytes_hex(data: bytes) -> str:
-    r"""Display bytes data in hex form, rather than with glyphs.
+    """Display bytes data in hex form, rather than with glyphs.
 
     Random data lines up nicer with this.
     """
-    chars    = (data[i : i + 1] for i in range(len(data)))
-    char_hex = [bytes2hex(c).lower() for c in chars]
-    return "".join(
+    chars           = (data[i : i + 1] for i in range(len(data)))
+    char_hex        = [bytes2hex(c).lower() for c in chars]
+    char_hex_padded = (
         c if i % 2 == 0 else c + " " for i, c in enumerate(char_hex)
-    ).strip()
+    )
+    return "".join(char_hex_padded).strip()
 
 
 def bytes_repr(data: bytes) -> str:
@@ -280,36 +226,19 @@ def bytes_repr(data: bytes) -> str:
 
 
 def params2bytes(p: params.Params) -> bytes:
-    r"""Serialize Params.
-
-    >>> p = params.init_params(12, 13, 16)
-    >>> params2bytes(p)
-    b'\x05\x0c\x10'
-    """
+    """Serialize Params."""
     assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
-    assert p.ecc_len < 16
     sbk_version = 0
-    ver_and_ecc = (sbk_version << 4) | p.ecc_len
-    args        = (ver_and_ecc, p.threshold, p.kdf_param_id)
-    return struct.pack("BBB", *args)
+    return struct.pack("BBB", sbk_version, p.threshold, p.kdf_param_id)
 
 
 def bytes2params(data: bytes) -> params.Params:
-    r"""Deserialize Params.
+    """Deserialize Params."""
+    sbk_version, threshold, kdf_param_id = struct.unpack("BBB", data)
+    assert sbk_version == 0
 
-    >>> p = bytes2params(b'\x05\x0C\x10')
-    >>> p.threshold
-    12
-    >>> p.kdf_param_id
-    16
-    >>> p.ecc_len
-    5
-    """
-    ver_and_ecc, threshold, kdf_param_id = struct.unpack("BBB", data)
-    ecc_len = ver_and_ecc & 0xF
-    version = (ver_and_ecc >> 4) & 0xF
-    assert version == 0
-
+    # decoded params doesn't include num_pieces as it's only required
+    # when originally generating the pieces.
     num_pieces = threshold
     config     = params.PARAM_CONFIGS_BY_ID[kdf_param_id]
 
@@ -317,6 +246,5 @@ def bytes2params(data: bytes) -> params.Params:
         threshold=threshold,
         num_pieces=num_pieces,
         kdf_param_id=kdf_param_id,
-        ecc_len=ecc_len,
         **config,
     )

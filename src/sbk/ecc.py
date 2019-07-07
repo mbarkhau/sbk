@@ -138,7 +138,7 @@ class Residual:
         self.indexes = indexes
 
         if sources is None:
-            self.sources = set([indexes])
+            self.sources = {indexes}
         else:
             self.sources = set(sources)
 
@@ -162,7 +162,7 @@ class Residual:
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Residual):
-            raise NotImplemented
+            raise NotImplementedError
 
         return (
             self.data        == other.data
@@ -186,25 +186,25 @@ class Residual:
 
 def _maybe_expand(x: Residual, y: Residual) -> typ.Optional[Residual]:
     if x == y:
-        return
+        return None
 
     x_idx = set(x.indexes)
     y_idx = set(y.indexes)
 
     has_intersect = x_idx & y_idx
     if not has_intersect:
-        return
+        return None
 
     z = x ^ y
     if len(z) == 0:
-        return
+        return None
 
     a = len(z) < len(x) or len(z) < len(y)
     b = len(z) >= len(x) and len(z) >= len(y)
     assert a != b
 
     if len(z) >= len(x) and len(z) >= len(y):
-        return
+        return None
 
     return z
 
@@ -231,11 +231,18 @@ class PacketCandidate(typ.NamedTuple):
     data   : bytes
 
 
+class MessageCandidate(typ.NamedTuple):
+    msg_idx : int
+    byte_val: int
+
+
 def _maybe_candidate(r: Residual) -> typ.Optional[PacketCandidate]:
     is_root_residual = len(r.indexes) == 1
     if is_root_residual:
         idx = r.indexes[0]
         return PacketCandidate(idx.start, r.data)
+    else:
+        return None
 
 
 def _iter_packet_candidates(
@@ -265,11 +272,12 @@ def _iter_packet_candidates(
                 yield c
 
 
-TopByteCandidates = typ.Dict[PacketCandidate, int]
-IndexCounts       = typ.Dict[int            , typ.List[int]]
+TopMessageCandidates = typ.Dict[MessageCandidate, int]
+
+IndexCounts = typ.Dict[int, typ.List[int]]
 
 
-def _index_counts(top_candidates: TopByteCandidates) -> IndexCounts:
+def _index_counts(top_candidates: TopMessageCandidates) -> IndexCounts:
     idx_counts: IndexCounts = collections.defaultdict(list)
     for (idx, _), count in top_candidates.items():
         idx_counts[idx].append(count)
@@ -316,16 +324,16 @@ def is_decidable(idx_counts: IndexCounts, threshold: float) -> bool:
     return True
 
 
-def _candidates_to_message(top_candidates: TopByteCandidates) -> bytes:
+def _candidates_to_message(top_candidates: TopMessageCandidates) -> bytes:
     top_counts: typ.Dict[int, int] = {}
-    top_data  : typ.Dict[int, int] = {}
+    top_values: typ.Dict[int, int] = {}
 
-    for (idx, data), count in top_candidates.items():
+    for (idx, byte_val), count in top_candidates.items():
         if top_counts.get(idx, 0) < count:
             top_counts[idx] = count
-            top_data[idx] = data
+            top_values[idx] = byte_val
 
-    return bytes(d for _, d in sorted(top_data.items()))
+    return bytes(v for _, v in sorted(top_values.items()))
 
 
 def _top_candidates(indexed_packets: IndexedPackets) -> bytes:
@@ -334,11 +342,12 @@ def _top_candidates(indexed_packets: IndexedPackets) -> bytes:
     num_packets     = len(indexed_packets)
     candidates_iter = _iter_packet_candidates(indexed_packets)
 
-    top_candidates: TopByteCandidates = collections.Counter()
-    for candidate in candidates_iter:
-        for i, data_byte in enumerate(candidate.data):
-            msg_idx = candidate.msg_idx + i
-            top_candidates[msg_idx, data_byte] += 1
+    top_candidates: TopMessageCandidates = collections.Counter()
+    for pkt_candidate in candidates_iter:
+        for i, data_byte in enumerate(pkt_candidate.data):
+            msg_idx       = pkt_candidate.msg_idx + i
+            msg_candidate = MessageCandidate(msg_idx, data_byte)
+            top_candidates[msg_candidate] += 1
 
         idx_counts = _index_counts(top_candidates)
 

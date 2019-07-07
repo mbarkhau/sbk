@@ -6,14 +6,12 @@
 # SPDX-License-Identifier: MIT
 """CLI/Imperative shell for SBK."""
 import os
-import re
 import sys
 import time
 import hashlib
 import threading
 import typing as typ
 import pathlib2 as pl
-import datetime as dt
 
 import click
 
@@ -21,7 +19,6 @@ import sbk
 
 from . import kdf
 from . import params
-from . import polynom
 from . import enc_util
 
 
@@ -37,7 +34,7 @@ click.disable_unicode_literals_warning = True
 
 APP_DIR          = pl.Path(click.get_app_dir("sbk"))
 PARAM_CTX        = params.get_param_ctx(APP_DIR)
-DEFAULT_PARAM_ID = PARAM_CTX.default_param_id
+PARAM_ID_DEFAULT = PARAM_CTX.param_id_default
 
 
 def _clean_help(helmsg: str) -> str:
@@ -46,29 +43,63 @@ def _clean_help(helmsg: str) -> str:
     )
 
 
+# NOTE mb: Wrappers for click funtions for the idom: `yes_all or clear`
+#   Maybe this should be rethought so the idom is not needed.
+
+
+def echo(msg: str) -> bool:
+    click.echo(msg)
+    return True
+
+
+def clear() -> bool:
+    click.clear()
+    return True
+
+
+def confirm(msg: str) -> bool:
+    click.confirm(msg, abort=True)
+    return True
+
+
+def anykey_confirm(message: str) -> bool:
+    click.prompt(
+        message,
+        default="",
+        show_choices=False,
+        show_default=False,
+        prompt_suffix="",
+    )
+    return False
+
+
 class ThreadWithReturnData(threading.Thread):
 
     _return: typ.Optional[bytes]
 
-    def __init__(self, target=None, args=(), kwargs={}):
+    def __init__(self, target=None, args=(), kwargs=None) -> None:
         threading.Thread.__init__(self, target=target, args=args, kwargs=kwargs)
         self._target = target
         self._args   = args
         self._kwargs = kwargs
         self._return = None
 
-    def run(self):
-        if self._target is None:
-            return
-        self._return = self._target(*self._args, **self._kwargs)
+    def run(self) -> None:
+        tgt = self._target
+        assert tgt is not None
+        kwargs       = self._kwargs or {}
+        self._return = tgt(*self._args, **kwargs)
 
-    def join(self, *args) -> bytes:
+    def join(self, *args) -> None:
         threading.Thread.join(self, *args)
-        data = self._return
-        if data is None:
+        if self._return is None:
             raise Exception("Missing return value after Thread.join")
-        else:
-            return data
+
+    @property
+    def retval(self) -> bytes:
+        rv = self._return
+        assert rv is not None
+        return rv
 
 
 def _derive_key(
@@ -103,23 +134,23 @@ def _derive_key(
             progress_bar = click.progressbar(
                 label=label, length=total, show_eta=True
             )
-            progress_bar.update(elapsed * 1000)
+            progress_bar.update(int(elapsed * 1000))
         elif progress_bar:
             if remaining_pct < 10:
-                progress_bar.update(step * 200)
+                progress_bar.update(int(step * 200))
             elif remaining_pct < 20:
-                progress_bar.update(step * 400)
+                progress_bar.update(int(step * 400))
             elif remaining_pct < 50:
-                progress_bar.update(step * 700)
+                progress_bar.update(int(step * 700))
             else:
-                progress_bar.update(step * 1000)
+                progress_bar.update(int(step * 1000))
 
     if progress_bar:
         progress_bar.update(total)
 
-    key_data = kdf_thread.join()
+    kdf_thread.join()
 
-    return key_data
+    return kdf_thread.retval
 
 
 @click.group()
@@ -131,7 +162,7 @@ def cli() -> None:
 @click.version_option(version="v201906.0001-alpha")
 def version() -> None:
     """Show version number."""
-    click.echo(f"SBK version: {sbk.__version__}")
+    echo(f"SBK version: {sbk.__version__}")
 
 
 MIN_TIME_SEC  = 10
@@ -158,7 +189,7 @@ def kdf_info(show_all: bool = False) -> None:
     """Show info for each available parameter config."""
     min_mem_kb = PARAM_CTX.sys_info.total_kb * MIN_MEM_RATIO
 
-    click.echo("Id  Mem[MB]  Iters  ~Time[Sec]  Algorithm")
+    echo("Id  Mem[MB]  Iters  ~Time[Sec]  Algorithm")
     for kdf_param_id, config in PARAM_CTX.avail_configs.items():
         eta_sec        = round(PARAM_CTX.est_times_by_id[kdf_param_id], 1)
         memory_cost    = config['memory_cost']
@@ -172,13 +203,13 @@ def kdf_info(show_all: bool = False) -> None:
             f"  argon2id",
         ]
 
-        if kdf_param_id == DEFAULT_PARAM_ID:
+        if kdf_param_id == PARAM_ID_DEFAULT:
             parts += ["<- default"]
 
         is_visible = memory_cost > min_mem_kb and eta_sec > MIN_TIME_SEC
 
-        if is_visible or show_all or kdf_param_id == PARAM_CTX.default_param_id:
-            click.echo(" ".join(parts))
+        if is_visible or show_all or kdf_param_id == PARAM_CTX.param_id_default:
+            echo(" ".join(parts))
 
 
 SECURITY_WARNING_PROMPT = """
@@ -216,7 +247,10 @@ Do you believe your system is secure?
 
 SALT_PROMPT_TEXT = """
 Step 1 of 3: Please write down your "salt".
+"""
 
+
+SALT_INFO_TEXT = """
 The main purpose of the salt is to prevent a brute-force attack. By
 itself a salt is useless. This means that a salt does not have to be a
 total secret (but there's no reason to make it public either).
@@ -225,28 +259,43 @@ What is most important about a salt is that you never lose it, as you
 will need it to recover your key. It is best to write it down and
 give a copy to each trustee. Write in clear and readable letters, use
 non-erasable ink.
+"""
 
+
+KEY_DERIVATION_INFO_TEXT = r"""
+Step 2 of 4: Deriving Secret Key
+
+To make brute force attacks infeasable, the SBK Secret Key is derived
+using the computationally and memory intensive Argon2 Key Derivation
+Function. This ensures that even when an attacker has access to the
+salt, a brainkey with relatively a low entropy of 48 bits is secure.
+
+    Brainkey + Salt -> Secret Key
+"""
+
+
+SBK_INFO_TEXT = r"""
+Your "secret key" is recovered by collect together a minimum of
+{threshold} pieces.
+
+Give one "SBK piece" each of your trustees. You should not only
+trust them to act in your interest, but also trust that they are
+competent to keep their SBK piece secure.
+
+                   Split Secret Key
+          Split                    . Recovery
+               \.-> SBK Piece 1 -./
+    Secret Key -O-> SBK Piece 2  +-> Secret Key
+                '-> SBK Piece 3 -'
+
+    Secret Key + Salt -> Wallet
 """
 
 
 SPLIT_KEY_WARNING_TEXT = r"""
-Step 2 of 3: Please write down "secret piece" {piece_no}/{num_pieces}.
+Step 3 of 4: Write Down SBK Piece {piece_no}/{num_pieces}.
 
-Your "secret key" is recovered by collect together a minimum of
-{threshold} pieces.
-
-Give one "secret piece" each of your trustees. You should not only
-trust them to act in your interest, but also trust that they are
-competent to keep their secret piece secure.
-
-                   Split Secret Key
-          Split                       . Recovery
-               \.-> Secret Piece 1 -./
-    Secret Key -O-> Secret Piece 2  +-> Secret Key
-                '-> Secret Piece 3 -'
-
-    Secret Key + Salt -> Wallet
-
+Please make a physical copy of SBK Piece {piece_no}/{num_pieces}.
 """
 
 
@@ -294,7 +343,7 @@ KDF_PARAM_ID_HELP = (
 _kdf_param_id_option = click.option(
     '-p',
     '--kdf-param-id',
-    default=DEFAULT_PARAM_ID,
+    default=PARAM_ID_DEFAULT,
     type=int,
     help=_clean_help(KDF_PARAM_ID_HELP),
 )
@@ -341,16 +390,6 @@ _yes_all_option = click.option(
 )
 
 
-def anykey_confirm(message: str) -> None:
-    click.prompt(
-        message,
-        default="",
-        show_choices=False,
-        show_default=False,
-        prompt_suffix="",
-    )
-
-
 def _show_secret(label: str, data: bytes) -> None:
     phrase = enc_util.bytes2phrase(data)
     assert enc_util.phrase2bytes(phrase) == data
@@ -374,19 +413,21 @@ def _show_secret(label: str, data: bytes) -> None:
     assert "".join(hex_parts) == hex_text
 
     label = "Phrases for " + label
-    click.echo(f"\t     Data   {label:^45}\n")
-    click.echo("\n".join(output_lines) + "\n\n")
+    echo(f"\t     Data   {label:^45}\n")
+    echo("\n".join(output_lines) + "\n\n")
 
 
 def _split_secret_key(
     secret_key: bytes, threshold: int, num_pieces: int
-) -> typ.Sequence[bytes]:
-    for i in range(num_pieces):
+) -> typ.Iterable[bytes]:
+    for _ in range(num_pieces):
         # TODO
         yield secret_key
 
 
 DEFAULT_SALT_LEN = 128 // 8
+
+DEFAULT_BRAINKEY_LEN = 6
 
 
 @cli.command()
@@ -397,15 +438,16 @@ DEFAULT_SALT_LEN = 128 // 8
 @_yes_all_option
 def new_key(
     email       : str,
-    kdf_param_id: params.KDFParamId = DEFAULT_PARAM_ID,
+    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
     threshold   : int               = 2,
     num_pieces  : int               = 3,
     salt_len    : int               = DEFAULT_SALT_LEN,
+    brainkey_len: int               = DEFAULT_BRAINKEY_LEN,
     yes_all     : bool              = False,
 ) -> None:
     """Generate a new key and split it to pieces."""
-    yes_all or click.clear()
-    yes_all or click.confirm(SECURITY_WARNING_PROMPT.strip(), abort=True)
+    yes_all or clear()
+    yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
 
     param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id)
     param_data = enc_util.params2bytes(param_cfg)
@@ -418,29 +460,35 @@ def new_key(
     # has one less thing to know about. They always need both
     # the seed and the original parameters, so we just combine
     # them so they are always together.
-    salt_data = (param_data + hasher.digest())[:salt_len]
+    param_and_salt_data = (param_data + hasher.digest())[:salt_len]
 
     # salt
-    yes_all or click.clear()
+    yes_all or clear()
 
-    click.echo(SALT_PROMPT_TEXT)
-    _show_secret("Salt", salt_data)
+    echo(SALT_PROMPT_TEXT)
+    _show_secret("Salt", param_and_salt_data)
+    echo(SALT_INFO_TEXT.strip())
     yes_all or anykey_confirm("Press enter when you have written down the salt")
 
-    hasher.update(os.urandom(4))
-    brainkey_data = hasher.digest()[:4]
+    hasher.update(os.urandom(brainkey_len))
+    brainkey_data = hasher.digest()[:brainkey_len]
 
     split_key_warning_text = SPLIT_KEY_WARNING_TEXT.format(
         piece_no=1, threshold=threshold, num_pieces=num_pieces
     )
-    yes_all or click.clear()
-    yes_all or click.echo(split_key_warning_text)
+    yes_all or clear()
+    yes_all or echo(split_key_warning_text)
 
     secret_key = _derive_key(
-        brainkey_data, salt_data, kdf_param_id, label="Deriving Secret Key"
+        brainkey_data,
+        param_and_salt_data,
+        kdf_param_id,
+        label="Deriving Secret Key",
     )
-    secret_pieces = _split_secret_key(
-        secret_key, threshold=threshold, num_pieces=num_pieces
+    secret_pieces = list(
+        _split_secret_key(
+            secret_key, threshold=threshold, num_pieces=num_pieces
+        )
     )
 
     # secret pieces
@@ -449,25 +497,25 @@ def new_key(
         split_key_warning_text = SPLIT_KEY_WARNING_TEXT.format(
             piece_no=piece_no, threshold=threshold, num_pieces=num_pieces
         )
-        yes_all or click.clear()
-        click.echo(split_key_warning_text)
+        yes_all or clear()
+        echo(split_key_warning_text)
         _show_secret(f"Secret Piece {piece_no}/{num_pieces}", secret_piece)
         yes_all or anykey_confirm("Press enter to continue")
 
     # brainkey
-    yes_all or click.clear()
-    click.echo(BRAINKEY_WARNING_TEXT)
+    yes_all or clear()
+    echo(BRAINKEY_WARNING_TEXT)
 
     yes_all or anykey_confirm("Press enter to show your brainkey\n")
 
     _show_secret("Brainkey", brainkey_data)
 
     yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT.strip())
-    yes_all or click.clear()
+    yes_all or clear()
 
     # wallet seed
 
-    yes_all or click.clear()
+    yes_all or clear()
 
     # recovery test
 
@@ -479,7 +527,7 @@ def verify_key() -> None:
 
 @cli.command()
 @_kdf_param_id_option
-def derive_key(kdf_param_id=DEFAULT_PARAM_ID) -> None:
+def derive_key(kdf_param_id=PARAM_ID_DEFAULT) -> None:
     """Derive secret key from a brainkey.
 
     You should avoid generating your own brainkey, as humans are
@@ -492,7 +540,7 @@ def derive_key(kdf_param_id=DEFAULT_PARAM_ID) -> None:
         secret_text = sys.stdin.read()
 
     if kdf_param_id is None:
-        kdf_param_id = PARAM_CTX.default_param_id
+        kdf_param_id = PARAM_CTX.param_id_default
 
     if kdf_param_id not in params.PARAM_CONFIGS_BY_ID:
         err_msg = (
@@ -502,18 +550,26 @@ def derive_key(kdf_param_id=DEFAULT_PARAM_ID) -> None:
         raise click.BadOptionUsage("--kdf-param-id", err_msg)
 
     secret_data = secret_text.encode("utf-8")
-    unsplit_key = _derive_key(secret_data, salt_data, kdf_param_id)
-    key_phrase  = enc_util.bytes2phrase(unsplit_key)
+    salt_data   = b""  # TODO
 
-    click.echo("\n")
-    click.echo(key_phrase)
+    unsplit_key = _derive_key(
+        secret_data, salt_data, kdf_param_id, "Deriving Secret Key"
+    )
+    key_phrase = enc_util.bytes2phrase(unsplit_key)
+
+    echo("\n")
+    echo(key_phrase)
 
 
 # def split_key():
-#     yes_all or click.clear()
-#     yes_all or click.confirm(SECURITY_WARNING_PROMPT.strip(), abort=True)
+#     yes_all or clear()
+#     yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
 
 
 # def recover_key():
-#     yes_all or click.clear()
-#     yes_all or click.confirm(SECURITY_WARNING_PROMPT.strip(), abort=True)
+#     yes_all or clear()
+#     yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
+
+
+if __name__ == '__main__':
+    cli()

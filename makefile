@@ -440,7 +440,9 @@ devtest:
 	@rm -rf "test/__pycache__";
 
 ifdef FILTER
-	ENV=$${ENV-dev} PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+	ENABLE_BACKTRACE=0 \
+		ENV=$${ENV-dev} \
+		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--no-cov \
@@ -451,7 +453,9 @@ ifdef FILTER
 		-k $(FILTER) \
 		test/ src/;
 else
-	ENV=$${ENV-dev} PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+	ENABLE_BACKTRACE=0 \
+		ENV=$${ENV-dev} \
+		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--no-cov \

@@ -15,8 +15,13 @@ A helpful introduction to Galois Fields:
 https://crypto.stackexchange.com/a/2718
 """
 
+import random
+import itertools
 import functools
 import typing as typ
+
+
+rand_int = functools.partial(random.SystemRandom().randint, 0)
 
 
 # The Euclidean GCD algorithm is based on the principle that the
@@ -49,20 +54,6 @@ class XGCDResult(typ.NamedTuple):
     t: int  # sometimes called y
 
 
-XgcdFn = typ.Callable[[int, int], XGCDResult]
-
-
-def check_xgcd(fn: XgcdFn) -> XgcdFn:
-    @functools.wraps(fn)
-    def wrapper(a: int, b: int) -> XGCDResult:
-        res = fn(a, b)
-        assert res.s * a + res.t * b == res.g
-        return res
-
-    return wrapper
-
-
-@check_xgcd
 def xgcd(a: int, b: int) -> XGCDResult:
     """Extended euclidien greatest common denominator."""
     if a == 0:
@@ -70,9 +61,13 @@ def xgcd(a: int, b: int) -> XGCDResult:
     else:
         g, s, t = xgcd(b % a, a)
 
-        q = b // a
-        return XGCDResult(g=g, s=t - q * s, t=s)
+        q   = b // a
+        res = XGCDResult(g=g, s=t - q * s, t=s)
+        assert res.s * a + res.t * b == res.g
+        return res
 
+
+Prime = int
 
 _SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59]
 
@@ -83,7 +78,6 @@ PRIMES = set(_SMALL_PRIMES)
 # bits -- too large and all the ciphertext is large; too small and
 # security is compromised
 
-PRIMES.add(2 ** 521 -   1)  # 13th Mersenne Prime
 PRIMES.add(2 ** 256 - 189)
 PRIMES.add(2 ** 128 - 159)
 PRIMES.add(2 ** 127 -   1)  # 12th Mersenne Prime
@@ -107,132 +101,19 @@ def _is_prime(n: int) -> bool:
     return True
 
 
-FFPolyArithmeticMethod = typ.Callable[['FFPoly', 'FFPoly'], 'FFPoly']
+Num = typ.TypeVar('Num', int, 'GFNum')
 
 
-def check_ffpoly_compat(a: 'FFPoly', b: 'FFPoly', opname: str) -> None:
-    msg_fmt = "Cannot do '{}' on FFPoly of different {}: {} vs {}."
-
-    if a.p != b.p:
-        raise ValueError(msg_fmt.format(opname, "characteristic", a.p, b.p))
-
-    # if a.n != b.n:
-    #     raise ValueError(msg_fmt.format(opname, "dimension", a.n, b.n))
-
-    len_a = len(a.coeffs)
-    len_b = len(b.coeffs)
-    if len_a != len_b:
-        raise ValueError(msg_fmt.format(opname, "degree", len_a, len_b))
-
-
-def check_arithmetic_args(fn: FFPolyArithmeticMethod) -> FFPolyArithmeticMethod:
-    opname = fn.__name__
-    if opname.startswith("__") and fn.__name__.endswith("__"):
-        opname = opname[2:-2]
-
-    @functools.wraps(fn)
-    def wrapper(self: 'FFPoly', other: 'FFPoly') -> 'FFPoly':
-        check_ffpoly_compat(self, other, opname)
-        return fn(self, other)
-
-    return wrapper
-
-
-Coefficients = typ.Sequence[int]
-
-FFPolyOrNum = typ.Union['FFPoly', int]
-
-
-class FFPoly:
-    """Polynomial/Number in a finite field.
-
-    This can also be thought of as simply as a number in a finite
-    field.
-
-    The coefficients are ordered in ascending powers of x, so
-    FFPoly(2, 5, 3, p=7) is 2x° + 5x¹ + 3x²
-
-    Note that the secret in this case is 2 (the 0th coefficient),
-    which corresponds to the y value when we evaluate at x=0. This is
-    also why other implementations call this value "intercept" or
-    "y_intercept".
-    """
-
-    coeffs: Coefficients
-    p     : int
-
-    def __init__(self, *coeffs: int, p: int) -> None:
-        # NOTE mb: In practice p is always prime, and the operations
-        #   are implemented with the assumtion that it is. If p were
-        #   not prime, then a multiplicative inverse would not exist
-        #   in all cases.
-        assert _is_prime(p)
-        # NOTE mb: I'm not sure the algorithms work for anything
-        #   other than n == 1.
-
-        # aka. characteristic, aka. order
-        self.p = p
-        # Mod p is done so often as a last operation on the
-        # coefficints, that we do it as part of the initialisation.
-        self.coeffs = tuple(c % p for c in coeffs)
-
-    def ffpoly(self, coeffs: Coefficients) -> 'FFPoly':
-        return FFPoly(*coeffs, p=self.p)
-
-    @check_arithmetic_args
-    def __add__(self, other: 'FFPoly') -> 'FFPoly':
-        coeffs = [a + b for a, b in zip(self.coeffs, other.coeffs)]
-        return self.ffpoly(coeffs)
-
-    @check_arithmetic_args
-    def __sub__(self, other: 'FFPoly') -> 'FFPoly':
-        coeffs = [a - b for a, b in zip(self.coeffs, other.coeffs)]
-        return self.ffpoly(coeffs)
-
-    def __neg__(self) -> 'FFPoly':
-        return self.ffpoly([-c for c in self.coeffs])
-
-    def __mul__(self, other: FFPolyOrNum) -> 'FFPoly':
-        if isinstance(other, FFPoly):
-            return self._ffpoly_mul(other)
-        elif isinstance(other, int):
-            return self._scalar_mul(other)
-        else:
-            raise NotImplementedError
-
-    @check_arithmetic_args
-    def _ffpoly_mul(self, other: 'FFPoly') -> 'FFPoly':
-        new_coeffs = [0] * (len(self.coeffs) + 1)
-        for i, a in enumerate(self.coeffs):
-            for j, b in enumerate(other.coeffs):
-                new_coeffs[i + j] += a * b
-                # new_coeffs[i + j] = (a * b) % self.p
-
-        # poly division
-        return self.ffpoly(new_coeffs)
-
-    def _scalar_mul(self, scalar: int) -> 'FFPoly':
-        return self.ffpoly([c * scalar for c in self.coeffs])
-
-    def __div__(self, other: 'FFPoly') -> 'FFPoly':
-        check_ffpoly_compat(self, other, "div")
+def val_of(other: Num) -> int:
+    if isinstance(other, int):
+        return other
+    elif isinstance(other, GFNum):
+        return other.val
+    else:
         raise NotImplementedError
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, FFPoly):
-            raise NotImplementedError
 
-        check_ffpoly_compat(self, other, "eq")
-        return self.p == other.p and self.coeffs == other.coeffs
-
-    def __call__(self, x: int) -> int:
-        """Evaluate polynomial at x."""
-        terms = [(coeff * x ** exp) for exp, coeff in enumerate(self.coeffs)]
-        return sum(terms) % self.p
-
-    def __repr__(self) -> str:
-        coef_str = ", ".join(map(str, self.coeffs))
-        return f"FFPoly({coef_str}, p={self.p})"
+Coefficients = typ.Sequence[Num]
 
 
 class GFNum:
@@ -246,25 +127,29 @@ class GFNum:
         #   not prime, then a multiplicative inverse would not exist
         #   in all cases.
         assert _is_prime(p)
+        self.p = p
+
         self.val = val
-        self.p   = p
 
     def gfnum(self, val: int) -> 'GFNum':
+        # Mod p is done so often as a last operation on the val, that
+        # we do it as part of the initialisation.
         return GFNum(val % self.p, p=self.p)
 
-    def __add__(self, other: 'GFNum') -> 'GFNum':
-        val = self.val + other.val
-        return self.gfnum(val)
+    def __add__(self, other: Num) -> 'GFNum':
+        other_val = val_of(other)
+        return self.gfnum(self.val + other_val)
 
-    def __sub__(self, other: 'GFNum') -> 'GFNum':
-        val = self.val - other.val
-        return self.gfnum(val)
+    def __sub__(self, other: Num) -> 'GFNum':
+        other_val = val_of(other)
+        return self.gfnum(self.val - other_val)
 
     def __neg__(self) -> 'GFNum':
         return self.gfnum(-self.val)
 
-    def __mul__(self, other: 'GFNum') -> 'GFNum':
-        return self.gfnum(self.val * other.val)
+    def __mul__(self, other: Num) -> 'GFNum':
+        other_val = val_of(other)
+        return self.gfnum(self.val * other_val)
 
     def _mod_inverse(self) -> 'GFNum':
         assert self.val >= 0
@@ -275,8 +160,21 @@ class GFNum:
         inv_val = self.p + t
         return self.gfnum(inv_val)
 
+    def __pow__(self, other: Num) -> 'GFNum':
+        other_val = val_of(other)
+        return self.gfnum(self.val ** other_val)
+
     def __truediv__(self, other: 'GFNum') -> 'GFNum':
         return self * other._mod_inverse()
+
+    def __radd__(self, other: int) -> 'GFNum':
+        return self.gfnum(other + self.val)
+
+    def __rsub__(self, other: int) -> 'GFNum':
+        return self.gfnum(other - self.val)
+
+    def __rmul__(self, other: int) -> 'GFNum':
+        return self.gfnum(other * self.val)
 
     def __hash__(self) -> int:
         return hash(self.val) ^ hash(self.p)
@@ -284,8 +182,10 @@ class GFNum:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, GFNum):
             raise NotImplementedError
+        if self.p != other.p:
+            raise ValueError("Numbers inf different fields are not comparable")
 
-        return self.val == other.val and self.p == other.p
+        return self.val == other.val
 
     def __repr__(self) -> str:
         return f"GFNum({self.val}, p={self.p})"
@@ -296,14 +196,18 @@ class GF:
     p: int
 
     def __init__(self, p: int) -> None:
+        # NOTE mb: In practice p is always prime, and the operations
+        #   are implemented with the assumtion that it is. If p were
+        #   not prime, then a multiplicative inverse would not exist
+        #   in all cases.
+
         assert _is_prime(p)
+
+        # aka. characteristic, aka. order
         self.p = p
 
     def __getitem__(self, val: int) -> GFNum:
         return GFNum(val % self.p, self.p)
-
-
-Num = typ.TypeVar('Num', float, FFPoly, GFNum)
 
 
 class Point(typ.Generic[Num]):
@@ -370,8 +274,90 @@ def interpolate(points: Points, x: Num) -> Num:
     if len(x_vals) != len(set(x_vals)):
         raise ValueError("Points must be distinct {points}")
 
-    # Start with addititve identity (aka. Zero, aka. 0.0).
-    # Initialization is done with x - x (vs. just using literal 0.0),
-    # so that the implementation also works for FFPoly.
-    zero = x - x
-    return sum(_interpolation_terms(points, x), zero)
+    terms = iter(_interpolation_terms(points, x))
+    accu  = next(terms)
+    for term in terms:
+        accu += term
+    return accu
+
+
+def poly_eval_fn(poly: typ.List[Num]) -> typ.Callable[[int], int]:
+    """Return eunction to evaluate polynomial at x."""
+
+    def eval_at(x: int) -> int:
+        """Evaluate polynomial at x."""
+        y = sum((coeff * x ** exp) for exp, coeff in enumerate(poly))
+        return val_of(y)
+
+    return eval_at
+
+
+GFPoints = typ.Sequence[Point[GFNum]]
+
+
+def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
+    # The coefficients of the polynomial are ordered in ascending
+    # powers of x, so poly = [2, 5, 3] represents 2x° + 5x¹ + 3x²
+    #
+    # Note that the secret in the above case is 2 (the 0th
+    # coefficient), which corresponds to the y value when we evaluate
+    # at x=0. This is also why other implementations call this value
+    # "intercept" or "y_intercept".
+    poly = [gf[secret]]
+
+    while len(poly) < threshold:
+        poly.append(gf[rand_int(gf.p)])
+
+    eval_at = poly_eval_fn(poly)
+
+    points = [Point(gf[x], gf[eval_at(x)]) for x in range(1, num_pieces + 1)]
+    assert len(points) == num_pieces
+
+    # make sure we only return pieces that we can join again
+    recoverd_secret = join(threshold, points)
+    assert recoverd_secret == secret
+
+    for points_subset in itertools.combinations(points, threshold):
+        recoverd_secret = join(threshold, points_subset)
+        assert recoverd_secret == secret
+
+    return points
+
+
+def split(
+    prime: int, threshold: int, num_pieces: int, secret: int, rand_int=rand_int
+) -> GFPoints:
+    """Generate points of a split secret."""
+
+    if num_pieces <= 1:
+        raise ValueError("number of pieces too low, secret would be exposed")
+
+    if num_pieces >= prime:
+        raise ValueError(
+            "number of pieces too high, cannot generate distinct points"
+        )
+
+    if threshold > num_pieces:
+        raise ValueError("threshold too high, must be <= number of pieces")
+
+    if secret < 0:
+        raise ValueError("Invalid secret, must be a positive integer")
+
+    if prime <= secret:
+        raise ValueError(
+            "Invalid prime for secret, must be greater than secret."
+        )
+
+    return _split(
+        gf=GF(p=prime),
+        threshold=threshold,
+        num_pieces=num_pieces,
+        secret=secret,
+    )
+
+
+def join(threshold: int, points: GFPoints) -> int:
+    if len(points) < threshold:
+        raise ValueError("Not enough pieces to recover secret")
+
+    return val_of(interpolate(points, 0))

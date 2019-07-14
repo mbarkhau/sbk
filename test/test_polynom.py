@@ -27,15 +27,7 @@ def test_prod():
     assert prod([2, 3, 4]) == 24
 
 
-def test_ffpoly_init():
-    x = FFPoly(2, 5, p=7)
-
-    assert x.coeffs == (2, 5)
-
-    assert x.p == 7
-
-
-def alt_eval(coeffs, p):
+def alt_eval_at(coeffs, p):
     """An alternative implementation of eval for validation.
 
     https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing
@@ -53,57 +45,44 @@ def alt_eval(coeffs, p):
 
 
 def test_ffpoly_eval():
-    a = FFPoly(2, 3, 4, p=7)
-    e = alt_eval([2, 3, 4], p=7)
+    gf7     = GF(7)
+    poly    = [2, 3, 4]
+    gf_poly = [gf7[2], gf7[3], gf7[4]]
+
+    _eval_at1 = poly_eval_fn(gf_poly)
+    _eval_at2 = alt_eval_at(poly, p=7)
 
     # 2*0° + 3*0¹ + 4*0² == (2 + 3 + 4) % 7 == 9 % 7 == 2
-    assert a(x=0) == (2 + 3 + 4) % 7
-    assert a(x=0) == e(x=0)
+    assert _eval_at1(x=0) == (2 + 3 + 4) % 7
+    assert _eval_at1(x=0) == _eval_at2(x=0)
 
     # 2*1° + 3*1¹ + 4*1² == (2 + 3 + 4) % 7 == 9 % 7 == 2
-    assert a(x=1) == (2 + 3 + 4) % 7
-    assert a(x=1) == e(x=1)
+    assert _eval_at1(x=1) == (2 + 3 + 4) % 7
+    assert _eval_at1(x=1) == _eval_at2(x=1)
 
     # 2*2° + 3*2¹ + 4*2² == (2 + 6 + 16) % 7 == 24 % 7 == 3
-    assert a(x=2) == (2 + 6 + 16) % 7
-    assert a(x=2) == e(x=2)
+    assert _eval_at1(x=2) == (2 + 6 + 16) % 7
+    assert _eval_at1(x=2) == _eval_at2(x=2)
 
     # 2*3° + 3*3¹ + 4*3² == (2 + 9 + 36) % 7 == 47 % 7 == 5
-    assert a(x=3) == (2 + 9 + 36) % 7
-    assert a(x=3) == e(x=3)
+    assert _eval_at1(x=3) == (2 + 9 + 36) % 7
+    assert _eval_at1(x=3) == _eval_at2(x=3)
 
 
 def test_ffpoly_eval_fuzz():
     primes = sorted(PRIMES)
     for _ in range(100):
-        p      = random.choice(primes)
-        coeffs = [random.randint(0, p - 1) for _ in range(random.randint(1, 9))]
-        a      = FFPoly(*coeffs, p=p)
-        e      = alt_eval(coeffs, p=p)
+        p  = random.choice(primes)
+        gf = GF(p)
+
+        poly    = [random.randint(0, p - 1) for _ in range(random.randint(1, 9))]
+        gf_poly = [gf[coeff] for coeff in poly]
+
+        e1 = poly_eval_fn(gf_poly)
+        e2 = alt_eval_at(poly, p=p)
         for _ in range(10):
             x = random.randint(0, p - 1)
-            assert a(x) == e(x)
-
-
-def test_ffpoly_add_sub():
-    a = FFPoly(2, 2, p=3)
-    b = FFPoly(1, 2, p=3)
-    assert (a + b) - b == a
-    assert -a + b == b - a
-
-
-def test_ffpoly_mul():
-    a = FFPoly(2, 2, p=7)
-    b = FFPoly(1, 2, p=7)
-    c = FFPoly(2, 2 + 4, 4, p=7)
-
-    assert a * b == c
-
-    # a = FFPoly(2, 2, p=3)
-    # b = FFPoly(1, 2, p=3)
-    # c = FFPoly(1, 1, p=3)
-
-    # assert a * b == c
+            assert e1(x) == e2(x)
 
 
 def test_interpolate_deg1_float():
@@ -130,29 +109,29 @@ def test_interpolate_deg2_float():
 
 
 def test_gf_arithmetic():
-    gf = GF(7)
+    gf7 = GF(7)
 
-    zero = gf[0]
-    one = gf[1]
-    two = gf[2]
-    five = gf[5]
+    zero = gf7[0]
+    one  = gf7[1]
+    two  = gf7[2]
+    five = gf7[5]
 
-    assert gf[0] == gf[7]
-    assert gf[1] == gf[8]
+    assert gf7[0] == gf7[7]
+    assert gf7[1] == gf7[8]
 
     assert one - one == zero
     assert two - two == zero
 
     assert one * two == two
     assert two * two + one == five
-    assert two * two * two == gf[1]
+    assert two * two * two == gf7[1]
 
     assert two / one == two
     assert two / two == one
 
 
 def test_interpolate_gf():
-    gf = GF(7)
+    gf     = GF(7)
     points = [
         Point(gf[0], gf[0]),
         Point(gf[1], gf[1]),
@@ -164,3 +143,61 @@ def test_interpolate_gf():
     assert interp_y == at_y
 
     assert interpolate(points[:-1], x=gf[1] / gf[2]) == gf[1] / gf[4]
+
+
+def test_split_and_join_2of3():
+    secret = random.randint(0, 10000000)
+    prime  = min(p for p in PRIMES if p > 10000000)
+    points = split(prime, threshold=2, num_pieces=3, secret=secret)
+    assert [p.x.val for p in points] == [1, 2, 3]
+    assert not any(p.y.val == secret for p in points)
+
+    assert join(threshold=2, points=points) == secret
+
+    sample1 = [points[0], points[1]]
+    sample2 = [points[0], points[2]]
+    sample3 = [points[1], points[2]]
+
+    assert join(threshold=2, points=sample1) == secret
+    assert join(threshold=2, points=sample2) == secret
+    assert join(threshold=2, points=sample3) == secret
+
+
+def test_split_and_join_fuzz():
+    primes = sorted([p for p in PRIMES if p > 10])
+    for _ in range(100):
+        prime      = random.choice(primes)
+        secret     = random.randint(0, prime - 1)
+        num_pieces = random.randint(2, 7)
+        threshold  = random.randint(2, num_pieces)
+        debug_info = {
+            'threshold' : threshold,
+            'num_pieces': num_pieces,
+            'prime'     : prime,
+            'secret'    : secret,
+        }
+        points = split(
+            prime=prime,
+            threshold=threshold,
+            num_pieces=num_pieces,
+            secret=secret,
+        )
+        actual_xs = [p.x.val for p in points]
+        actual_ys = [p.y.val for p in points]
+
+        expected_xs = list(range(1, num_pieces + 1))
+        assert actual_xs == expected_xs, debug_info
+
+        # we accept collisions for primes below 100k, everything else
+        # is probably not a coincidence/is probably a bug.
+        lt_100k = prime < 100_000
+        assert lt_100k or secret not in actual_ys, debug_info
+
+        recovered_secret = join(threshold=num_pieces, points=points)
+        assert recovered_secret == secret, debug_info
+
+        for i in range(num_pieces - threshold):
+            debug_info['sample_size'] = threshold + i
+            sample           = random.sample(points, threshold + i)
+            recovered_secret = join(threshold=threshold, points=sample)
+            assert recovered_secret == secret, debug_info

@@ -10,3 +10,6 @@
 click
 pathlib2
 prompt_toolkit
+
+# NOTE mb: We don't need qrcode[pil] as is otherwise recommended.
+qrcode

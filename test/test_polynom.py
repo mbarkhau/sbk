@@ -1,5 +1,8 @@
 import random
 
+import pytest
+
+import sbk.primes
 from sbk.polynom import *
 
 
@@ -69,8 +72,23 @@ def test_ffpoly_eval():
     assert _eval_at1(x=3) == _eval_at2(x=3)
 
 
+@pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
+def test_prime(prime_idx):
+    param = sbk.primes.POW2_PRIME_PARAMS[prime_idx]
+    prime = sbk.primes.POW2_PRIMES[prime_idx]
+    assert sbk.primes.is_miller_rabin_prp(prime), param
+
+
+def test_is_miller_rabin_prp():
+    assert sbk.primes.is_miller_rabin_prp(2 ** 127 -  1)
+    assert sbk.primes.is_miller_rabin_prp(2 **  64 - 59)
+    assert not sbk.primes.is_miller_rabin_prp(60)
+    assert not sbk.primes.is_miller_rabin_prp( 7 * 73 * 103)
+    assert not sbk.primes.is_miller_rabin_prp(89 * 683)
+
+
 def test_ffpoly_eval_fuzz():
-    primes = sorted(PRIMES)
+    primes = sorted(sbk.primes.PRIMES)
     for _ in range(100):
         p  = random.choice(primes)
         gf = GF(p)
@@ -147,7 +165,7 @@ def test_interpolate_gf():
 
 def test_split_and_join_2of3():
     secret = random.randint(0, 10000000)
-    prime  = min(p for p in PRIMES if p > 10000000)
+    prime  = min(p for p in sbk.primes.PRIMES if p > 10000000)
     points = split(prime, threshold=2, num_pieces=3, secret=secret)
     assert [p.x.val for p in points] == [1, 2, 3]
     assert not any(p.y.val == secret for p in points)
@@ -164,7 +182,7 @@ def test_split_and_join_2of3():
 
 
 def test_split_and_join_fuzz():
-    primes = sorted([p for p in PRIMES if p > 10])
+    primes = sorted([p for p in sbk.primes.PRIMES if p > 10])
     for _ in range(100):
         prime      = random.choice(primes)
         secret     = random.randint(0, prime - 1)

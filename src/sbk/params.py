@@ -43,6 +43,7 @@ class Params(typ.NamedTuple):
 
     threshold     : int
     num_pieces    : int
+    pow2prime_idx : int
     kdf_param_id  : KDFParamId
     hash_algo     : HashAlgo
     hash_len_bytes: int
@@ -52,7 +53,10 @@ class Params(typ.NamedTuple):
 
 
 def init_params(
-    threshold: int, num_pieces: int, kdf_param_id: KDFParamId
+    threshold    : int,
+    num_pieces   : int,
+    pow2prime_idx: int,
+    kdf_param_id : KDFParamId,
 ) -> Params:
     if threshold > num_pieces:
         err_msg = (
@@ -64,6 +68,7 @@ def init_params(
     return Params(
         threshold=threshold,
         num_pieces=num_pieces,
+        pow2prime_idx=pow2prime_idx,
         kdf_param_id=kdf_param_id,
         **param_cfg,
     )

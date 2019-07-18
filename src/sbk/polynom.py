@@ -20,8 +20,13 @@ import itertools
 import functools
 import typing as typ
 
+from . import primes
 
-rand_int = functools.partial(random.SystemRandom().randint, 0)
+
+randint = functools.partial(random.SystemRandom().randint, 0)
+
+
+Num = typ.TypeVar('Num', int, 'GFNum')
 
 
 # The Euclidean GCD algorithm is based on the principle that the
@@ -58,50 +63,13 @@ def xgcd(a: int, b: int) -> XGCDResult:
     """Extended euclidien greatest common denominator."""
     if a == 0:
         return XGCDResult(b, 0, 1)
-    else:
-        g, s, t = xgcd(b % a, a)
 
-        q   = b // a
-        res = XGCDResult(g=g, s=t - q * s, t=s)
-        assert res.s * a + res.t * b == res.g
-        return res
+    g, s, t = xgcd(b % a, a)
 
-
-Prime = int
-
-_SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59]
-
-PRIMES = set(_SMALL_PRIMES)
-
-# For this application we want a known prime number as close as
-# possible to our security level; e.g. desired security level of 128
-# bits -- too large and all the ciphertext is large; too small and
-# security is compromised
-
-PRIMES.add(2 ** 256 - 189)
-PRIMES.add(2 ** 128 - 159)
-PRIMES.add(2 ** 127 -   1)  # 12th Mersenne Prime
-PRIMES.add(2 **  64 -  59)
-PRIMES.add(2 **  32 -   5)
-PRIMES.add(2 **  16 -  15)
-PRIMES.add(2 **   8 -   5)
-
-
-def _is_prime(n: int) -> bool:
-    for p in PRIMES:
-        if n == p:
-            return True
-
-        if n < (p * p) and n % p == 0:
-            return False
-
-    if n > max(_SMALL_PRIMES) ** 2:
-        raise NotImplementedError
-
-    return True
-
-
-Num = typ.TypeVar('Num', int, 'GFNum')
+    q   = b // a
+    res = XGCDResult(g=g, s=t - q * s, t=s)
+    assert res.s * a + res.t * b == res.g
+    return res
 
 
 def val_of(other: Num) -> int:
@@ -126,7 +94,7 @@ class GFNum:
         #   are implemented with the assumtion that it is. If p were
         #   not prime, then a multiplicative inverse would not exist
         #   in all cases.
-        assert _is_prime(p)
+        assert primes.is_prime(p)
         self.p = p
 
         self.val = val
@@ -201,7 +169,7 @@ class GF:
         #   not prime, then a multiplicative inverse would not exist
         #   in all cases.
 
-        assert _is_prime(p)
+        assert primes.is_prime(p)
 
         # aka. characteristic, aka. order
         self.p = p
@@ -292,7 +260,9 @@ def poly_eval_fn(poly: typ.List[Num]) -> typ.Callable[[int], int]:
     return eval_at
 
 
-GFPoints = typ.Sequence[Point[GFNum]]
+GFPoint = Point[GFNum]
+
+GFPoints = typ.Sequence[GFPoint]
 
 
 def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
@@ -306,7 +276,7 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
     poly = [gf[secret]]
 
     while len(poly) < threshold:
-        poly.append(gf[rand_int(gf.p)])
+        poly.append(gf[randint(gf.p)])
 
     eval_at = poly_eval_fn(poly)
 
@@ -325,7 +295,7 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
 
 
 def split(
-    prime: int, threshold: int, num_pieces: int, secret: int, rand_int=rand_int
+    prime: int, threshold: int, num_pieces: int, secret: int, randint=randint
 ) -> GFPoints:
     """Generate points of a split secret."""
 

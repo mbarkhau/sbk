@@ -1,5 +1,6 @@
 import os
 
+import sbk.polynom as polynom
 from sbk.enc_util import *
 
 
@@ -331,11 +332,24 @@ def test_bytes2int_fuzz():
 
 
 def test_params2bytes():
-    p = params.init_params(12, 14, 16)
-    assert params2bytes(p) == b"\x00\x0c\x10"
+    p = params.init_params(
+        threshold=12, num_pieces=14, pow2prime_idx=15, kdf_param_id=16
+    )
 
-    p = bytes2params(b"\x00\x0c\x10")
+    expected_data = b"\x00\x0c\x0f\x10"
+
+    assert params2bytes(p) == expected_data
+
+    p = bytes2params(expected_data)
 
     assert p.threshold == 12
     assert p.num_pieces >= 12
-    assert p.kdf_param_id == 16
+    assert p.pow2prime_idx == 15
+    assert p.kdf_param_id  == 16
+
+
+def test_bytes2gfpoint():
+    gf         = polynom.GF(2 ** 128 - 159)
+    in_point   = polynom.Point(gf[7], gf[1234567890])
+    point_data = gfpoint2bytes(in_point)
+    assert bytes2gfpoint(point_data, gf) == in_point

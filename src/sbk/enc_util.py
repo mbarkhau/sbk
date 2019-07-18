@@ -11,6 +11,8 @@ import typing as typ
 import itertools as it
 
 from . import params
+from . import polynom
+
 
 ADJECTIVES = [
     "brave",
@@ -225,16 +227,11 @@ def bytes_repr(data: bytes) -> str:
     return 'b"' + "".join(char_reprs) + '"'
 
 
-def params2bytes(p: params.Params) -> bytes:
-    """Serialize Params."""
-    assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
-    sbk_version = 0
-    return struct.pack("BBB", sbk_version, p.threshold, p.kdf_param_id)
-
-
 def bytes2params(data: bytes) -> params.Params:
     """Deserialize Params."""
-    sbk_version, threshold, kdf_param_id = struct.unpack("BBB", data)
+    sbk_version, threshold, pow2prime_idx, kdf_param_id = struct.unpack(
+        "BBBB", data
+    )
     assert sbk_version == 0
 
     # decoded params doesn't include num_pieces as it's only required
@@ -245,6 +242,31 @@ def bytes2params(data: bytes) -> params.Params:
     return params.Params(
         threshold=threshold,
         num_pieces=num_pieces,
+        pow2prime_idx=pow2prime_idx,
         kdf_param_id=kdf_param_id,
         **config,
     )
+
+
+def params2bytes(p: params.Params) -> bytes:
+    """Serialize Params."""
+    assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
+    sbk_version = 0
+    return struct.pack(
+        "BBBB", sbk_version, p.threshold, p.pow2prime_idx, p.kdf_param_id
+    )
+
+
+def bytes2gfpoint(data: bytes, gf: polynom.GF) -> polynom.GFPoint:
+    x_data = data[:1]
+    y_data = data[1:]
+    x      = bytes2int(x_data)
+    y      = bytes2int(y_data)
+    return polynom.Point(gf[x], gf[y])
+
+
+def gfpoint2bytes(point: polynom.GFPoint) -> bytes:
+    x_data = int2bytes(point.x.val)
+    y_data = int2bytes(point.y.val)
+    assert len(x_data) == 1
+    return x_data + y_data

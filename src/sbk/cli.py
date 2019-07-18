@@ -6,19 +6,23 @@
 # SPDX-License-Identifier: MIT
 """CLI/Imperative shell for SBK."""
 import os
+import io
 import sys
 import time
 import hashlib
 import threading
 import typing as typ
 import pathlib2 as pl
+import itertools as it
 
+import qrcode
 import click
 
 import sbk
 
 from . import kdf
 from . import params
+from . import primes
 from . import enc_util
 
 
@@ -246,19 +250,24 @@ Do you believe your system is secure?
 
 
 SALT_PROMPT_TEXT = """
-Step 1 of 3: Please write down your "salt".
+Step 1 of 3: Please write down and photograph your "salt".
 """
 
 
 SALT_INFO_TEXT = """
-The main purpose of the salt is to prevent a brute-force attack. By
-itself a salt is useless. This means that a salt does not have to be a
-total secret (but there's no reason to make it public either).
+The purpose of the salt is to prevent a brute-force attack. By itself
+a salt is useless, which means that it is not a big problem if the
+salt is not kept secret and an attacker gets a hold of it. That being
+said, there is no good reason to make it public either.
 
-What is most important about a salt is that you never lose it, as you
-will need it to recover your key. It is best to write it down and
-give a copy to each trustee. Write in clear and readable letters, use
-non-erasable ink.
+The main risk for the salt is that it is lost. Without the salt, your
+wallet cannot be recoverd. It is best to make a copy of the salt for
+every trustee. This way, if your trustees need to recover your
+wallet, they can do so without access to your files.
+
+Write in clear and readable letters, use non-erasable ink (ideally
+archival ink). Take a picture and store the picture in your
+Dropbox/Google Drive/One Drive.
 """
 
 
@@ -390,11 +399,12 @@ _yes_all_option = click.option(
 )
 
 
-def _show_secret(label: str, data: bytes) -> None:
+def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
     phrase = enc_util.bytes2phrase(data)
     assert enc_util.phrase2bytes(phrase) == data
 
-    output_lines = []
+    label        = "Phrases for " + label
+    output_lines = [f"         Data   {label:^45}", ""]
     hex_parts    = []
     for i, phrase_line in enumerate(phrase.splitlines()):
         line_no   = i + 1
@@ -403,17 +413,36 @@ def _show_secret(label: str, data: bytes) -> None:
         hex_part = enc_util.bytes2hex(line_data)
         hex_parts.append(hex_part)
 
-        out_line = f"\t{line_no:>2}.  {hex_part}   {phrase_line}"
+        out_line = f"    {line_no:>2}.  {hex_part}   {phrase_line}"
         output_lines.append(out_line)
         if line_no % 4 == 0:
-            output_lines.append("")
+            output_lines.append("    ")
 
     hex_text = enc_util.bytes2hex(data)
     assert enc_util.hex2bytes(hex_text) == data
     assert "".join(hex_parts) == hex_text
 
-    label = "Phrases for " + label
-    echo(f"\t     Data   {label:^45}\n")
+    if qr:
+        qr_renderer = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr_renderer.add_data(data)
+        buf = io.StringIO()
+        qr_renderer.print_ascii(out=buf, invert=True)
+        qr_lines = buf.getvalue().splitlines()
+    else:
+        qr_lines = []
+
+    # TODO mb: Don't interleave if terminal is too narrow.
+    len_padding  = max(map(len, output_lines))
+    output_lines = [
+        ((a or "").ljust(len_padding)) + "  " + (b or "")
+        for a, b in it.zip_longest(output_lines, qr_lines)
+    ]
+
     echo("\n".join(output_lines) + "\n\n")
 
 
@@ -425,9 +454,11 @@ def _split_secret_key(
         yield secret_key
 
 
-DEFAULT_SALT_LEN = 128 // 8
+DEFAULT_SALT_LEN = 160 // 8
 
-DEFAULT_BRAINKEY_LEN = 6
+DEFAULT_SBK_LEN = 256 // 8
+
+DEFAULT_BRAINKEY_LEN = 6  # 48 bits
 
 
 @cli.command()
@@ -442,6 +473,7 @@ def new_key(
     threshold   : int               = 2,
     num_pieces  : int               = 3,
     salt_len    : int               = DEFAULT_SALT_LEN,
+    sbk_len     : int               = DEFAULT_SBK_LEN,
     brainkey_len: int               = DEFAULT_BRAINKEY_LEN,
     yes_all     : bool              = False,
 ) -> None:
@@ -449,7 +481,10 @@ def new_key(
     yes_all or clear()
     yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
 
-    param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id)
+    pow2prime_idx = primes.get_pow2prime_index(sbk_len * 8)
+    param_cfg     = params.init_params(
+        threshold, num_pieces, pow2prime_idx, kdf_param_id
+    )
     param_data = enc_util.params2bytes(param_cfg)
 
     hasher = hashlib.sha256()
@@ -466,7 +501,7 @@ def new_key(
     yes_all or clear()
 
     echo(SALT_PROMPT_TEXT)
-    _show_secret("Salt", param_and_salt_data)
+    _show_secret("Salt", param_and_salt_data, qr=True)
     echo(SALT_INFO_TEXT.strip())
     yes_all or anykey_confirm("Press enter when you have written down the salt")
 

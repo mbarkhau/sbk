@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 """Helper functions related to data/type encoding/decoding."""
 
+import math
 import struct
 import base64
 import typing as typ
@@ -188,11 +189,11 @@ def bytes2int(data: bytes) -> int:
     return num
 
 
-def int2bytes(num: int) -> bytes:
+def int2bytes(num: int, zfill_bytes: int = 1) -> bytes:
     """Convert (arbitrary sized) int to bytes.
 
     Serialized in big-endian order.
-    Only positive integers are encoded.
+    Only integers >= 0 are allowed.
     """
     assert num >= 0
 
@@ -200,6 +201,10 @@ def int2bytes(num: int) -> bytes:
     while num:
         parts.append(struct.pack("<B", num & 0xFF))
         num = num >> 8
+
+    while len(parts) < zfill_bytes:
+        parts.append(b"\x00")
+
     return b"".join(reversed(parts))
 
 
@@ -262,11 +267,23 @@ def bytes2gfpoint(data: bytes, gf: polynom.GF) -> polynom.GFPoint:
     y_data = data[1:]
     x      = bytes2int(x_data)
     y      = bytes2int(y_data)
+
+    if y >= gf.p:
+        raise Exception(f"Invalid prime for point with y >= {gf.p}")
+
     return polynom.Point(gf[x], gf[y])
 
 
 def gfpoint2bytes(point: polynom.GFPoint) -> bytes:
-    x_data = int2bytes(point.x.val)
-    y_data = int2bytes(point.y.val)
+    x = point.x.val
+    if x == 0:
+        raise Exception(f"Invalid point with x={x} == 0")
+    if x >= 256:
+        raise Exception(f"Invalid point with x={x} >= 256")
+
+    bits        = int(math.ceil(math.log2(point.y.p)))
+    zfill_bytes = bits // 8
+    x_data      = int2bytes(x)
+    y_data      = int2bytes(point.y.val, zfill_bytes)
     assert len(x_data) == 1
     return x_data + y_data

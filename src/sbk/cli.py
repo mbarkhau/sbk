@@ -4,6 +4,7 @@
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
+
 """CLI/Imperative shell for SBK."""
 import os
 import io
@@ -15,14 +16,15 @@ import typing as typ
 import pathlib2 as pl
 import itertools as it
 
-import qrcode
 import click
+import qrcode
 
 import sbk
 
 from . import kdf
 from . import params
 from . import primes
+from . import polynom
 from . import enc_util
 
 
@@ -51,7 +53,7 @@ def _clean_help(helmsg: str) -> str:
 #   Maybe this should be rethought so the idom is not needed.
 
 
-def echo(msg: str) -> bool:
+def echo(msg: str = "") -> bool:
     click.echo(msg)
     return True
 
@@ -62,13 +64,16 @@ def clear() -> bool:
 
 
 def confirm(msg: str) -> bool:
-    click.confirm(msg, abort=True)
+    res = click.prompt(msg.strip() + " [y/N]")
+    if "y" not in res.lower():
+        raise click.Abort()
+
     return True
 
 
 def anykey_confirm(message: str) -> bool:
     click.prompt(
-        message,
+        message.strip(),
         default="",
         show_choices=False,
         show_default=False,
@@ -216,7 +221,7 @@ def kdf_info(show_all: bool = False) -> None:
             echo(" ".join(parts))
 
 
-SECURITY_WARNING_PROMPT = """
+SECURITY_WARNING_TEXT = """
 The security of your system is important. Please make sure that:
 
  - You are the only person who can view your screen.
@@ -243,15 +248,29 @@ The security of your system is important. Please make sure that:
    software (despite precautions), disconnecting from any networks
    (aka. air-gap) can sometimes prevent your keys from being leaked.
 
-For more information on setting up a secure system see: TODO
+For more information on setting up a secure system see:
 
+    TODO TODO TODO TODO
+    TODO TODO TODO TODO
+    TODO TODO TODO TODO
+
+"""
+
+
+SECURITY_WARNING_PROMPT = """
 Do you believe your system is secure?
 """
 
 
-SALT_PROMPT_TEXT = """
-Step 1 of 3: Please write down and photograph your "salt".
-"""
+SALT_INFO_TITLE = r'Step 1 of 5: Copy your "salt".'
+
+SBK_KEYGEN_TITLE = r"Step 2 of 5: Deriving Secret Key"
+
+SBK_PIECE_TITLE = r"Step 3 of 5: Copy SBK Piece {piece_no}/{num_pieces}."
+
+BRAINKEY_INFO_TITLE = r"Step 4 of 5: Copy Brainkey."
+
+RECOVERY_VALIDATION_TITLE = r"Step 5 of 5: Validation"
 
 
 SALT_INFO_TEXT = """
@@ -261,35 +280,39 @@ salt is not kept secret and an attacker gets a hold of it. That being
 said, there is no good reason to make it public either.
 
 The main risk for the salt is that it is lost. Without the salt, your
-wallet cannot be recoverd. It is best to make a copy of the salt for
-every trustee. This way, if your trustees need to recover your
-wallet, they can do so without access to your files.
+secret key cannot be recovered. It is best to make a copy of the salt
+for each trustee. This allows your trustees to recover your secret key
+if they cannot access to your files.
 
 Write in clear and readable letters, use non-erasable ink (ideally
-archival ink). Take a picture and store the picture in your
-Dropbox/Google Drive/One Drive.
+archival ink). Take a picture and store the picture in your Dropbox,
+Google Drive, One Drive or other backup location.
+
 """
 
+SALT_INFO_PROMPT = "Press enter when you have copied the salt"
 
-KEY_DERIVATION_INFO_TEXT = r"""
-Step 2 of 4: Deriving Secret Key
+SBK_KEYGEN_TEXT = r"""
+The SBK Secret Key is derived using the computationally and memory
+intensive Argon2 KDF (Key Derivation Function). This ensures that your
+brainkey is secure even if an attacker gains access to the salt.
 
-To make brute force attacks infeasable, the SBK Secret Key is derived
-using the computationally and memory intensive Argon2 Key Derivation
-Function. This ensures that even when an attacker has access to the
-salt, a brainkey with relatively a low entropy of 48 bits is secure.
-
-    Brainkey + Salt -> Secret Key
+    (Brainkey + Salt) -> Secret Key
 """
 
+SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue"
 
-SBK_INFO_TEXT = r"""
-Your "secret key" is recovered by collect together a minimum of
-{threshold} pieces.
 
-Give one "SBK piece" each of your trustees. You should not only
-trust them to act in your interest, but also trust that they are
-competent to keep their SBK piece secure.
+SBK_PIECE_TEXT = r"""
+Give this "SBK Piece" one of your trustees. Your trustees should not
+only be trustworthy in the sense that they will act in your best
+interests, they should also be trustworthy in the sense that they are
+competent to keep this SBK Piece secure and secret.
+"""
+
+RECOVERY_TEXT = r"""
+Your "secret key" is recovered by collecting a minimum of {threshold}
+pieces.
 
                    Split Secret Key
           Split                    . Recovery
@@ -300,17 +323,11 @@ competent to keep their SBK piece secure.
     Secret Key + Salt -> Wallet
 """
 
-
-SPLIT_KEY_WARNING_TEXT = r"""
-Step 3 of 4: Write Down SBK Piece {piece_no}/{num_pieces}.
-
+SBK_PIECE_PROMPT = r"""
 Please make a physical copy of SBK Piece {piece_no}/{num_pieces}.
 """
 
-
-BRAINKEY_WARNING_TEXT = r"""
-Step 3 of 3: Please write down your brainkey.
-
+BRAINKEY_INFO_TEXT = r"""
 Your "brainkey" and "salt" are combined to produce your "secret key".
 Your secret key in turn is combined with your salt to recover your
 "wallet".
@@ -342,6 +359,10 @@ If you do not yet feel confident in your memory:
  3. Destroy the memory aid before you use the wallet.
 
 Press enter to hide your brainkey and to continue
+"""
+
+RECOVERY_VALIDATION_TEXT = """
+Finally, please verify the data you have copied.
 """
 
 
@@ -404,7 +425,7 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
     assert enc_util.phrase2bytes(phrase) == data
 
     label        = "Phrases for " + label
-    output_lines = [f"         Data   {label:^45}", ""]
+    output_lines = [f"      Data   {label:^35}", ""]
     hex_parts    = []
     for i, phrase_line in enumerate(phrase.splitlines()):
         line_no   = i + 1
@@ -413,7 +434,7 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
         hex_part = enc_util.bytes2hex(line_data)
         hex_parts.append(hex_part)
 
-        out_line = f"    {line_no:>2}.  {hex_part}   {phrase_line}"
+        out_line = f"  {line_no:>2}: {hex_part:<4}  {phrase_line}"
         output_lines.append(out_line)
         if line_no % 4 == 0:
             output_lines.append("    ")
@@ -439,7 +460,7 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
     # TODO mb: Don't interleave if terminal is too narrow.
     len_padding  = max(map(len, output_lines))
     output_lines = [
-        ((a or "").ljust(len_padding)) + "  " + (b or "")
+        ((a or "").ljust(len_padding)) + "     " + (b or "")
         for a, b in it.zip_longest(output_lines, qr_lines)
     ]
 
@@ -447,16 +468,23 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
 
 
 def _split_secret_key(
-    secret_key: bytes, threshold: int, num_pieces: int
+    secret_key: bytes, threshold: int, num_pieces: int, pow2prime_idx: int
 ) -> typ.Iterable[bytes]:
-    for _ in range(num_pieces):
-        # TODO
-        yield secret_key
+    secret_int = enc_util.bytes2int(secret_key)
+    prime      = primes.POW2_PRIMES[pow2prime_idx]
+    gf_points  = polynom.split(
+        prime=prime,
+        threshold=threshold,
+        num_pieces=num_pieces,
+        secret=secret_int,
+    )
+    for gfpoint in gf_points:
+        yield enc_util.gfpoint2bytes(gfpoint)
 
 
 DEFAULT_SALT_LEN = 160 // 8
 
-DEFAULT_SBK_LEN = 256 // 8
+DEFAULT_SBK_LEN = 248 // 8
 
 DEFAULT_BRAINKEY_LEN = 6  # 48 bits
 
@@ -479,13 +507,26 @@ def new_key(
 ) -> None:
     """Generate a new key and split it to pieces."""
     yes_all or clear()
-    yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
+    yes_all or echo(SECURITY_WARNING_TEXT)
+    yes_all or confirm(SECURITY_WARNING_PROMPT)
 
     pow2prime_idx = primes.get_pow2prime_index(sbk_len * 8)
     param_cfg     = params.init_params(
         threshold, num_pieces, pow2prime_idx, kdf_param_id
     )
-    param_data = enc_util.params2bytes(param_cfg)
+    param_data        = enc_util.params2bytes(param_cfg)
+    decoded_param_cfg = enc_util.bytes2params(param_data)
+
+    is_param_recoverable = (
+        param_cfg.threshold         == decoded_param_cfg.threshold
+        and param_cfg.pow2prime_idx == decoded_param_cfg.pow2prime_idx
+        and param_cfg.kdf_param_id  == decoded_param_cfg.kdf_param_id
+    )
+
+    if not is_param_recoverable:
+        raise Exception(
+            "Integrity error. Aborting to prevent use of invald salt."
+        )
 
     hasher = hashlib.sha256()
     hasher.update(email.encode("utf-8"))
@@ -500,19 +541,17 @@ def new_key(
     # salt
     yes_all or clear()
 
-    echo(SALT_PROMPT_TEXT)
+    echo(SALT_INFO_TITLE)
     _show_secret("Salt", param_and_salt_data, qr=True)
-    echo(SALT_INFO_TEXT.strip())
-    yes_all or anykey_confirm("Press enter when you have written down the salt")
+    echo(SALT_INFO_TEXT)
+    yes_all or anykey_confirm(SALT_INFO_PROMPT)
 
     hasher.update(os.urandom(brainkey_len))
     brainkey_data = hasher.digest()[:brainkey_len]
 
-    split_key_warning_text = SPLIT_KEY_WARNING_TEXT.format(
-        piece_no=1, threshold=threshold, num_pieces=num_pieces
-    )
     yes_all or clear()
-    yes_all or echo(split_key_warning_text)
+    yes_all or echo(SBK_KEYGEN_TITLE.strip())
+    yes_all or echo(SBK_KEYGEN_TEXT)
 
     secret_key = _derive_key(
         brainkey_data,
@@ -520,32 +559,47 @@ def new_key(
         kdf_param_id,
         label="Deriving Secret Key",
     )
-    secret_pieces = list(
-        _split_secret_key(
-            secret_key, threshold=threshold, num_pieces=num_pieces
-        )
+    echo("\n\n")
+    yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
+
+    secret_pieces = _split_secret_key(
+        secret_key,
+        threshold=threshold,
+        num_pieces=num_pieces,
+        pow2prime_idx=pow2prime_idx,
     )
 
     # secret pieces
     for i, secret_piece in enumerate(secret_pieces):
-        piece_no               = i + 1
-        split_key_warning_text = SPLIT_KEY_WARNING_TEXT.format(
-            piece_no=piece_no, threshold=threshold, num_pieces=num_pieces
-        )
+        piece_no = i + 1
         yes_all or clear()
-        echo(split_key_warning_text)
+        info = {
+            'piece_no'  : piece_no,
+            'threshold' : threshold,
+            'num_pieces': num_pieces,
+        }
+        sbk_piece_title  = SBK_PIECE_TITLE.format(**info).strip()
+        sbk_piece_prompt = SBK_PIECE_PROMPT.format(**info)
+
+        echo(sbk_piece_title)
+        echo(SBK_PIECE_TEXT)
+
         _show_secret(f"Secret Piece {piece_no}/{num_pieces}", secret_piece)
-        yes_all or anykey_confirm("Press enter to continue")
+
+        yes_all or anykey_confirm(sbk_piece_prompt)
 
     # brainkey
     yes_all or clear()
-    echo(BRAINKEY_WARNING_TEXT)
+    echo(BRAINKEY_INFO_TITLE.strip())
+    echo(BRAINKEY_INFO_TEXT)
 
-    yes_all or anykey_confirm("Press enter to show your brainkey\n")
+    yes_all or anykey_confirm("Press enter to show your brainkey")
+
+    echo()
 
     _show_secret("Brainkey", brainkey_data)
 
-    yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT.strip())
+    yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT)
     yes_all or clear()
 
     # wallet seed
@@ -553,6 +607,17 @@ def new_key(
     yes_all or clear()
 
     # recovery test
+    yes_all or clear()
+    yes_all or echo(RECOVERY_VALIDATION_TITLE)
+    yes_all or echo(RECOVERY_VALIDATION_TEXT)
+
+    yes_all or anykey_confirm("noop")
+
+
+_phrase0_words = [w.upper() for w in enc_util.ADJECTIVES]
+_phrase1_words = [w.upper() for w in enc_util.TITLES]
+_phrase2_words = [w.upper() for w in enc_util.CITIES]
+_phrase3_words = [w.upper() for w in enc_util.PLACES]
 
 
 @cli.command()
@@ -598,12 +663,14 @@ def derive_key(kdf_param_id=PARAM_ID_DEFAULT) -> None:
 
 # def split_key():
 #     yes_all or clear()
-#     yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
+#     yes_all or confirm(SECURITY_WARNING_TEXT)
+#     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
 
 # def recover_key():
 #     yes_all or clear()
-#     yes_all or confirm(SECURITY_WARNING_PROMPT.strip())
+#     yes_all or confirm(SECURITY_WARNING_TEXT)
+#     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
 
 if __name__ == '__main__':

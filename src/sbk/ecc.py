@@ -54,26 +54,24 @@ PacketBlockIndexes = Seq[BlockIndexes]
 def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     """List of block indexes used to generate packets of a block.
 
-    n: message length (must be true: n % 4 == 0)
+    n: message length (must be: n % 4 == 0)
     M: the last message byte (index n-1)
 
-    example for n=20
+    example for n=24  (24 * 8 = 192 bit)
 
-       message data
-    a =  0- 5  b =  5-10
-    c = 10-15  d = 15-20
+              message data
+    A0-2  a = 0- 6    B0-2  c = 12-18
+    A3-5  b = 6-12    B3-5  d = 18-24
 
-         ecc data
-    e = a^b    f = b^c
-    g = c^d    h = a^d
+               ecc data
+    C0-2  e = a^c^d   D0-2  g = a^c^d
+    C3-5  f = a^b^d   D3-5  h = b^c^d
 
-    Phrases are just a different encoding of the message data.
+    C0-2  e = c^d     D0-2  g = a^c
+    C3-5  f = b^d     D3-5  h = a^b
 
-    a=0 e=0^1^I    phrase(0) phrase(1)    b=1 f=0^1^J
-    a=2 e=...      phrase(2) phrase(3)    b=3 f=...
-    ...
-    c=I g=0^I^J    phrase(I) phrase(J)    d=J h=1^I^J
-    c=K g=...      phrase(K) phrase(M)    d=M h=...
+    Phrases are just a different encoding of
+    the message data, without any ecc data.
     """
     assert msg_len % 4 == 0
     pkt_len = msg_len // 4
@@ -83,6 +81,11 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     c = (BlockIndex(pkt_len * 2, pkt_len * 3),)
     d = (BlockIndex(pkt_len * 3, pkt_len * 4),)
 
+    # e = c + d
+    # f = b + d
+    # g = a + c
+    # h = a + b
+
     e = a + b + c
     f = a + b + d
     g = a + c + d
@@ -91,7 +94,7 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     return [a, b, c, d, e, f, g, h]
 
 
-def _iter_lt_encoded(msg: bytes) -> Iter[Packet]:
+def _iter_lt_encoded(msg: Message) -> Iter[Packet]:
     msg_len = len(msg)
     pkt_len = msg_len // 4
 
@@ -102,6 +105,10 @@ def _iter_lt_encoded(msg: bytes) -> Iter[Packet]:
         for pbi in indexes:
             packet = xor_bytes(packet, pbi.apply(msg))
         yield packet
+
+
+def encode2packets(msg: Message) -> typ.List[Packet]:
+    return list(_iter_lt_encoded(msg))
 
 
 def encode(msg: Message) -> Block:
@@ -369,8 +376,11 @@ def _top_candidates(indexed_packets: IndexedPackets) -> bytes:
 def decode_packets(maybe_packets: MaybePackets) -> Message:
     """Decode packets to original message."""
     assert len(maybe_packets) == 8
+
     indexed_packets: IndexedPackets = {
-        idx: pkt for idx, pkt in enumerate(maybe_packets) if pkt is not None
+        idx: pkt
+        for idx, pkt in enumerate(maybe_packets)
+        if pkt is not None
     }
     if len(indexed_packets) < 4:
         raise DecodeError("Not enough data")

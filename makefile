@@ -295,6 +295,8 @@ update: build/deps.txt
 git_hooks:
 	@rm -f "$(PWD)/.git/hooks/pre-push"
 	ln -s "$(PWD)/scripts/pre-push-hook.sh" "$(PWD)/.git/hooks/pre-push"
+	@rm -f "$(PWD)/.git/hooks/pre-commit"
+	ln -s "$(PWD)/scripts/pre-commit-hook.sh" "$(PWD)/.git/hooks/pre-commit"
 
 
 ## -- Integration --
@@ -306,6 +308,15 @@ lint:
 	@printf "flake8 ..\n"
 	@$(DEV_ENV)/bin/flake8 src/
 	@printf "\e[1F\e[9C ok\n"
+	@printf "sjfmt ..\n"
+	@$(DEV_ENV)/bin/sjfmt \
+		--target-version py36 \
+		--skip-string-normalization \
+		--line-length=80 \
+		--check \
+		src/ test/
+	@printf "\e[1F\e[9C ok\n"
+
 
 
 ## Run mypy type checker

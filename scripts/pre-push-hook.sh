@@ -8,5 +8,4 @@ git diff --exit-code --stat test/;
 git diff --exit-code --stat scripts/;
 git diff --exit-code --stat requirements/;
 
-make lint;
-make test;
+make lint mypy devtest;

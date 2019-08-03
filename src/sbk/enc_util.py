@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 """Helper functions related to data/type encoding/decoding."""
 
+import re
 import math
 import struct
 import base64
@@ -150,13 +151,13 @@ def bytes2phrase(data: bytes) -> PhraseStr:
 
 def phrase2bytes(phrase: PhraseStr) -> bytes:
     """Decode human readable phrases to bytes."""
+    corpus = [ADJECTIVES, TITLES, CITIES, PLACES]
+
     filler = {"the", "at", ""}
     parts  = phrase.replace(".", "").lower().split()
     parts  = [p for p in parts if p not in filler]
-    corpus = [ADJECTIVES, TITLES, CITIES, PLACES]
 
     data: typ.List[int] = []
-
     for i, part in enumerate(parts):
         corpus_words = corpus[i % 4]
         part_idx     = corpus_words.index(part)
@@ -300,9 +301,10 @@ PartVal   = bytes
 Part      = typ.Tuple[PartIndex, PartVal]
 
 
-IntCode      = str
-IntCodes     = typ.List[str]
-IntCodeParts = typ.List[Part]
+IntCode       = str
+IntCodes      = typ.Sequence[str]
+MaybeIntCodes = typ.Sequence[typ.Optional[str]]
+IntCodeParts  = typ.Sequence[Part]
 
 
 def _bytes2intcode_parts(data: bytes) -> typ.Iterable[str]:
@@ -321,13 +323,11 @@ def bytes2intcode(data: bytes) -> IntCode:
     The main purpose of the intcode format is to be
     compact, redundant and resilient to input errors.
     """
-    # packets = ecc.encode2packets(data)
-    # print(packets)
     data_with_ecc = ecc.encode(data)
     return "\n".join(_bytes2intcode_parts(data_with_ecc))
 
 
-def _intcode2bytes_parts(intcodes: IntCodes) -> typ.Iterable[Part]:
+def _intcode2bytes_parts(intcodes: MaybeIntCodes) -> typ.Iterable[Part]:
     """Decode part index and part values.
 
     Since the range for part numbers is limited, we assume
@@ -336,6 +336,9 @@ def _intcode2bytes_parts(intcodes: IntCodes) -> typ.Iterable[Part]:
     part_no_offset = 0
     prev_part_no   = 3
     for part in intcodes:
+        if part is None:
+            continue
+
         part_num = int(part, 10)
         part_no  = part_num >> 8
 
@@ -350,13 +353,19 @@ def _intcode2bytes_parts(intcodes: IntCodes) -> typ.Iterable[Part]:
         yield idx, part_val
 
 
-def intcode_parts2bytes(intcodes: IntCodes, block_len: int) -> bytes:
-    packet_size = block_len // 8  # aka. parts per packet
-    assert packet_size * 8 == block_len
-
-    packets = [b""] * 8
+def intcode_parts2packets(
+    intcodes: IntCodes, packet_size: int
+) -> typ.List[bytes]:
+    num_packets = len(intcodes) // packet_size
+    packets     = [b""] * num_packets
     for idx, part_val in _intcode2bytes_parts(intcodes):
         packets[idx // packet_size] += part_val
+    return packets
+
+
+def intcode_parts2bytes(intcodes: IntCodes, block_len: int) -> bytes:
+    packet_size = block_len // 8  # aka. parts per packet
+    packets     = intcode_parts2packets(intcodes, packet_size)
 
     # NOTE: It is unfortunate that missing one part makes
     #   the whole packet ivalid. A better ECC algo would
@@ -372,24 +381,98 @@ def intcode2bytes(intcode: IntCode) -> bytes:
     return intcode_parts2bytes(intcodes, block_len=len(intcodes))
 
 
-def format_secret(data: bytes) -> typ.Iterable[str]:
+# https://regex101.com/r/iQKt5L/2
+FORMATTED_LINE_PATTERN = r"""
+[AB]\d:[ ]
+    (\d{4})
+    [ ]
+    (\d{4})
+\s+
+The[ ]
+    ([A-Z]+)\s+([A-Z]+)
+\s+at[ ]the[ ]
+    ([A-Z]+)\s+([A-Z]+)\.
+\s+
+[CD]\d:[ ]
+    (\d{4})
+    [ ]
+    (\d{4})
+"""
+
+
+FORMATTED_LINE_RE = re.compile(FORMATTED_LINE_PATTERN, flags=re.VERBOSE)
+
+
+Lines = typ.Iterable[str]
+
+
+def format_secret(data: bytes, add_ecc=True) -> Lines:
     phrase = bytes2phrase(data)
     assert phrase2bytes(phrase) == data
 
-    code_parts = []
-    for i, phrase_line in enumerate(phrase.splitlines()):
-        line_no   = i + 1
-        line_data = phrase2bytes(phrase_line)
+    if add_ecc:
+        intcode = bytes2intcode(data)
+        assert intcode2bytes(intcode) == data
+    else:
+        # This allows the function to be used when
+        # only part of the secret has been input.
+        intcode = "\n".join(_bytes2intcode_parts(data))
 
-        int_part  = bytes2int(line_data)
-        code_part = line_no * 8 ** 16
-        code_parts.append(f"{code_part:06}")
+    phrase_lines    = phrase.splitlines()
+    split_offset    = len(phrase_lines) // 2
+    phrases_padding = max(map(len, phrase_lines))
 
-        out_line = f"  {line_no:>2}: {int_part:<4}  {phrase_line}"
+    intcodes   = intcode.splitlines()
+    ecc_offset = len(intcodes) // 2
+
+    for i, phrase_line in enumerate(phrase_lines):
+        if i == split_offset:
+            yield ""
+
+        data_0 = intcodes[i * 2]
+        data_1 = intcodes[i * 2 + 1]
+
+        if add_ecc:
+            ecc_0 = intcodes[ecc_offset + i * 2]
+            ecc_1 = intcodes[ecc_offset + i * 2 + 1]
+        else:
+            ecc_0 = ecc_1 = ""
+
+        marker_id = i % split_offset
+        prefix_id = f"A{marker_id}" if i < split_offset else f"B{marker_id}"
+        suffix_id = f"C{marker_id}" if i < split_offset else f"D{marker_id}"
+
+        prefix   = f"{prefix_id}: {data_0} {data_1}"
+        suffix   = f"{suffix_id}: {ecc_0} {ecc_1}"
+        out_line = f"{prefix}   {phrase_line:<{phrases_padding}}   {suffix}"
         yield out_line
-        if line_no % 4 == 0:
-            yield "    "
 
-    hex_text = bytes2hex(data)
-    assert hex2bytes(hex_text) == data
-    assert "".join(code_parts) == hex_text
+
+class ParsedSecret(typ.NamedTuple):
+    phrases   : typ.List[str]
+    data_codes: typ.List[str]
+    ecc_codes : typ.List[str]
+
+
+def parse_formatted_secret(text: str) -> ParsedSecret:
+    phrases   : typ.List[str] = []
+    data_codes: typ.List[str] = []
+    ecc_codes : typ.List[str] = []
+
+    for i, line in enumerate(text.splitlines()):
+        if not line.strip():
+            continue
+        line_no = i + 1
+
+        match = FORMATTED_LINE_RE.match(line.strip())
+        if match is None:
+            err_msg = f"Invalid input at line {line_no}: {line}"
+            raise Exception(err_msg)
+
+        (data_0, data_1, p0, p1, p2, p3, ecc_0, ecc_1) = match.groups()
+
+        data_codes.extend([data_0, data_1])
+        phrases.extend([p0, p1, p2, p3])
+        ecc_codes.extend([ecc_0, ecc_1])
+
+    return ParsedSecret(phrases, data_codes, ecc_codes)

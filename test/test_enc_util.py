@@ -405,4 +405,19 @@ def test_intcode_fuzz_loss(data_len):
 
 
 def test_format_secret():
-    test_format_secret
+    data_len    = 24
+    block_len   = data_len * 2
+    packet_size = block_len // 8
+
+    data      = os.urandom(data_len)
+    formatted = "\n".join(format_secret(data))
+
+    parsed = parse_formatted_secret(formatted)
+
+    assert phrase2bytes(" ".join(parsed.phrases)) == data
+    packets = intcode_parts2packets(parsed.data_codes, packet_size)
+    assert b"".join(packets) == data
+
+    codes   = parsed.data_codes + parsed.ecc_codes
+    decoded = intcode_parts2bytes(codes, block_len)
+    assert decoded == data

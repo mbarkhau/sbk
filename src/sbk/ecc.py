@@ -57,18 +57,38 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     n: message length (must be: n % 4 == 0)
     M: the last message byte (index n-1)
 
+    block length = n * 2
+
     example for n=24  (24 * 8 = 192 bit)
 
               message data
-    A0-2  a = 0- 6    B0-2  c = 12-18
-    A3-5  b = 6-12    B3-5  d = 18-24
+    a = 0- 5    b = 12-17
+    a = 6-11    b = 18-23
 
                ecc data
-    C0-2  e = a^c^d   D0-2  g = a^c^d
-    C3-5  f = a^b^d   D3-5  h = b^c^d
+    e = a^c^d   g = a^c^d
+    f = a^b^d   h = b^c^d
 
     Phrases are just a different encoding of
     the message data, without any ecc data.
+
+    Note that the format/layout on paper is
+    sideways compared to the above.
+
+         Data            Phrases              ECC
+    A0: a0  a1    Phrase  0 Phrase  1    C0: e0  e1
+    A1: a2  a3    Phrase  2 Phrase  3    C1: e2  e3
+    A2: a4  a5    Phrase  4 Phrase  5    C2: e4  e5
+    A3: b0  b1    Phrase  6 Phrase  7    C3: f0  f1
+    A4: b2  b3    Phrase  8 Phrase  9    C4: f2  f3
+    A5: b4  b5    Phrase 10 Phrase 11    C5: f4  f5
+
+    B0: c0  c1    Phrase 12 Phrase 13    D0: g0  g1
+    B1: c2  c3    Phrase 14 Phrase 15    D1: g2  g3
+    B2: c4  c5    Phrase 16 Phrase 17    D2: g4  g5
+    B3: d0  d1    Phrase 18 Phrase 19    D3: h0  h1
+    B4: d2  d3    Phrase 20 Phrase 21    D4: h2  h3
+    B5: d4  d5    Phrase 22 Phrase 23    D5: h4  h5
     """
     assert msg_len % 4 == 0
     pkt_len = msg_len // 4

@@ -17,15 +17,12 @@ def test_xor_bytes():
 
 def test_packet_block_indexes():
     _bi = sbk.ecc.BlockIndex
+
     expected = [
         (_bi( 0,  6),),
         (_bi( 6, 12),),
         (_bi(12, 18),),
         (_bi(18, 24),),
-        # (_bi(12, 18), _bi(18, 24)),
-        # (_bi( 6, 12), _bi(18, 24)),
-        # (_bi( 0,  6), _bi(12, 18)),
-        # (_bi( 0,  6), _bi( 6, 12)),
         (_bi( 0,  6), _bi( 6, 12), _bi(12, 18)),
         (_bi( 0,  6), _bi( 6, 12), _bi(18, 24)),
         (_bi( 0,  6), _bi(12, 18), _bi(18, 24)),
@@ -42,14 +39,6 @@ def test_encode():
     assert block.startswith(message)
     ecc_data = bytes(
         [
-        #     ord(b'c') ^ ord(b'd'),
-        #     ord(b'3') ^ ord(b'4'),
-        #     ord(b'b') ^ ord(b'd'),
-        #     ord(b'2') ^ ord(b'4'),
-        #     ord(b'a') ^ ord(b'c'),
-        #     ord(b'1') ^ ord(b'3'),
-        #     ord(b'a') ^ ord(b'b'),
-        #     ord(b'1') ^ ord(b'2'),
             ord(b'a') ^ ord(b'b') ^ ord(b'c'),
             ord(b'1') ^ ord(b'2') ^ ord(b'3'),
             ord(b'a') ^ ord(b'b') ^ ord(b'd'),

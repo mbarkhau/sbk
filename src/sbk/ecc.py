@@ -67,9 +67,6 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     C0-2  e = a^c^d   D0-2  g = a^c^d
     C3-5  f = a^b^d   D3-5  h = b^c^d
 
-    C0-2  e = c^d     D0-2  g = a^c
-    C3-5  f = b^d     D3-5  h = a^b
-
     Phrases are just a different encoding of
     the message data, without any ecc data.
     """
@@ -80,11 +77,6 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     b = (BlockIndex(pkt_len * 1, pkt_len * 2),)
     c = (BlockIndex(pkt_len * 2, pkt_len * 3),)
     d = (BlockIndex(pkt_len * 3, pkt_len * 4),)
-
-    # e = c + d
-    # f = b + d
-    # g = a + c
-    # h = a + b
 
     e = a + b + c
     f = a + b + d
@@ -378,9 +370,7 @@ def decode_packets(maybe_packets: MaybePackets) -> Message:
     assert len(maybe_packets) == 8
 
     indexed_packets: IndexedPackets = {
-        idx: pkt
-        for idx, pkt in enumerate(maybe_packets)
-        if pkt is not None
+        idx: pkt for idx, pkt in enumerate(maybe_packets) if pkt is not None
     }
     if len(indexed_packets) < 4:
         raise DecodeError("Not enough data")

@@ -1,4 +1,6 @@
 import os
+import string
+import random
 
 import pytest
 
@@ -284,8 +286,8 @@ def test_phrase_hardcoded():
 
 
 def test_phrase_fuzz():
-    for i in range(100):
-        data   = os.urandom(10)
+    for i in range(1, 100):
+        data   = os.urandom(i % 20)
         phrase = bytes2phrase(data)
         assert phrase2bytes(phrase) == data
 
@@ -364,3 +366,43 @@ def test_bytes2gfpoint():
     in_point   = polynom.Point(gf[7], gf[1234567890])
     point_data = gfpoint2bytes(in_point)
     assert bytes2gfpoint(point_data, gf) == in_point
+
+
+def test_intcode_fuzz():
+    print()
+    bytes2intcode(os.urandom(12))
+    for i in range(0, 50, 4):
+        data_len = i % 20 + 4
+        data     = os.urandom(data_len)
+        intcode  = bytes2intcode(data)
+        decoded  = intcode2bytes(intcode)
+        assert decoded == data
+
+        lines = intcode.splitlines()
+        assert all(len(l) == 4 for l in lines)
+        assert len(lines) == data_len * 2
+        if intcode:
+            assert "".join(lines).isdigit()
+
+
+TEST_DATA = (string.ascii_letters + "0123456789").encode('ascii')
+
+
+@pytest.mark.parametrize("data_len", range(16, 33, 4))
+def test_intcode_fuzz_loss(data_len):
+    for _ in range(5):
+        data    = TEST_DATA[:data_len]
+        intcode = bytes2intcode(data)
+        decoded = intcode2bytes(intcode)
+        assert decoded == data
+
+        parts     = intcode.split("\n")
+        block_len = len(parts)
+        clear_idx = random.randrange(0, len(parts))
+        parts[clear_idx] = None
+        decoded = intcode_parts2bytes(parts, block_len)
+        assert decoded == data
+
+
+def test_format_secret():
+    test_format_secret

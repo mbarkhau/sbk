@@ -11,6 +11,7 @@ import base64
 import typing as typ
 import itertools as it
 
+from . import ecc
 from . import params
 from . import polynom
 
@@ -121,25 +122,29 @@ assert len(PLACE_PARTS ) == 2 ** 8
 # for person, place in zip(PERSON_PARTS, PLACE_PARTS):
 #     print(person, place, end="")
 
+
+def _char_at(data: bytes, i: int) -> int:
+    # for py2 compat
+    return ord(data[i : i + 1])
+
+
 PhraseStr = str
+
+
+def _bytes2phrase_parts(data: bytes) -> typ.Iterable[str]:
+    corpus = [PERSON_PARTS, PLACE_PARTS]
+
+    for i in range(len(data)):
+        part_idx = _char_at(data, i)
+        part     = corpus[i % 2][part_idx]
+        yield part
 
 
 def bytes2phrase(data: bytes) -> PhraseStr:
     r"""Encode data as a human readable phrases."""
-
-    corpus = [PERSON_PARTS, PLACE_PARTS]
-    parts  = []
-
-    for i in range(len(data)):
-        part_char = data[i : i + 1]
-        part_idx  = ord(part_char)
-        part      = corpus[i % 2][part_idx]
-        parts.append(part)
-
-    phrase = "".join(parts)
+    phrase = "".join(_bytes2phrase_parts(data))
     if len(data) % 2 != 0:
         phrase = phrase.strip() + "."
-
     return phrase.strip()
 
 
@@ -160,6 +165,7 @@ def phrase2bytes(phrase: PhraseStr) -> bytes:
         else:
             data[-1] += part_idx
 
+    # NOTE: python3 specific
     return bytes(data)
 
 
@@ -287,3 +293,103 @@ def gfpoint2bytes(point: polynom.GFPoint) -> bytes:
     y_data      = int2bytes(point.y.val, zfill_bytes)
     assert len(x_data) == 1
     return x_data + y_data
+
+
+PartIndex = int
+PartVal   = bytes
+Part      = typ.Tuple[PartIndex, PartVal]
+
+
+IntCode      = str
+IntCodes     = typ.List[str]
+IntCodeParts = typ.List[Part]
+
+
+def _bytes2intcode_parts(data: bytes) -> typ.Iterable[str]:
+    for idx in range(len(data)):
+        part_no = (idx % 34) + 4
+        assert 4 <= part_no <= 37
+        part_val = _char_at(data, idx)
+        part_num = (part_no << 8) + part_val
+        assert 1024 <= part_num <= 9983
+        yield str(part_num)
+
+
+def bytes2intcode(data: bytes) -> IntCode:
+    """Encode data to intcode.
+
+    The main purpose of the intcode format is to be
+    compact, redundant and resilient to input errors.
+    """
+    # packets = ecc.encode2packets(data)
+    # print(packets)
+    data_with_ecc = ecc.encode(data)
+    return "\n".join(_bytes2intcode_parts(data_with_ecc))
+
+
+def _intcode2bytes_parts(intcodes: IntCodes) -> typ.Iterable[Part]:
+    """Decode part index and part values.
+
+    Since the range for part numbers is limited, we assume
+    consecutive input for intcodes longer than 34 bytes.
+    """
+    part_no_offset = 0
+    prev_part_no   = 3
+    for part in intcodes:
+        part_num = int(part, 10)
+        part_no  = part_num >> 8
+
+        if part_no < prev_part_no:
+            # assume the wrap around happened
+            part_no_offset += 34
+
+        prev_part_no = part_no
+
+        part_val = bytes([part_num & 0xFF])
+        idx      = (part_no_offset + part_no) - 4
+        yield idx, part_val
+
+
+def intcode_parts2bytes(intcodes: IntCodes, block_len: int) -> bytes:
+    packet_size = block_len // 8  # aka. parts per packet
+    assert packet_size * 8 == block_len
+
+    packets = [b""] * 8
+    for idx, part_val in _intcode2bytes_parts(intcodes):
+        packets[idx // packet_size] += part_val
+
+    # NOTE: It is unfortunate that missing one part makes
+    #   the whole packet ivalid. A better ECC algo would
+    #   make use of all available parts.
+    maybe_packets: ecc.MaybePackets = [
+        pkt if len(pkt) == packet_size else None for pkt in packets
+    ]
+    return ecc.decode_packets(maybe_packets)
+
+
+def intcode2bytes(intcode: IntCode) -> bytes:
+    intcodes = typ.cast(IntCodes, intcode.splitlines())
+    return intcode_parts2bytes(intcodes, block_len=len(intcodes))
+
+
+def format_secret(data: bytes) -> typ.Iterable[str]:
+    phrase = bytes2phrase(data)
+    assert phrase2bytes(phrase) == data
+
+    code_parts = []
+    for i, phrase_line in enumerate(phrase.splitlines()):
+        line_no   = i + 1
+        line_data = phrase2bytes(phrase_line)
+
+        int_part  = bytes2int(line_data)
+        code_part = line_no * 8 ** 16
+        code_parts.append(f"{code_part:06}")
+
+        out_line = f"  {line_no:>2}: {int_part:<4}  {phrase_line}"
+        yield out_line
+        if line_no % 4 == 0:
+            yield "    "
+
+    hex_text = bytes2hex(data)
+    assert hex2bytes(hex_text) == data
+    assert "".join(code_parts) == hex_text

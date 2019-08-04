@@ -278,9 +278,9 @@ def bytes_repr(data: bytes) -> str:
 
 def bytes2params(data: bytes) -> params.Params:
     """Deserialize Params."""
-    sbk_version, threshold, pow2prime_idx, kdf_param_id = struct.unpack(
-        "BBBB", data
-    )
+    field0, threshold, kdf_param_id = struct.unpack("BBB", data)
+    sbk_version  = field0 >> 4
+    hash_len_num = field0 & 0x0F
     assert sbk_version == 0
 
     # decoded params doesn't include num_pieces as it's only required
@@ -288,22 +288,32 @@ def bytes2params(data: bytes) -> params.Params:
     num_pieces = threshold
     config     = params.PARAM_CONFIGS_BY_ID[kdf_param_id]
 
+    hash_len_bytes = (hash_len_num + 1) * 4
+    pow2prime_idx  = primes.get_pow2prime_index(hash_len_bytes * 8)
+
     return params.Params(
         threshold=threshold,
         num_pieces=num_pieces,
         pow2prime_idx=pow2prime_idx,
         kdf_param_id=kdf_param_id,
+        hash_len_bytes=hash_len_bytes,
         **config,
     )
 
 
 def params2bytes(p: params.Params) -> bytes:
-    """Serialize Params."""
-    assert p.kdf_param_id in params.PARAM_CONFIGS_BY_ID
+    """Serialize Params.
+
+    Since these fields are part of the salt,
+    we try to keep the serialized params small
+    and leave more room for the randomness.
+    """
+    hash_len_num = p.hash_len_bytes // 4 - 1
+    assert 0 <= hash_len_num < 2 ** 4
+
     sbk_version = 0
-    return struct.pack(
-        "BBBB", sbk_version, p.threshold, p.pow2prime_idx, p.kdf_param_id
-    )
+    field0      = (sbk_version << 4) + hash_len_num
+    return struct.pack("BBB", field0, p.threshold, p.kdf_param_id)
 
 
 def bytes2gfpoint(data: bytes, gf: polynom.GF) -> polynom.GFPoint:

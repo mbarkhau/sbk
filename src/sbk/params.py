@@ -14,6 +14,8 @@ import pathlib2 as pl
 
 import argon2
 
+from . import primes
+
 
 log = logging.getLogger(__name__)
 
@@ -45,18 +47,18 @@ class Params(typ.NamedTuple):
     num_pieces    : int
     pow2prime_idx : int
     kdf_param_id  : KDFParamId
-    hash_algo     : HashAlgo
     hash_len_bytes: int
+    hash_algo     : HashAlgo
     memory_cost   : KibiBytes
     time_cost     : Iterations
     parallelism   : int
 
 
 def init_params(
-    threshold    : int,
-    num_pieces   : int,
-    pow2prime_idx: int,
-    kdf_param_id : KDFParamId,
+    threshold     : int,
+    num_pieces    : int,
+    kdf_param_id  : KDFParamId,
+    hash_len_bytes: int,
 ) -> Params:
     if threshold > num_pieces:
         err_msg = (
@@ -64,23 +66,31 @@ def init_params(
         )
         raise ValueError(err_msg)
 
+    # NOTE: we need one byte for the x value
+    prime_bits    = hash_len_bytes * 8 - 8
+    pow2prime_idx = primes.get_pow2prime_index(prime_bits)
+    assert 0 < hash_len_bytes <= 64
+    assert hash_len_bytes % 4 == 0, hash_len_bytes
+    assert 0 <= pow2prime_idx < len(primes.POW2_PRIMES), pow2prime_idx
+    assert kdf_param_id in PARAM_CONFIGS_BY_ID, kdf_param_id
+
     param_cfg = PARAM_CONFIGS_BY_ID[kdf_param_id]
     return Params(
         threshold=threshold,
         num_pieces=num_pieces,
         pow2prime_idx=pow2prime_idx,
         kdf_param_id=kdf_param_id,
+        hash_len_bytes=hash_len_bytes,
         **param_cfg,
     )
 
 
 INSECURE: KDFParamId = 1
 INSECURE_PARAM_CONFIG = {
-    'hash_algo'     : HashAlgo.ARGON2_V19_ID.value,
-    'hash_len_bytes': 8,
-    'memory_cost'   : 1024,
-    'time_cost'     : 1,
-    'parallelism'   : 32,
+    'hash_algo'  : HashAlgo.ARGON2_V19_ID.value,
+    'memory_cost': 1024,
+    'time_cost'  : 1,
+    'parallelism': 32,
 }
 
 # Some notes on parameter choices.
@@ -129,10 +139,7 @@ def _init_configs() -> ParamsByConfigId:
         {'ts': [1, 3, 10, 33, 100], 'p': 32, 'm': 28000 * MB},
     ]
 
-    BASE_PARAMS = {
-        'hash_algo'     : HashAlgo.ARGON2_V19_ID.value,
-        'hash_len_bytes': 8,
-    }
+    BASE_PARAMS = {'hash_algo': HashAlgo.ARGON2_V19_ID.value}
 
     param_configs_by_id: ParamsByConfigId = {INSECURE: INSECURE_PARAM_CONFIG}
 
@@ -145,6 +152,9 @@ def _init_configs() -> ParamsByConfigId:
             params['time_cost'  ] = time_cost
 
             param_configs_by_id[m_idx * 5 + t_idx] = params
+
+    assert min(param_configs_by_id) >= 0
+    assert max(param_configs_by_id) < 256
 
     # import hashlib
     #

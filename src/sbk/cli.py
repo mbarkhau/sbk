@@ -521,21 +521,25 @@ def new_key(
     yes_all     : bool              = False,
 ) -> None:
     """Generate a new key and split it to pieces."""
+
+    # length that use ecc must be multiples of 4
+    # round up to nearest multiple.
+    salt_len = (salt_len + 3) // 4 * 4
+    key_len  = (key_len  + 3) // 4 * 4
+    print("<<< key_len", key_len)
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-    pow2prime_idx = primes.get_pow2prime_index(sbk_len * 8)
-    param_cfg     = params.init_params(
-        threshold, num_pieces, pow2prime_idx, kdf_param_id
-    )
-    param_data        = enc_util.params2bytes(param_cfg)
-    decoded_param_cfg = enc_util.bytes2params(param_data)
+    param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id, key_len)
+    param_data = enc_util.params2bytes(param_cfg)
 
+    # validate encoding round trip before we use the params
+    decoded_param_cfg    = enc_util.bytes2params(param_data)
     is_param_recoverable = (
-        param_cfg.threshold         == decoded_param_cfg.threshold
-        and param_cfg.pow2prime_idx == decoded_param_cfg.pow2prime_idx
-        and param_cfg.kdf_param_id  == decoded_param_cfg.kdf_param_id
+        param_cfg.threshold          == decoded_param_cfg.threshold
+        and param_cfg.kdf_param_id   == decoded_param_cfg.kdf_param_id
+        and param_cfg.hash_len_bytes == decoded_param_cfg.hash_len_bytes
     )
 
     if not is_param_recoverable:
@@ -575,18 +579,17 @@ def new_key(
         key_len,
         label="Deriving Secret Key",
     )
-    echo("\n\n")
+    assert len(secret_key) % 4 == 0, len(secret_key)
+
+    echo("\n")
     yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
 
-    secret_pieces = _split_secret_key(
-        secret_key,
-        threshold=threshold,
-        num_pieces=num_pieces,
-        pow2prime_idx=pow2prime_idx,
+    sbk_pieces = _split_secret_key(
+        secret_key, threshold=threshold, num_pieces=num_pieces
     )
 
     # secret pieces
-    for i, secret_piece in enumerate(secret_pieces):
+    for i, sbk_piece_data in enumerate(sbk_pieces):
         piece_no = i + 1
         yes_all or clear()
         info = {
@@ -600,7 +603,7 @@ def new_key(
         echo(sbk_piece_title)
         echo(SBK_PIECE_TEXT)
 
-        _show_secret(f"Secret Piece {piece_no}/{num_pieces}", secret_piece)
+        _show_secret(f"Secret Piece {piece_no}/{num_pieces}", sbk_piece_data)
 
         yes_all or anykey_confirm(sbk_piece_prompt)
 

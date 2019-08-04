@@ -112,14 +112,21 @@ class ThreadWithReturnData(threading.Thread):
 
 
 def _derive_key(
-    secret_data : bytes,
-    salt_data   : bytes,
-    kdf_param_id: params.KDFParamId,
-    label       : str,
+    brainkey_data: bytes,
+    salt_data    : bytes,
+    kdf_param_id : params.KDFParamId,
+    key_len      : int,
+    label        : str,
 ) -> bytes:
     eta_sec = PARAM_CTX.est_times_by_id[kdf_param_id]
 
-    kdf_args   = secret_data, salt_data, kdf_param_id
+    # NOTE: Since we encode the x value of a point in the top byte,
+    #   and since the key we derive (the y value) has to be smaller
+    #   than the prime with key_len * 8 - 8 bits, we have to cut off
+    #   the top byte here too.
+    hash_len = key_len - 1
+
+    kdf_args   = (brainkey_data, salt_data, kdf_param_id, hash_len)
     kdf_thread = ThreadWithReturnData(target=kdf.derive_key, args=kdf_args)
     # daemon means the thread is killed if user hits Ctrl-C
     kdf_thread.daemon = True
@@ -159,7 +166,10 @@ def _derive_key(
 
     kdf_thread.join()
 
-    return kdf_thread.retval
+    hash_data = kdf_thread.retval
+    key_data  = b"\x00" + hash_data
+    assert len(key_data) == key_len, len(key_data)
+    return key_data
 
 
 @click.group()
@@ -410,6 +420,12 @@ _num_pieces_option = click.option(
 
 YES_ALL_OPTION_HELP = "Enable non-interactive mode."
 
+DEFAULT_SALT_LEN = 192 // 8
+
+DEFAULT_KEY_LEN = 192 // 8
+
+DEFAULT_BRAINKEY_LEN = 48 // 8
+
 _yes_all_option = click.option(
     '-y',
     '--yes-all',
@@ -468,25 +484,24 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
 
 
 def _split_secret_key(
-    secret_key: bytes, threshold: int, num_pieces: int, pow2prime_idx: int
+    secret_key: bytes, threshold: int, num_pieces: int
 ) -> typ.Iterable[bytes]:
-    secret_int = enc_util.bytes2int(secret_key)
-    prime      = primes.POW2_PRIMES[pow2prime_idx]
-    gf_points  = polynom.split(
+    key_len = len(secret_key)
+    assert secret_key[0] == 0
+    secret_int = enc_util.bytes2int(secret_key[1:])
+
+    key_bits  = (key_len - 1) * 8
+    prime     = primes.get_pow2prime(key_bits)
+    gf_points = polynom.split(
         prime=prime,
         threshold=threshold,
         num_pieces=num_pieces,
         secret=secret_int,
     )
     for gfpoint in gf_points:
-        yield enc_util.gfpoint2bytes(gfpoint)
-
-
-DEFAULT_SALT_LEN = 160 // 8
-
-DEFAULT_SBK_LEN = 248 // 8
-
-DEFAULT_BRAINKEY_LEN = 6  # 48 bits
+        sbk_piece_data = enc_util.gfpoint2bytes(gfpoint)
+        assert len(sbk_piece_data) == key_len, len(sbk_piece_data)
+        yield sbk_piece_data
 
 
 @cli.command()
@@ -557,6 +572,7 @@ def new_key(
         brainkey_data,
         param_and_salt_data,
         kdf_param_id,
+        key_len,
         label="Deriving Secret Key",
     )
     echo("\n\n")
@@ -653,7 +669,7 @@ def derive_key(kdf_param_id=PARAM_ID_DEFAULT) -> None:
     salt_data   = b""  # TODO
 
     unsplit_key = _derive_key(
-        secret_data, salt_data, kdf_param_id, "Deriving Secret Key"
+        secret_data, salt_data, kdf_param_id, key_len, "Deriving Secret Key"
     )
     key_phrase = enc_util.bytes2phrase(unsplit_key)
 

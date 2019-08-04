@@ -284,6 +284,7 @@ def bytes2gfpoint(data: bytes, gf: polynom.GF) -> polynom.GFPoint:
 def gfpoint2bytes(point: polynom.GFPoint) -> bytes:
     x = point.x.val
     if x == 0:
+        # NOTE: for x=0 the y value is the secret
         raise Exception(f"Invalid point with x={x} == 0")
     if x >= 256:
         raise Exception(f"Invalid point with x={x} >= 256")

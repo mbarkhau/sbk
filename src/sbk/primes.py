@@ -128,6 +128,12 @@ validate_pow2_prime_params()
 
 POW2_PRIMES = [pow2prime(exp, k) for exp, k in POW2_PRIME_PARAMS]
 
+# NOTE: since the index into POW2_PRIMES is derived from the
+#   serialized parameters, the format of which is limited in
+#   space, we don't want to have more primes than can be
+#   derived from that format.
+assert len(POW2_PRIMES) < 256
+
 
 # https://oeis.org/A132358
 assert 251                                     in POW2_PRIMES
@@ -151,10 +157,15 @@ def get_pow2prime_index(sbk_bits: int) -> int:
 
     target_exp = sbk_bits
     for p2pp_idx, param in enumerate(POW2_PRIME_PARAMS):
-        if param.exp == target_exp:
+        if param.exp >= target_exp:
             return p2pp_idx
 
-    raise ValueError("Invalid sbk_bits={sbk_bits}, no known 2**n-k primes ")
+    raise ValueError(f"Invalid sbk_bits={sbk_bits}, no known 2**n-k primes ")
+
+
+def get_pow2prime(sbk_bits: int) -> int:
+    p2pp_idx = get_pow2prime_index(sbk_bits)
+    return POW2_PRIMES[p2pp_idx]
 
 
 def is_prime(n: int) -> bool:

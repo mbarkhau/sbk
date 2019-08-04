@@ -9,6 +9,7 @@
 import os
 import io
 import sys
+import math
 import time
 import hashlib
 import threading
@@ -476,27 +477,8 @@ _yes_all_option = click.option(
 
 
 def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
-    phrase = enc_util.bytes2phrase(data)
-    assert enc_util.phrase2bytes(phrase) == data
-
-    label        = "Phrases for " + label
-    output_lines = [f"      Data   {label:^35}", ""]
-    hex_parts    = []
-    for i, phrase_line in enumerate(phrase.splitlines()):
-        line_no   = i + 1
-        line_data = enc_util.phrase2bytes(phrase_line)
-
-        hex_part = enc_util.bytes2hex(line_data)
-        hex_parts.append(hex_part)
-
-        out_line = f"  {line_no:>2}: {hex_part:<4}  {phrase_line}"
-        output_lines.append(out_line)
-        if line_no % 4 == 0:
-            output_lines.append("    ")
-
-    hex_text = enc_util.bytes2hex(data)
-    assert enc_util.hex2bytes(hex_text) == data
-    assert "".join(hex_parts) == hex_text
+    assert len(data) % 4 == 0, len(data)
+    output_lines = list(enc_util.format_secret_lines(data))
 
     if qr:
         qr_renderer = qrcode.QRCode(
@@ -513,12 +495,14 @@ def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
         qr_lines = []
 
     # TODO mb: Don't interleave if terminal is too narrow.
-    len_padding  = max(map(len, output_lines))
+    len_padding = max(map(len, output_lines))
+
     output_lines = [
         ((a or "").ljust(len_padding)) + "     " + (b or "")
         for a, b in it.zip_longest(output_lines, qr_lines)
     ]
 
+    echo(f"{label:^{len_padding}}")
     echo("\n".join(output_lines) + "\n\n")
 
 
@@ -568,7 +552,7 @@ def new_key(
     # round up to nearest multiple.
     salt_len = (salt_len + 3) // 4 * 4
     key_len  = (key_len  + 3) // 4 * 4
-    print("<<< key_len", key_len)
+
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
@@ -715,6 +699,50 @@ def derive_key(
     echo(key_phrase)
 
 
+def _parse_input(
+    idx: int, in_val: str
+) -> typ.Optional[typ.Tuple[str, str, bytes]]:
+    maybe_code = in_val.replace(" ", "")
+    if maybe_code.isdigit():
+        echo("Invalid code or phrase.")
+        if len(maybe_code) < 8:
+            echo("Invalid code. Missing digits.")
+            return None
+
+        if len(maybe_code) > 8:
+            echo("Invalid code. Too many digits.")
+            return None
+
+        c0 = maybe_code[:4]
+        c1 = maybe_code[4:]
+
+        parts = enc_util.intcodes2parts([c0, c1])
+        (p0_idx, p0_val), (p1_idx, p1_val) = parts
+        if not (p0_idx == idx and p1_idx == idx + 1):
+            echo("Invalid code: Bad order.")
+            echo(" Type 'skip' if you cannot read the code")
+            return None
+
+        line_data = p0_val + p1_val
+    else:
+        try:
+            phrase_parts = enc_util.phrase2parts(in_val)
+        except ValueError as err:
+            echo(f"Unknown word: {err.args[1]}")
+            return None
+
+        if len(phrase_parts) < 4:
+            echo(f"Invalid Phrase. Missing words (expected 4)")
+            return None
+
+        if len(phrase_parts) > 4:
+            echo(f"Invalid Phrase. Too many words (expected 4)")
+            return None
+
+        line_data = enc_util.phrase2bytes(" ".join(phrase_parts))
+        c0, c1 = enc_util.bytes2intcode_parts(line_data, idx)
+
+    return c0, c1, line_data
 
 
 @cli.command()
@@ -723,6 +751,75 @@ def recover_key(key_len: int = DEFAULT_KEY_LEN,) -> None:
     """Use Data and ECC codes to recover a Phrase."""
     # length that use ecc must be multiples of 4
     key_len = int(math.ceil(key_len / 4.0) * 4)
+
+    block_len  = key_len * 2
+    marker_mod = key_len // 4
+
+    phrase_lines: typ.List[str] = [enc_util.EMPTY_PHRASE_LINE] * (key_len // 2)
+    intcodes    : typ.List[typ.Optional[str]] = [None] * block_len
+
+    idx = 0
+
+    while idx < block_len:
+        # data      = enc_util.intcode_parts2bytes(intcode_parts, block_len)
+        # data      = b"\x00" * key_len
+        lines     = enc_util.format_partial_secret_lines(phrase_lines, intcodes)
+        formatted = "\n".join(lines)
+
+        clear()
+        echo()
+        echo(formatted)
+        echo()
+        echo("Available commands:")
+        echo()
+        echo("    e/exit: abort recovery")
+        echo("    s/skip: skip code/phrase if not legible")
+        echo("    u/undo: undo previous code/phrase")
+        echo()
+
+        marker_char = "ABCD"[(idx // 2) // marker_mod]
+        marker_id   = (idx // 2) % marker_mod
+        marker      = f"{marker_char}{marker_id}"
+
+        if idx < key_len:
+            prompt_msg = f"Enter a command, data code or phrase {marker}"
+        else:
+            prompt_msg = f"Enter a command or ECC code for {marker}"
+
+        while True:
+            in_val = click.prompt(prompt_msg)
+            in_val = in_val.strip().lower()
+            if in_val in ('s', 'skip'):
+                idx += 2
+                break
+            if in_val in ('e', 'exit'):
+                return
+            if in_val in ('u', 'undo'):
+                idx = max(0, idx - 2)
+                phrase_lines[idx // 2] = enc_util.EMPTY_PHRASE_LINE
+                intcodes[idx] = None
+                intcodes[idx + 1] = None
+                break
+
+            res = _parse_input(idx, in_val)
+            if res is None:
+                continue
+
+            c0, c1, line_data = res
+
+            if idx < key_len:
+                phrase_line = enc_util.bytes2phrase(line_data)
+                phrase_lines[idx // 2] = phrase_line
+            else:
+                # TODO: fill in ecc if possible
+                pass
+
+            intcodes[idx] = c0
+            intcodes[idx + 1] = c1
+            idx += 2
+            break
+
+
 # def split_key():
 #     yes_all or clear()
 #     yes_all or confirm(SECURITY_WARNING_TEXT)

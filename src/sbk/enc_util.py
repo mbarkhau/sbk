@@ -355,11 +355,14 @@ MaybeIntCodes = typ.Sequence[typ.Optional[str]]
 IntCodeParts  = typ.Sequence[Part]
 
 
-def _bytes2intcode_parts(data: bytes) -> typ.Iterable[str]:
-    for idx in range(len(data)):
+def bytes2intcode_parts(
+    data: bytes, idx_offset: int = 0
+) -> typ.Iterable[IntCode]:
+    for i in range(len(data)):
+        idx     = i + idx_offset
         part_no = (idx % 34) + 4
         assert 4 <= part_no <= 37
-        part_val = _char_at(data, idx)
+        part_val = _char_at(data, i)
         part_num = (part_no << 8) + part_val
         assert 1024 <= part_num <= 9983
         yield str(part_num)
@@ -372,10 +375,10 @@ def bytes2intcode(data: bytes) -> IntCode:
     compact, redundant and resilient to input errors.
     """
     data_with_ecc = ecc.encode(data)
-    return "\n".join(_bytes2intcode_parts(data_with_ecc))
+    return "\n".join(bytes2intcode_parts(data_with_ecc))
 
 
-def _intcode2bytes_parts(intcodes: MaybeIntCodes) -> typ.Iterable[Part]:
+def intcodes2parts(intcodes: MaybeIntCodes) -> typ.Iterable[Part]:
     """Decode part index and part values.
 
     Since the range for part numbers is limited, we assume
@@ -402,16 +405,16 @@ def _intcode2bytes_parts(intcodes: MaybeIntCodes) -> typ.Iterable[Part]:
 
 
 def intcode_parts2packets(
-    intcodes: IntCodes, packet_size: int
+    intcodes: MaybeIntCodes, packet_size: int
 ) -> typ.List[bytes]:
     num_packets = len(intcodes) // packet_size
     packets     = [b""] * num_packets
-    for idx, part_val in _intcode2bytes_parts(intcodes):
+    for idx, part_val in intcodes2parts(intcodes):
         packets[idx // packet_size] += part_val
     return packets
 
 
-def intcode_parts2bytes(intcodes: IntCodes, block_len: int) -> bytes:
+def intcode_parts2bytes(intcodes: MaybeIntCodes, block_len: int) -> bytes:
     packet_size = block_len // 8  # aka. parts per packet
     packets     = intcode_parts2packets(intcodes, packet_size)
 
@@ -453,47 +456,70 @@ FORMATTED_LINE_RE = re.compile(FORMATTED_LINE_PATTERN, flags=re.VERBOSE)
 
 Lines = typ.Iterable[str]
 
+PhraseLines = typ.Sequence[str]
 
-def format_secret(data: bytes, add_ecc=True) -> Lines:
+
+def format_partial_secret_lines(
+    phrase_lines: PhraseLines, intcodes: MaybeIntCodes
+) -> Lines:
+    ecc_offset      = len(intcodes    ) // 2
+    spacer_offset   = len(phrase_lines) // 2
+    phrases_padding = max(map(len, phrase_lines))
+
+    yield f"       Data      {'Phrases':^{phrases_padding}}         ECC"
+    yield ""
+
+    for i, pl in enumerate(phrase_lines):
+        if i == spacer_offset:
+            yield ""
+
+        d0 = intcodes[i * 2]
+        d1 = intcodes[i * 2 + 1]
+
+        ecc_idx = ecc_offset + i * 2
+
+        e0 = intcodes[ecc_idx]
+        e1 = intcodes[ecc_idx + 1]
+
+        data_0 = "____" if d0 is None else d0
+        data_1 = "____" if d1 is None else d1
+        ecc_0  = "____" if e0 is None else e0
+        ecc_1  = "____" if e1 is None else e1
+
+        marker_id = i % spacer_offset
+        prefix_id = f"A{marker_id}" if i < spacer_offset else f"B{marker_id}"
+        suffix_id = f"C{marker_id}" if i < spacer_offset else f"D{marker_id}"
+
+        prefix = f"{prefix_id}: {data_0} {data_1}"
+        suffix = f"{suffix_id}: {ecc_0} {ecc_1}"
+
+        phrase_line = EMPTY_PHRASE_LINE if pl is None else pl
+        out_line    = f"{prefix}   {phrase_line:<{phrases_padding}}   {suffix}"
+        yield out_line
+
+
+def format_secret_lines(data: bytes, add_ecc=True) -> Lines:
     phrase = bytes2phrase(data)
     assert phrase2bytes(phrase) == data
+    phrase_lines = phrase.splitlines()
+
+    intcodes: MaybeIntCodes
 
     if add_ecc:
-        intcode = bytes2intcode(data)
+        intcode  = bytes2intcode(data)
+        intcodes = intcode.splitlines()
         assert intcode2bytes(intcode) == data
     else:
         # This allows the function to be used when
         # only part of the secret has been input.
-        intcode = "\n".join(_bytes2intcode_parts(data))
+        intcodes = list(bytes2intcode_parts(data))
+        intcodes.extend([None] * len(intcodes))
 
-    phrase_lines    = phrase.splitlines()
-    split_offset    = len(phrase_lines) // 2
-    phrases_padding = max(map(len, phrase_lines))
+    return format_partial_secret_lines(phrase_lines, intcodes)
 
-    intcodes   = intcode.splitlines()
-    ecc_offset = len(intcodes) // 2
 
-    for i, phrase_line in enumerate(phrase_lines):
-        if i == split_offset:
-            yield ""
-
-        data_0 = intcodes[i * 2]
-        data_1 = intcodes[i * 2 + 1]
-
-        if add_ecc:
-            ecc_0 = intcodes[ecc_offset + i * 2]
-            ecc_1 = intcodes[ecc_offset + i * 2 + 1]
-        else:
-            ecc_0 = ecc_1 = ""
-
-        marker_id = i % split_offset
-        prefix_id = f"A{marker_id}" if i < split_offset else f"B{marker_id}"
-        suffix_id = f"C{marker_id}" if i < split_offset else f"D{marker_id}"
-
-        prefix   = f"{prefix_id}: {data_0} {data_1}"
-        suffix   = f"{suffix_id}: {ecc_0} {ecc_1}"
-        out_line = f"{prefix}   {phrase_line:<{phrases_padding}}   {suffix}"
-        yield out_line
+def format_secret(data: bytes, add_ecc=True) -> str:
+    return "\n".join(format_secret_lines(data, add_ecc))
 
 
 class ParsedSecret(typ.NamedTuple):
@@ -508,6 +534,8 @@ def parse_formatted_secret(text: str) -> ParsedSecret:
     ecc_codes : typ.List[str] = []
 
     for i, line in enumerate(text.splitlines()):
+        if line.strip().startswith("Data"):
+            continue
         if not line.strip():
             continue
         line_no = i + 1

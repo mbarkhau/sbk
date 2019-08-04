@@ -317,7 +317,7 @@ SBK_PIECE_TEXT = r"""
 Give this "SBK Piece" one of your trustees. Your trustees should not
 only be trustworthy in the sense that they will act in your best
 interests, they should also be trustworthy in the sense that they are
-competent to keep this SBK Piece secure and secret.
+competent to keep this SBK Piece safe and secret.
 """
 
 RECOVERY_TEXT = r"""
@@ -377,7 +377,7 @@ Finally, please verify the data you have copied.
 
 
 KDF_PARAM_ID_HELP = (
-    "KDF difficulty selection. Use 'sbk kdf-info' to see valid options."
+    "KDF difficulty selection. Use 'sbk kdf-info' to see valid options"
 )
 
 _kdf_param_id_option = click.option(
@@ -388,7 +388,7 @@ _kdf_param_id_option = click.option(
     help=_clean_help(KDF_PARAM_ID_HELP),
 )
 
-EMAIL_OPTION_HELP = "Email which is used as a salt."
+EMAIL_OPTION_HELP = "Email which is used as a salt"
 
 _email_option = click.option(
     '-e',
@@ -398,33 +398,72 @@ _email_option = click.option(
     help=_clean_help(EMAIL_OPTION_HELP),
 )
 
-THRESHOLD_OPTION_HELP = "Minimum number of pieces required to recover the key."
+THRESHOLD_OPTION_HELP = "Number of pieces required to recover the key"
+
+DEFAULT_THRESHOLD = 2
 
 _threshold_option = click.option(
     '-t',
     '--threshold',
     type=int,
-    default=3,
+    default=DEFAULT_THRESHOLD,
+    show_default=True,
     help=_clean_help(THRESHOLD_OPTION_HELP),
 )
 
-NUM_PIECES_OPTION_HELP = "Total number of pieces to split the key into."
+NUM_PIECES_OPTION_HELP = "Number of pieces to split the key into"
+
+DEFAULT_NUM_PIECES = 3
 
 _num_pieces_option = click.option(
     '-n',
     '--num-pieces',
     type=int,
-    default=5,
+    default=DEFAULT_NUM_PIECES,
+    show_default=True,
     help=_clean_help(NUM_PIECES_OPTION_HELP),
 )
 
-YES_ALL_OPTION_HELP = "Enable non-interactive mode."
+SALT_LEN_OPTION_HELP = "Length (in bytes) of the Salt"
 
 DEFAULT_SALT_LEN = 192 // 8
 
+_salt_len_option = click.option(
+    '-s',
+    '--salt-len',
+    type=int,
+    default=DEFAULT_SALT_LEN,
+    show_default=True,
+    help=_clean_help(SALT_LEN_OPTION_HELP),
+)
+
+KEY_LEN_OPTION_HELP = "Length (in bytes) of the Key/SBK Piece"
+
 DEFAULT_KEY_LEN = 192 // 8
 
+_key_len_option = click.option(
+    '-k',
+    '--key-len',
+    type=int,
+    default=DEFAULT_KEY_LEN,
+    show_default=True,
+    help=_clean_help(KEY_LEN_OPTION_HELP),
+)
+
+BRAINKEY_LEN_OPTION_HELP = "Length (in bytes) of the Brainkey"
+
 DEFAULT_BRAINKEY_LEN = 48 // 8
+
+_brainkey_len_option = click.option(
+    '-b',
+    '--brainkey-len',
+    type=int,
+    default=DEFAULT_BRAINKEY_LEN,
+    show_default=True,
+    help=_clean_help(BRAINKEY_LEN_OPTION_HELP),
+)
+
+YES_ALL_OPTION_HELP = "Enable non-interactive mode"
 
 _yes_all_option = click.option(
     '-y',
@@ -509,14 +548,17 @@ def _split_secret_key(
 @_email_option
 @_threshold_option
 @_num_pieces_option
+@_salt_len_option
+@_key_len_option
+@_brainkey_len_option
 @_yes_all_option
 def new_key(
     email       : str,
     kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
-    threshold   : int               = 2,
-    num_pieces  : int               = 3,
+    threshold   : int               = DEFAULT_THRESHOLD,
+    num_pieces  : int               = DEFAULT_NUM_PIECES,
     salt_len    : int               = DEFAULT_SALT_LEN,
-    sbk_len     : int               = DEFAULT_SBK_LEN,
+    key_len     : int               = DEFAULT_KEY_LEN,
     brainkey_len: int               = DEFAULT_BRAINKEY_LEN,
     yes_all     : bool              = False,
 ) -> None:
@@ -633,20 +675,13 @@ def new_key(
     yes_all or anykey_confirm("noop")
 
 
-_phrase0_words = [w.upper() for w in enc_util.ADJECTIVES]
-_phrase1_words = [w.upper() for w in enc_util.TITLES]
-_phrase2_words = [w.upper() for w in enc_util.CITIES]
-_phrase3_words = [w.upper() for w in enc_util.PLACES]
-
-
-@cli.command()
-def verify_key() -> None:
-    pass
-
-
 @cli.command()
 @_kdf_param_id_option
-def derive_key(kdf_param_id=PARAM_ID_DEFAULT) -> None:
+@_key_len_option
+def derive_key(
+    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
+    key_len     : int               = DEFAULT_KEY_LEN,
+) -> None:
     """Derive secret key from a brainkey.
 
     You should avoid generating your own brainkey, as humans are
@@ -680,6 +715,14 @@ def derive_key(kdf_param_id=PARAM_ID_DEFAULT) -> None:
     echo(key_phrase)
 
 
+
+
+@cli.command()
+@_key_len_option
+def recover_key(key_len: int = DEFAULT_KEY_LEN,) -> None:
+    """Use Data and ECC codes to recover a Phrase."""
+    # length that use ecc must be multiples of 4
+    key_len = int(math.ceil(key_len / 4.0) * 4)
 # def split_key():
 #     yes_all or clear()
 #     yes_all or confirm(SECURITY_WARNING_TEXT)

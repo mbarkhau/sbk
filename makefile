@@ -314,6 +314,7 @@ lint:
 		--skip-string-normalization \
 		--line-length=80 \
 		--check \
+		--quiet \
 		src/ test/
 	@printf "\e[1F\e[9C ok\n"
 

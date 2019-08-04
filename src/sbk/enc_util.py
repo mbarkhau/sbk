@@ -12,8 +12,11 @@ import base64
 import typing as typ
 import itertools as it
 
+import pylev
+
 from . import ecc
 from . import params
+from . import primes
 from . import polynom
 
 
@@ -22,7 +25,6 @@ ADJECTIVES = [
     "crazy",
     "dirty",
     "evil",
-    "fancy",
     "funny",
     "guilty",
     "happy",
@@ -34,6 +36,7 @@ ADJECTIVES = [
     "pretty",
     "scary",
     "ugly",
+    "vapid",
 ]
 
 TITLES = [
@@ -60,7 +63,6 @@ CITIES = [
     "cairo",
     "oslo",
     "delhi",
-    "dubai",
     "dublin",
     "lagos",
     "london",
@@ -70,6 +72,7 @@ CITIES = [
     "paris",
     "prague",
     "sparta",
+    "seoul",
     "tokyo",
     "vienna",
 ]
@@ -85,9 +88,9 @@ PLACES = [
     "ghetto",
     "hotel",
     "lake",
+    "museum",
     "oasis",
     "opera",
-    "river",
     "school",
     "stage",
     "temple",
@@ -99,10 +102,15 @@ TITLES.sort()
 CITIES.sort()
 PLACES.sort()
 
-assert max(map(len, ADJECTIVES)) == 6
-assert max(map(len, TITLES    )) == 6
-assert max(map(len, PLACES    )) == 6
-assert max(map(len, CITIES    )) == 6
+WORDS = set(ADJECTIVES + TITLES + CITIES + PLACES)
+
+for _w in WORDS:
+    assert len(_w) <= 6, _w
+
+assert len(WORDS) == 16 * 4
+
+
+EMPTY_PHRASE_LINE = "The ______ ______ at the ______ ______."
 
 
 PERSON_PARTS = [
@@ -119,7 +127,8 @@ PLACE_PARTS = [
 assert len(PERSON_PARTS) == 2 ** 8
 assert len(PLACE_PARTS ) == 2 ** 8
 
-# Generate output for test/test_enc_util.py
+# If corpus words change, regenerate output for
+#   test/test_enc_util.py@TEST_PHRASE_LINES
 # for person, place in zip(PERSON_PARTS, PLACE_PARTS):
 #     print(person, place, end="")
 
@@ -149,13 +158,41 @@ def bytes2phrase(data: bytes) -> PhraseStr:
     return phrase.strip()
 
 
+def _phrase2parts(cleaned_parts: typ.List[str]) -> typ.Iterable[str]:
+    corpus  = [ADJECTIVES, TITLES, CITIES, PLACES]
+    dist_fn = pylev.damerau_levenshtein
+
+    for i, part in enumerate(cleaned_parts):
+        corpus_words = corpus[i % 4]
+        if part in corpus_words:
+            yield part
+        else:
+            dist_part_pairs = [
+                (dist_fn(corpus_word, part), corpus_word)
+                for corpus_word in corpus_words
+            ]
+            dist_part_pairs.sort()
+            dist, corpus_word = dist_part_pairs[0]
+            if dist <= 3:
+                yield corpus_word
+            else:
+                errmsg = f"Unknown word: {part}"
+                raise ValueError(errmsg, part)
+
+
+def phrase2parts(phrase: PhraseStr) -> typ.List[str]:
+    filler        = {"the", "at", "teh", "th", "atthe", "att", "he", "eat", ""}
+    unclean_parts = phrase.replace(".", "").lower().split()
+    cleaned_parts = [p for p in unclean_parts if p not in filler]
+
+    return list(_phrase2parts(cleaned_parts))
+
+
 def phrase2bytes(phrase: PhraseStr) -> bytes:
     """Decode human readable phrases to bytes."""
     corpus = [ADJECTIVES, TITLES, CITIES, PLACES]
 
-    filler = {"the", "at", ""}
-    parts  = phrase.replace(".", "").lower().split()
-    parts  = [p for p in parts if p not in filler]
+    parts = phrase2parts(phrase)
 
     data: typ.List[int] = []
     for i, part in enumerate(parts):

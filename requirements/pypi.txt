@@ -12,3 +12,4 @@ pathlib2
 
 # NOTE mb: We don't need qrcode[pil] as is otherwise recommended.
 qrcode
+pylev

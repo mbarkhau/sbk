@@ -159,8 +159,9 @@ def bytes2phrase(data: bytes) -> PhraseStr:
 
 
 def _phrase2parts(cleaned_parts: typ.List[str]) -> typ.Iterable[str]:
-    corpus  = [ADJECTIVES, TITLES, CITIES, PLACES]
-    dist_fn = pylev.damerau_levenshtein
+    corpus    = [ADJECTIVES, TITLES, CITIES, PLACES]
+    all_words = set(sum(corpus, []))
+    dist_fn   = pylev.damerau_levenshtein
 
     for i, part in enumerate(cleaned_parts):
         corpus_words = corpus[i % 4]
@@ -175,6 +176,9 @@ def _phrase2parts(cleaned_parts: typ.List[str]) -> typ.Iterable[str]:
             dist, corpus_word = dist_part_pairs[0]
             if dist <= 3:
                 yield corpus_word
+            elif part in all_words:
+                errmsg = f"Invalid word order: {part}"
+                raise ValueError(errmsg, part)
             else:
                 errmsg = f"Unknown word: {part}"
                 raise ValueError(errmsg, part)
@@ -350,22 +354,31 @@ Part      = typ.Tuple[PartIndex, PartVal]
 
 
 IntCode       = str
-IntCodes      = typ.Sequence[str]
-MaybeIntCodes = typ.Sequence[typ.Optional[str]]
+IntCodes      = typ.Sequence[IntCode]
+MaybeIntCodes = typ.Sequence[typ.Optional[IntCode]]
 IntCodeParts  = typ.Sequence[Part]
+
+
+def _parity(num: int) -> int:
+    result = 0
+    while num > 0:
+        if num & 1 == 1:
+            result += 1
+        num = num >> 1
+    return result
 
 
 def bytes2intcode_parts(
     data: bytes, idx_offset: int = 0
 ) -> typ.Iterable[IntCode]:
     for i in range(len(data)):
-        idx     = i + idx_offset
-        part_no = (idx % 34) + 4
-        assert 4 <= part_no <= 37
+        idx      = idx_offset + i
         part_val = _char_at(data, i)
-        part_num = (part_no << 8) + part_val
-        assert 1024 <= part_num <= 9983
-        yield str(part_num)
+        part_no  = idx & 0b111
+        parity   = _parity((idx << 10) + part_val) & 0b11
+        part_num = (part_no << 10) + (parity << 8) + part_val
+        assert part_num < 10000
+        yield f"{part_num:04}"
 
 
 def bytes2intcode(data: bytes) -> IntCode:
@@ -378,30 +391,43 @@ def bytes2intcode(data: bytes) -> IntCode:
     return "\n".join(bytes2intcode_parts(data_with_ecc))
 
 
-def intcodes2parts(intcodes: MaybeIntCodes) -> typ.Iterable[Part]:
-    """Decode part index and part values.
+def intcodes2parts(
+    intcodes: MaybeIntCodes, idx_offset: int = 0
+) -> typ.Iterable[Part]:
+    """Decode part index and part values."""
+    expected_part_no = idx_offset & 0b111
+    part_no_offset   = idx_offset - expected_part_no
 
-    Since the range for part numbers is limited, we assume
-    consecutive input for intcodes longer than 34 bytes.
-    """
-    part_no_offset = 0
-    prev_part_no   = 3
     for part in intcodes:
-        if part is None:
-            continue
+        next_part_no = (expected_part_no + 1) & 0b111
+        if part:
+            part_num = int(part, 10)
+            part_val = part_num & 0xFF
+            part_no  = (part_num >> 10) & 0b111
 
-        part_num = int(part, 10)
-        part_no  = part_num >> 8
+            idx = part_no_offset + part_no
 
-        if part_no < prev_part_no:
-            # assume the wrap around happened
-            part_no_offset += 34
+            if part_no != expected_part_no:
+                raise ValueError("Invalid code: Bad order.")
 
-        prev_part_no = part_no
+            part_parity     = (part_num >> 8) & 0b11
+            expected_parity = _parity((idx << 10) + part_val) & 0b11
 
-        part_val = bytes([part_num & 0xFF])
-        idx      = (part_no_offset + part_no) - 4
-        yield idx, part_val
+            if part_parity != expected_parity:
+                raise ValueError("Invalid code: Bad parity.")
+
+            yield idx, bytes([part_val])
+
+        if next_part_no < expected_part_no:
+            # Since the range for part numbers is
+            # limited, we assume consecutive input
+            # to validate part_no.
+            #
+            # part_no  ... 5, 6, 7, 0, 1, 2  ...
+            # part_idx ... 5, 6, 7, 8, 9, 10 ...
+            part_no_offset += 8
+
+        expected_part_no = next_part_no
 
 
 def intcode_parts2packets(
@@ -414,7 +440,14 @@ def intcode_parts2packets(
     return packets
 
 
-def intcode_parts2bytes(intcodes: MaybeIntCodes, block_len: int) -> bytes:
+def intcode_parts2bytes(intcodes: MaybeIntCodes) -> bytes:
+    block_len = len(intcodes)
+    if block_len % 8 != 0:
+        errmsg = (
+            f"Invalid len(intcodes)={len(intcodes)}, must be divisible by 8"
+        )
+        raise ValueError(errmsg)
+
     packet_size = block_len // 8  # aka. parts per packet
     packets     = intcode_parts2packets(intcodes, packet_size)
 
@@ -429,7 +462,15 @@ def intcode_parts2bytes(intcodes: MaybeIntCodes, block_len: int) -> bytes:
 
 def intcode2bytes(intcode: IntCode) -> bytes:
     intcodes = typ.cast(IntCodes, intcode.splitlines())
-    return intcode_parts2bytes(intcodes, block_len=len(intcodes))
+    return intcode_parts2bytes(intcodes)
+
+
+def validated_intcodes(intcodes: MaybeIntCodes) -> IntCodes:
+    complete_intcodes = [intcode for intcode in intcodes if intcode]
+    if len(complete_intcodes) == len(intcodes):
+        return complete_intcodes
+    else:
+        return []
 
 
 # https://regex101.com/r/iQKt5L/2

@@ -402,7 +402,7 @@ def test_bytes2gfpoint():
 
 
 def test_intcode_fuzz():
-    bytes2intcode(os.urandom(12))
+    bytes2intcode(os.urandom(8))
     for i in range(0, 50, 4):
         data_len = i % 20 + 4
         data     = os.urandom(data_len)
@@ -432,8 +432,40 @@ def test_intcode_fuzz_loss(data_len):
         block_len = len(parts)
         clear_idx = random.randrange(0, len(parts))
         parts[clear_idx] = None
-        decoded = intcode_parts2bytes(parts, block_len)
+        decoded = intcode_parts2bytes(parts)
         assert decoded == data
+
+
+def test_intcode_order_fail():
+    data    = os.urandom(8)
+    intcode = bytes2intcode(data)
+    codes   = intcode.splitlines()
+    decoded = intcode2bytes("\n".join(codes))
+    assert decoded == data
+
+    codes[0], codes[-1] = codes[-1], codes[0]
+
+    try:
+        intcode2bytes("\n".join(codes))
+        assert False
+    except ValueError as err:
+        assert "Bad order" in str(err)
+
+
+def test_intcode_parity_fail():
+    data    = os.urandom(8)
+    intcode = bytes2intcode(data)
+    codes   = intcode.splitlines()
+    decoded = intcode2bytes("\n".join(codes))
+    assert decoded == data
+
+    broken_code = int(codes[0], 10) + 1
+    codes[random.randrange(8)] = f"{broken_code:04}"
+    try:
+        intcode2bytes("\n".join(codes))
+        assert False
+    except ValueError as err:
+        assert "Bad parity" in str(err)
 
 
 def test_format_secret():
@@ -450,6 +482,7 @@ def test_format_secret():
     packets = intcode_parts2packets(parsed.data_codes, packet_size)
     assert b"".join(packets) == data
 
-    codes   = parsed.data_codes + parsed.ecc_codes
-    decoded = intcode_parts2bytes(codes, block_len)
+    codes = parsed.data_codes + parsed.ecc_codes
+    assert len(codes) == block_len
+    decoded = intcode_parts2bytes(codes)
     assert decoded == data

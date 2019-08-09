@@ -704,7 +704,6 @@ def _parse_input(
 ) -> typ.Optional[typ.Tuple[str, str, bytes]]:
     maybe_code = in_val.replace(" ", "")
     if maybe_code.isdigit():
-        echo("Invalid code or phrase.")
         if len(maybe_code) < 8:
             echo("Invalid code. Missing digits.")
             return None
@@ -716,10 +715,11 @@ def _parse_input(
         c0 = maybe_code[:4]
         c1 = maybe_code[4:]
 
-        parts = enc_util.intcodes2parts([c0, c1])
-        (p0_idx, p0_val), (p1_idx, p1_val) = parts
-        if not (p0_idx == idx and p1_idx == idx + 1):
-            echo("Invalid code: Bad order.")
+        try:
+            parts = enc_util.intcodes2parts([c0, c1], idx)
+            (p0_idx, p0_val), (p1_idx, p1_val) = parts
+        except ValueError as err:
+            echo(*err.args)
             echo(" Type 'skip' if you cannot read the code")
             return None
 

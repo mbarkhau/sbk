@@ -17,13 +17,12 @@ https://crypto.stackexchange.com/a/2718
 
 import random
 import itertools
-import functools
 import typing as typ
 
 from . import primes
 
 
-randint = functools.partial(random.SystemRandom().randint, 0)
+_rand = random.SystemRandom()
 
 
 Num = typ.TypeVar('Num', int, 'GFNum')
@@ -276,7 +275,7 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
     poly = [gf[secret]]
 
     while len(poly) < threshold:
-        poly.append(gf[randint(gf.p)])
+        poly.append(gf[_rand.randrange(gf.p)])
 
     eval_at = poly_eval_fn(poly)
 
@@ -294,9 +293,7 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
     return points
 
 
-def split(
-    prime: int, threshold: int, num_pieces: int, secret: int, randint=randint
-) -> GFPoints:
+def split(prime: int, threshold: int, num_pieces: int, secret: int) -> GFPoints:
     """Generate points of a split secret."""
 
     if num_pieces <= 1:

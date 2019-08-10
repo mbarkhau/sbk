@@ -459,8 +459,10 @@ def test_intcode_parity_fail():
     decoded = intcode2bytes("\n".join(codes))
     assert decoded == data
 
-    broken_code = int(codes[0], 10) + 1
-    codes[random.randrange(8)] = f"{broken_code:04}"
+    i = random.randrange(8)
+
+    broken_code = int(codes[i], 10) ^ 1
+    codes[i] = f"{broken_code:04}"
     try:
         intcode2bytes("\n".join(codes))
         assert False

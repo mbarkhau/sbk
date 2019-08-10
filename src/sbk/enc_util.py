@@ -282,7 +282,8 @@ def bytes_repr(data: bytes) -> str:
 
 def bytes2params(data: bytes) -> params.Params:
     """Deserialize Params."""
-    field0, threshold, kdf_param_id = struct.unpack("BBB", data)
+    param_data = data[:3]
+    field0, threshold, kdf_param_id = struct.unpack("BBB", param_data)
     sbk_version  = field0 >> 4
     hash_len_num = field0 & 0x0F
     assert sbk_version == 0
@@ -465,12 +466,16 @@ def intcode2bytes(intcode: IntCode) -> bytes:
     return intcode_parts2bytes(intcodes)
 
 
-def validated_intcodes(intcodes: MaybeIntCodes) -> IntCodes:
+def is_completed_intcodes(intcodes: MaybeIntCodes) -> bool:
     complete_intcodes = [intcode for intcode in intcodes if intcode]
-    if len(complete_intcodes) == len(intcodes):
-        return complete_intcodes
-    else:
-        return []
+    if len(complete_intcodes) < len(intcodes):
+        return False
+
+    try:
+        intcode_parts2bytes(complete_intcodes)
+        return True
+    except ValueError:
+        return False
 
 
 # https://regex101.com/r/iQKt5L/2

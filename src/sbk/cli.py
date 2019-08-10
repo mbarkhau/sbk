@@ -8,9 +8,9 @@
 """CLI/Imperative shell for SBK."""
 import os
 import io
-import sys
 import math
 import time
+import random
 import hashlib
 import threading
 import typing as typ
@@ -26,15 +26,30 @@ from . import kdf
 from . import params
 from . import primes
 from . import polynom
-from . import enc_util
+from . import enc_util as eu
 
 
 # To enable pretty tracebacks:
 #   echo "export ENABLE_BACKTRACE=1;" >> ~/.bashrc
 if os.environ.get('ENABLE_BACKTRACE') == '1':
-    import backtrace
+    try:
+        import backtrace
 
-    backtrace.hook(align=True, strip_path=True, enable_on_envvar_only=True)
+        backtrace.hook(align=True, strip_path=True, enable_on_envvar_only=True)
+    except ImportError:
+        pass
+
+
+def debug_urandom(size: int) -> bytes:
+    # https://xkcd.com/221/
+    return b"4" * size
+
+
+if os.environ.get('SBK_DEBUG_RANDOM') == 'DANGER':
+    polynom._rand = random.Random(0)  # type: ignore
+    urandom       = debug_urandom
+else:
+    urandom = os.urandom
 
 
 click.disable_unicode_literals_warning = True
@@ -173,18 +188,6 @@ def _derive_key(
     return key_data
 
 
-@click.group()
-def cli() -> None:
-    """Cli for SBK."""
-
-
-@cli.command()
-@click.version_option(version="v201906.0001-alpha")
-def version() -> None:
-    """Show version number."""
-    echo(f"SBK version: {sbk.__version__}")
-
-
 MIN_TIME_SEC  = 10
 MIN_MEM_RATIO = 0.1
 
@@ -195,41 +198,6 @@ Show all available KDF parameter choices.
 By default only shows reasonable
 choices for the current system.
 """
-
-
-@cli.command()
-@click.option(
-    '-a',
-    '--show-all',
-    is_flag=True,
-    default=False,
-    help=_clean_help(SHOW_ALL_HELP),
-)
-def kdf_info(show_all: bool = False) -> None:
-    """Show info for each available parameter config."""
-    min_mem_kb = PARAM_CTX.sys_info.total_kb * MIN_MEM_RATIO
-
-    echo("Id  Mem[MB]  Iters  ~Time[Sec]  Algorithm")
-    for kdf_param_id, config in PARAM_CTX.avail_configs.items():
-        eta_sec        = round(PARAM_CTX.est_times_by_id[kdf_param_id], 1)
-        memory_cost    = config['memory_cost']
-        memory_cost_mb = int(memory_cost / 1024)
-        time_cost      = config['time_cost']
-        parts          = [
-            f"{kdf_param_id:<3}",
-            f"{memory_cost_mb:7}",
-            f"{time_cost:6}",
-            f"{eta_sec:11}",
-            f"  argon2id",
-        ]
-
-        if kdf_param_id == PARAM_ID_DEFAULT:
-            parts += ["<- default"]
-
-        is_visible = memory_cost > min_mem_kb and eta_sec > MIN_TIME_SEC
-
-        if is_visible or show_all or kdf_param_id == PARAM_CTX.param_id_default:
-            echo(" ".join(parts))
 
 
 SECURITY_WARNING_TEXT = """
@@ -273,7 +241,7 @@ Do you believe your system is secure?
 """
 
 
-SALT_INFO_TITLE = r'Step 1 of 5: Copy your "salt".'
+SALT_INFO_TITLE = r'Step 1 of 5: Copy your "Salt".'
 
 SBK_KEYGEN_TITLE = r"Step 2 of 5: Deriving Secret Key"
 
@@ -306,7 +274,8 @@ SALT_INFO_PROMPT = "Press enter when you have copied the salt"
 SBK_KEYGEN_TEXT = r"""
 The SBK Secret Key is derived using the computationally and memory
 intensive Argon2 KDF (Key Derivation Function). This ensures that your
-brainkey is secure even if an attacker gains access to the salt.
+brainkey is secure even if an attacker has access to the salt (for
+example if they are a trustee).
 
     (Brainkey + Salt) -> Secret Key
 """
@@ -371,11 +340,6 @@ If you do not yet feel confident in your memory:
 
 Press enter to hide your brainkey and to continue
 """
-
-RECOVERY_VALIDATION_TEXT = """
-Finally, please verify the data you have copied.
-"""
-
 
 KDF_PARAM_ID_HELP = (
     "KDF difficulty selection. Use 'sbk kdf-info' to see valid options"
@@ -476,9 +440,14 @@ _yes_all_option = click.option(
 )
 
 
-def _show_secret(label: str, data: bytes, qr: bool = False) -> None:
-    assert len(data) % 4 == 0, len(data)
-    output_lines = list(enc_util.format_secret_lines(data))
+def _show_secret(
+    label: str, data: bytes, codes: bool = True, qr: bool = False
+) -> None:
+    if codes:
+        assert len(data) % 4 == 0, len(data)
+        output_lines = list(eu.format_secret_lines(data))
+    else:
+        output_lines = list(eu.bytes2phrase(data).splitlines())
 
     if qr:
         qr_renderer = qrcode.QRCode(
@@ -511,7 +480,7 @@ def _split_secret_key(
 ) -> typ.Iterable[bytes]:
     key_len = len(secret_key)
     assert secret_key[0] == 0
-    secret_int = enc_util.bytes2int(secret_key[1:])
+    secret_int = eu.bytes2int(secret_key[1:])
 
     key_bits  = (key_len - 1) * 8
     prime     = primes.get_pow2prime(key_bits)
@@ -522,9 +491,336 @@ def _split_secret_key(
         secret=secret_int,
     )
     for gfpoint in gf_points:
-        sbk_piece_data = enc_util.gfpoint2bytes(gfpoint)
+        sbk_piece_data = eu.gfpoint2bytes(gfpoint)
         assert len(sbk_piece_data) == key_len, len(sbk_piece_data)
         yield sbk_piece_data
+
+
+def _parse_command(in_val: str) -> typ.Optional[str]:
+    in_val  = in_val.strip().lower()
+    is_done = in_val in ('y', 'yes', 'd', 'done', 'a', 'accept')
+    if is_done:
+        return 'done'
+    elif in_val in ('c', 'cancel', 'e', 'exit'):
+        return 'cancel'
+    elif in_val in ('p', 'prev'):
+        return 'prev'
+    elif in_val in ('n', 'next'):
+        return 'next'
+    else:
+        return None
+
+
+def _parse_input(
+    idx: int, in_val: str
+) -> typ.Optional[typ.Tuple[str, str, bytes]]:
+    maybe_code = in_val.replace(" ", "")
+    if maybe_code.isdigit():
+        if len(maybe_code) < 8:
+            echo("Invalid code. Missing digits.")
+            return None
+
+        if len(maybe_code) > 8:
+            echo("Invalid code. Too many digits.")
+            return None
+
+        c0 = maybe_code[:4]
+        c1 = maybe_code[4:]
+
+        try:
+            parts = eu.intcodes2parts([c0, c1], idx)
+            (p0_idx, p0_val), (p1_idx, p1_val) = parts
+        except ValueError as err:
+            echo(*err.args)
+            echo(" Type 'skip' if you cannot read the code")
+            return None
+
+        line_data = p0_val + p1_val
+    else:
+        try:
+            phrase_parts = eu.phrase2parts(in_val)
+        except ValueError as err:
+            echo(f"Unknown word: {err.args[1]}")
+            return None
+
+        if len(phrase_parts) < 4:
+            echo(f"Invalid Phrase. Missing words (expected 4)")
+            return None
+
+        if len(phrase_parts) > 4:
+            echo(f"Invalid Phrase. Too many words (expected 4)")
+            return None
+
+        line_data = eu.phrase2bytes(" ".join(phrase_parts))
+        c0, c1 = eu.bytes2intcode_parts(line_data, idx)
+
+    return c0, c1, line_data
+
+
+MaybeIntCodes = typ.List[typ.Optional[eu.IntCode]]
+
+
+def _recover_full_data(intcodes: eu.MaybeIntCodes) -> typ.Optional[eu.IntCodes]:
+    try:
+        recovered_data = eu.intcode_parts2bytes(intcodes)
+    except Exception:
+        return None
+
+    # abort if any recovered codes disagree with the input
+    recovered_intcode_lines = eu.bytes2intcode(recovered_data)
+    recovered_intcodes      = recovered_intcode_lines.splitlines()
+    if not all(recovered_intcodes):
+        return None
+
+    assert len(recovered_intcodes) == len(intcodes)
+
+    for i, intcode in enumerate(intcodes):
+        if intcode and intcode != recovered_intcodes[i]:
+            return None
+
+    return recovered_intcodes
+
+
+def _line_marker(idx: int, key_len: int) -> str:
+    marker_mod  = key_len // 4
+    marker_char = "ABCD"[(idx // 2) // marker_mod]
+    marker_id   = (idx // 2) % marker_mod
+    return f"{marker_char}{marker_id}"
+
+
+def _format_partial_secret(
+    phrase_lines: eu.PhraseLines,
+    intcodes    : eu.MaybeIntCodes,
+    idx         : int,
+    key_len     : int,
+) -> str:
+    marker = _line_marker(idx, key_len)
+    lines  = eu.format_partial_secret_lines(phrase_lines, intcodes)
+
+    marked_lines = []
+    l_idx        = 0
+    for line in lines:
+        if "at the" in line:
+            if line.startswith(marker):
+                marked_line = "=> " + line
+            else:
+                marked_line = "   " + line
+
+            if idx >= key_len and idx % key_len == l_idx:
+                marked_line += " <="
+
+            l_idx += 2
+        else:
+            marked_line = ("   " + line).strip()
+
+        marked_lines.append(marked_line)
+
+    return "\n".join(marked_lines)
+
+
+def _expand_codes_if_recoverable(
+    intcodes: eu.MaybeIntCodes, key_len: int
+) -> typ.Optional[typ.Tuple[eu.IntCodes, eu.PhraseLines]]:
+    if len([ic for ic in intcodes if ic]) < key_len:
+        return None
+
+    recoverd_intcodes = _recover_full_data(intcodes)
+    if recoverd_intcodes is None:
+        return None
+
+    data = eu.intcode_parts2bytes(recoverd_intcodes)
+
+    recovered_phrase       = eu.bytes2phrase(data)
+    recovered_phrase_lines = recovered_phrase.splitlines()
+    return recoverd_intcodes, recovered_phrase_lines
+
+
+def _echo_state(
+    intcodes    : eu.MaybeIntCodes,
+    phrase_lines: eu.PhraseLines,
+    idx         : int,
+    key_len     : int,
+    header_text : str,
+) -> str:
+    clear()
+
+    echo(header_text)
+
+    echo()
+    echo(_format_partial_secret(phrase_lines, intcodes, idx, key_len))
+    echo()
+    echo("Available commands:")
+    echo()
+    echo("    c/cancel: cancel recovery")
+    echo("    p/prev  : move to previous code/phrase")
+    echo("    n/next  : move to next code/phrase")
+
+    if eu.is_completed_intcodes(intcodes):
+        echo("    a/accept: accept input")
+
+    echo()
+
+    marker = _line_marker(idx, key_len)
+    if idx < key_len:
+        return f"Enter a command, data code or phrase {marker}"
+    elif eu.is_completed_intcodes(intcodes):
+        return f"Accept input (or continue entering update ECC {marker})"
+    else:
+        return f"Enter a command or ECC code for {marker}"
+
+
+def _sbk_prompt(
+    header_text: str, key_len: int = DEFAULT_KEY_LEN
+) -> typ.Optional[eu.IntCodes]:
+    block_len = key_len * 2
+
+    phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
+    intcodes    : typ.List[typ.Optional[str]] = [None] * block_len
+
+    idx = 0
+
+    while True:
+        expanded = _expand_codes_if_recoverable(intcodes, key_len)
+        if expanded:
+            intcodes     = list(expanded[0])
+            phrase_lines = list(expanded[1])
+
+        prompt_msg = _echo_state(
+            intcodes, phrase_lines, idx, key_len, header_text
+        )
+
+        while True:
+            in_val = click.prompt(prompt_msg)
+            cmd    = _parse_command(in_val)
+            if cmd == 'done' and eu.is_completed_intcodes(intcodes):
+                return typ.cast(eu.IntCodes, intcodes)
+            elif cmd == 'cancel':
+                return None
+            elif cmd == 'prev':
+                idx = max(0, idx - 2)
+                break
+            elif cmd == 'next':
+                idx = min(key_len * 2 - 2, idx + 2)
+                break
+
+            res = _parse_input(idx, in_val)
+            if res is None:
+                continue
+
+            c0, c1, line_data = res
+
+            if idx < key_len:
+                phrase_line = eu.bytes2phrase(line_data)
+                phrase_lines[idx // 2] = phrase_line
+            else:
+                # TODO: fill in ecc if possible
+                pass
+
+            intcodes[idx] = c0
+            intcodes[idx + 1] = c1
+            idx += 2
+            break
+
+
+def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
+    header_text = """Step 2 of 2: Enter your "Brainkey"."""
+    header_text = (
+        "\n\tEnter BrainKey"
+        + "\n\tTo skip and enter SBK Pieces instead, type 'abort'"
+    )
+
+    phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
+
+    idx = 0
+
+    while idx < key_len:
+        phrase_no = idx // 2
+        clear()
+
+        echo(header_text)
+        echo()
+
+        for i, line in enumerate(phrase_lines):
+            prefix = "=> " if i == phrase_no else "   "
+            echo(prefix + line)
+
+        echo()
+        echo("    c/cancel: cancel recovery")
+        echo("    p/prev  : move to previous code/phrase")
+        echo("    n/next  : move to next code/phrase")
+        echo()
+
+        prompt_msg = f"Enter phrase {(phrase_no) + 1}"
+
+        while True:
+            in_val = click.prompt(prompt_msg)
+
+            cmd = _parse_command(in_val)
+            if cmd == 'cancel':
+                return None
+            elif cmd == 'prev':
+                idx = max(0, idx - 2)
+                break
+            elif cmd == 'next':
+                idx = min(key_len * 2 - 2, idx + 2)
+                break
+
+            res = _parse_input(idx, in_val)
+            if res is None:
+                break
+            c0, c1, line_data = res
+        idx += 2
+
+        if all(line != eu.EMPTY_PHRASE_LINE for line in phrase_lines):
+            return b""
+    return None
+
+
+@click.group()
+def cli() -> None:
+    """Cli for SBK."""
+
+
+@cli.command()
+@click.version_option(version="v201906.0001-alpha")
+def version() -> None:
+    """Show version number."""
+    echo(f"SBK version: {sbk.__version__}")
+
+
+@cli.command()
+@click.option(
+    '-a',
+    '--show-all',
+    is_flag=True,
+    default=False,
+    help=_clean_help(SHOW_ALL_HELP),
+)
+def kdf_info(show_all: bool = False) -> None:
+    """Show info for each available parameter config."""
+    min_mem_kb = PARAM_CTX.sys_info.total_kb * MIN_MEM_RATIO
+
+    echo("Id  Mem[MB]  Iters  ~Time[Sec]  Algorithm")
+    for kdf_param_id, config in PARAM_CTX.avail_configs.items():
+        eta_sec        = round(PARAM_CTX.est_times_by_id[kdf_param_id], 1)
+        memory_cost    = config['memory_cost']
+        memory_cost_mb = int(memory_cost / 1024)
+        time_cost      = config['time_cost']
+        parts          = [
+            f"{kdf_param_id:<3}",
+            f"{memory_cost_mb:7}",
+            f"{time_cost:6}",
+            f"{eta_sec:11}",
+            f"  argon2id",
+        ]
+
+        if kdf_param_id == PARAM_ID_DEFAULT:
+            parts += ["<- default"]
+
+        is_visible = memory_cost > min_mem_kb and eta_sec > MIN_TIME_SEC
+
+        if is_visible or show_all or kdf_param_id == PARAM_CTX.param_id_default:
+            echo(" ".join(parts))
 
 
 @cli.command()
@@ -550,6 +846,14 @@ def new_key(
 
     # length that use ecc must be multiples of 4
     # round up to nearest multiple.
+    if salt_len < 8:
+        echo("Minimum value for --salt-len is 8")
+        raise click.Abort()
+
+    if key_len < 8:
+        echo("Minimum value for --key-len is 8")
+        raise click.Abort()
+
     salt_len = (salt_len + 3) // 4 * 4
     key_len  = (key_len  + 3) // 4 * 4
 
@@ -558,10 +862,10 @@ def new_key(
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
     param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id, key_len)
-    param_data = enc_util.params2bytes(param_cfg)
+    param_data = eu.params2bytes(param_cfg)
 
     # validate encoding round trip before we use the params
-    decoded_param_cfg    = enc_util.bytes2params(param_data)
+    decoded_param_cfg    = eu.bytes2params(param_data)
     is_param_recoverable = (
         param_cfg.threshold          == decoded_param_cfg.threshold
         and param_cfg.kdf_param_id   == decoded_param_cfg.kdf_param_id
@@ -575,7 +879,7 @@ def new_key(
 
     hasher = hashlib.sha256()
     hasher.update(email.encode("utf-8"))
-    hasher.update(os.urandom(salt_len * 2))
+    hasher.update(urandom(salt_len * 2))
 
     # The main reason to combine these is just so that the user
     # has one less thing to know about. They always need both
@@ -587,11 +891,11 @@ def new_key(
     yes_all or clear()
 
     echo(SALT_INFO_TITLE)
-    _show_secret("Salt", param_and_salt_data, qr=True)
+    _show_secret("Salt", param_and_salt_data, qr=False)
     echo(SALT_INFO_TEXT)
     yes_all or anykey_confirm(SALT_INFO_PROMPT)
 
-    hasher.update(os.urandom(brainkey_len))
+    hasher.update(urandom(brainkey_len))
     brainkey_data = hasher.digest()[:brainkey_len]
 
     yes_all or clear()
@@ -610,9 +914,10 @@ def new_key(
     echo("\n")
     yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
 
-    sbk_pieces = _split_secret_key(
+    _sbk_pieces = _split_secret_key(
         secret_key, threshold=threshold, num_pieces=num_pieces
     )
+    sbk_pieces = list(_sbk_pieces)
 
     # secret pieces
     for i, sbk_piece_data in enumerate(sbk_pieces):
@@ -642,7 +947,7 @@ def new_key(
 
     echo()
 
-    _show_secret("Brainkey", brainkey_data)
+    _show_secret("Brainkey", brainkey_data, codes=False)
 
     yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT)
     yes_all or clear()
@@ -651,185 +956,78 @@ def new_key(
 
     yes_all or clear()
 
-    # recovery test
-    yes_all or clear()
-    yes_all or echo(RECOVERY_VALIDATION_TITLE)
-    yes_all or echo(RECOVERY_VALIDATION_TEXT)
-
-    yes_all or anykey_confirm("noop")
+    if not yes_all:
+        _validate_copies(param_and_salt_data, sbk_pieces)
 
 
-@cli.command()
-@_kdf_param_id_option
-@_key_len_option
-def derive_key(
-    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
-    key_len     : int               = DEFAULT_KEY_LEN,
-) -> None:
-    """Derive secret key from a brainkey.
+def _validate_data(data: bytes, header_text: str) -> None:
+    full_header_text = RECOVERY_VALIDATION_TITLE + "\n\n\t" + header_text
+    data_len         = len(data)
+    while True:
+        recovered_intcodes = _sbk_prompt(full_header_text, data_len)
+        if recovered_intcodes is None:
+            return
 
-    You should avoid generating your own brainkey, as humans are
-    notorious for generating data that can easilly be guessed by an
-    attacker.
-    """
-    if sys.stdin.isatty():
-        secret_text = click.prompt("Enter your secret")
-    else:
-        secret_text = sys.stdin.read()
+        recovered_data = eu.intcode_parts2bytes(recovered_intcodes)
+        if data == recovered_data:
+            return
 
-    if kdf_param_id is None:
-        kdf_param_id = PARAM_CTX.param_id_default
-
-    if kdf_param_id not in params.PARAM_CONFIGS_BY_ID:
-        err_msg = (
-            f"Invalid argument '{kdf_param_id}' for -p/--kdf-param-id."
-            f"\n\n\tUse 'sbk kdf-info' to see valid choices."
-        )
-        raise click.BadOptionUsage("--kdf-param-id", err_msg)
-
-    secret_data = secret_text.encode("utf-8")
-    salt_data   = b""  # TODO
-
-    unsplit_key = _derive_key(
-        secret_data, salt_data, kdf_param_id, key_len, "Deriving Secret Key"
-    )
-    key_phrase = enc_util.bytes2phrase(unsplit_key)
-
-    echo("\n")
-    echo(key_phrase)
+        anykey_confirm("Invalid input. Data mismatch.")
 
 
-def _parse_input(
-    idx: int, in_val: str
-) -> typ.Optional[typ.Tuple[str, str, bytes]]:
-    maybe_code = in_val.replace(" ", "")
-    if maybe_code.isdigit():
-        if len(maybe_code) < 8:
-            echo("Invalid code. Missing digits.")
-            return None
+def _validate_copies(salt_data: bytes, sbk_pieces: typ.Sequence[bytes]) -> None:
+    _validate_data(salt_data, "Validate your copy of the Salt")
 
-        if len(maybe_code) > 8:
-            echo("Invalid code. Too many digits.")
-            return None
+    num_pieces = len(sbk_pieces)
 
-        c0 = maybe_code[:4]
-        c1 = maybe_code[4:]
-
-        try:
-            parts = enc_util.intcodes2parts([c0, c1], idx)
-            (p0_idx, p0_val), (p1_idx, p1_val) = parts
-        except ValueError as err:
-            echo(*err.args)
-            echo(" Type 'skip' if you cannot read the code")
-            return None
-
-        line_data = p0_val + p1_val
-    else:
-        try:
-            phrase_parts = enc_util.phrase2parts(in_val)
-        except ValueError as err:
-            echo(f"Unknown word: {err.args[1]}")
-            return None
-
-        if len(phrase_parts) < 4:
-            echo(f"Invalid Phrase. Missing words (expected 4)")
-            return None
-
-        if len(phrase_parts) > 4:
-            echo(f"Invalid Phrase. Too many words (expected 4)")
-            return None
-
-        line_data = enc_util.phrase2bytes(" ".join(phrase_parts))
-        c0, c1 = enc_util.bytes2intcode_parts(line_data, idx)
-
-    return c0, c1, line_data
+    for i, sbk_piece_data in enumerate(sbk_pieces):
+        piece_no   = i + 1
+        title_text = f"Validate your copy of SBK Piece {piece_no}/{num_pieces}"
+        _validate_data(sbk_piece_data, title_text)
 
 
 @cli.command()
 @_key_len_option
-def recover_key(key_len: int = DEFAULT_KEY_LEN,) -> None:
-    """Use Data and ECC codes to recover a Phrase."""
+def recover(key_len: int = DEFAULT_KEY_LEN) -> None:
+    """Recover an SBK Piece or Salt."""
     # length that use ecc must be multiples of 4
     key_len = int(math.ceil(key_len / 4.0) * 4)
-
-    block_len  = key_len * 2
-    marker_mod = key_len // 4
-
-    phrase_lines: typ.List[str] = [enc_util.EMPTY_PHRASE_LINE] * (key_len // 2)
-    intcodes    : typ.List[typ.Optional[str]] = [None] * block_len
-
-    idx = 0
-
-    while idx < block_len:
-        # data      = enc_util.intcode_parts2bytes(intcode_parts, block_len)
-        # data      = b"\x00" * key_len
-        lines     = enc_util.format_partial_secret_lines(phrase_lines, intcodes)
-        formatted = "\n".join(lines)
-
-        clear()
-        echo()
-        echo(formatted)
-        echo()
-        echo("Available commands:")
-        echo()
-        echo("    e/exit: abort recovery")
-        echo("    s/skip: skip code/phrase if not legible")
-        echo("    u/undo: undo previous code/phrase")
-        echo()
-
-        marker_char = "ABCD"[(idx // 2) // marker_mod]
-        marker_id   = (idx // 2) % marker_mod
-        marker      = f"{marker_char}{marker_id}"
-
-        if idx < key_len:
-            prompt_msg = f"Enter a command, data code or phrase {marker}"
-        else:
-            prompt_msg = f"Enter a command or ECC code for {marker}"
-
-        while True:
-            in_val = click.prompt(prompt_msg)
-            in_val = in_val.strip().lower()
-            if in_val in ('s', 'skip'):
-                idx += 2
-                break
-            if in_val in ('e', 'exit'):
-                return
-            if in_val in ('u', 'undo'):
-                idx = max(0, idx - 2)
-                phrase_lines[idx // 2] = enc_util.EMPTY_PHRASE_LINE
-                intcodes[idx] = None
-                intcodes[idx + 1] = None
-                break
-
-            res = _parse_input(idx, in_val)
-            if res is None:
-                continue
-
-            c0, c1, line_data = res
-
-            if idx < key_len:
-                phrase_line = enc_util.bytes2phrase(line_data)
-                phrase_lines[idx // 2] = phrase_line
-            else:
-                # TODO: fill in ecc if possible
-                pass
-
-            intcodes[idx] = c0
-            intcodes[idx + 1] = c1
-            idx += 2
-            break
+    _sbk_prompt("Recovery of SBK Piece/Salt", key_len)
 
 
-# def split_key():
-#     yes_all or clear()
-#     yes_all or confirm(SECURITY_WARNING_TEXT)
-#     yes_all or confirm(SECURITY_WARNING_PROMPT)
+@cli.command()
+@_salt_len_option
+@_brainkey_len_option
+@_yes_all_option
+def load_wallet(
+    salt_len    : int  = DEFAULT_SALT_LEN,
+    brainkey_len: int  = DEFAULT_BRAINKEY_LEN,
+    yes_all     : bool = False,
+) -> None:
+    """Open wallet using Salt and Brainkey or Salt and SBK Pieces."""
+    salt_len = (salt_len + 3) // 4 * 4
 
+    yes_all or clear()
+    yes_all or echo(SECURITY_WARNING_TEXT)
+    yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-# def recover_key():
-#     yes_all or clear()
-#     yes_all or confirm(SECURITY_WARNING_TEXT)
-#     yes_all or confirm(SECURITY_WARNING_PROMPT)
+    brainkey_data = _brainkey_prompt(brainkey_len)
+
+    header_text   = """Step 1 of 2: Enter your "Salt"."""
+    salt_intcodes = _sbk_prompt(header_text, salt_len)
+    if salt_intcodes is None:
+        return
+
+    salt_data = eu.intcode_parts2bytes(salt_intcodes)
+    param_cfg = eu.bytes2params(salt_data)  # noqa
+
+    if brainkey_len:
+        brainkey_data = _brainkey_prompt(brainkey_len)
+        if brainkey_data is None:
+            return
+    else:
+        header_text   = """Step 2 of 2: Enter your "SBK Pieces"."""
+        salt_intcodes = _sbk_prompt(header_text, salt_len)
 
 
 if __name__ == '__main__':

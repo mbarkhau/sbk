@@ -121,7 +121,7 @@ ParamsByConfigId = typ.Dict[KDFParamId, ParamConfig]
 # entries of PARAM_CONFIGS_BY_ID are hashed. This provides a safety
 # net against inadvertant changes to the _init_configs function.
 PARAM_CONFIG_HASHES = {
-    0x7F007F007F007F007F00FF01FF0002: '67d43eafd309c50f112f368060ef5ba8be52c5fb'
+    0x1FFFFFFFFFE2: '230521051899b44c95d5f48257ec2d9e02d2771a'
 }
 
 
@@ -156,35 +156,35 @@ def _init_configs() -> ParamsByConfigId:
     assert min(param_configs_by_id) >= 0
     assert max(param_configs_by_id) < 256
 
-    # import hashlib
-    #
+    import hashlib
+
     # debug_bitfield = sum(
     #     1 << param_id for param_id in param_configs_by_id.keys()
     # )
     # print(hex(debug_bitfield))
 
-    # checked_config_ids: typ.Set[KDFParamId] = set()
-    # for ids_bitfield, expected_hash in PARAM_CONFIG_HASHES.items():
-    #     params_configs_subset = {
-    #         param_id: config
-    #         for param_id, config in param_configs_by_id.items()
-    #         if ids_bitfield & (1 << param_id) > 0
-    #     }
-    #     checked_config_ids.update(params_configs_subset.keys())
-    #     params_str  = json.dumps(params_configs_subset, sort_keys=True)
-    #     params_hash = hashlib.sha1(params_str.encode('ascii')).hexdigest()
-    #     # print(params_hash)
+    checked_config_ids: typ.Set[KDFParamId] = set()
+    for ids_bitfield, expected_hash in PARAM_CONFIG_HASHES.items():
+        params_configs_subset = {
+            param_id: config
+            for param_id, config in param_configs_by_id.items()
+            if ids_bitfield & (1 << param_id) > 0
+        }
+        checked_config_ids.update(params_configs_subset.keys())
+        params_str  = json.dumps(params_configs_subset, sort_keys=True)
+        params_hash = hashlib.sha1(params_str.encode('ascii')).hexdigest()
+        # print(params_hash)
 
-    #     if params_hash != expected_hash:
-    #         err_msg = (
-    #             "Params hash changed! To prevent existing hashes from "
-    #             "becomming invalid, it is vital that the parameters for "
-    #             "a specific config does not change."
-    #         )
-    #         raise RuntimeError(err_msg)
+        if params_hash != expected_hash:
+            err_msg = (
+                "Params hash changed! To prevent existing hashes from "
+                "becomming invalid, it is vital that the parameters for "
+                "a specific config does not change."
+            )
+            raise RuntimeError(err_msg)
 
-    # if checked_config_ids != set(param_configs_by_id.keys()):
-    #     raise RuntimeError("Unchecked param configs!")
+    if checked_config_ids != set(param_configs_by_id.keys()):
+        raise RuntimeError("Unchecked param configs!")
 
     return param_configs_by_id
 

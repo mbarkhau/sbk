@@ -27,5 +27,4 @@ pycalver
 # needed for mypy coverage report
 lxml
 
-shiv
-
+pyinstaller

@@ -8,8 +8,10 @@
 # should see if there is a conda package that suits your needs.
 
 click
+click-repl
 pathlib2
 
 # NOTE mb: We don't need qrcode[pil] as is otherwise recommended.
 qrcode
 pylev
+argon2-cffi

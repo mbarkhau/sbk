@@ -50,10 +50,10 @@ TITLES = [
     "mayor",
     "mother",
     "nurse",
-    "priest",
     "prince",
     "queen",
     "sister",
+    "tailor",
     "waiter",
     "worker",
 ]
@@ -129,8 +129,8 @@ assert len(PLACE_PARTS ) == 2 ** 8
 
 # If corpus words change, regenerate output for
 #   test/test_enc_util.py@TEST_PHRASE_LINES
-# for person, place in zip(PERSON_PARTS, PLACE_PARTS):
-#     print(person, place, end="")
+# for person_part, place_part in zip(PERSON_PARTS, PLACE_PARTS):
+#     print(f'    "{person_part} {place_part.strip()}",')
 
 
 def _char_at(data: bytes, i: int) -> int:
@@ -282,26 +282,36 @@ def bytes_repr(data: bytes) -> str:
 
 def bytes2params(data: bytes) -> params.Params:
     """Deserialize Params."""
-    param_data = data[:3]
-    field0, threshold, kdf_param_id = struct.unpack("BBB", param_data)
+    field0_data = data[0:1]
+    (field0,) = struct.unpack("B", field0_data)
     sbk_version  = field0 >> 4
     hash_len_num = field0 & 0x0F
-    assert sbk_version == 0
+
+    if sbk_version == 0:
+        (field1,) = struct.unpack("B", data[1:2])
+        threshold_num = field1 >> 5
+        kdf_param_id  = field1 & 0x1F
+    elif sbk_version == 1:
+        (field1, field2) = struct.unpack("BB", data[1:3])
+        threshold_num = field1
+        kdf_param_id  = field2
+    else:
+        raise Exception("Invalid/Unknown/Incompatible SBK Version")
 
     # decoded params doesn't include num_pieces as it's only required
     # when originally generating the pieces.
-    num_pieces = threshold
+    num_pieces = threshold_num + 1
     config     = params.PARAM_CONFIGS_BY_ID[kdf_param_id]
 
-    hash_len_bytes = (hash_len_num + 1) * 4
-    pow2prime_idx  = primes.get_pow2prime_index(hash_len_bytes * 8)
+    key_len_bytes = (hash_len_num + 1) * 4
+    pow2prime_idx = primes.get_pow2prime_index(key_len_bytes * 8)
 
     return params.Params(
-        threshold=threshold,
+        threshold=num_pieces,
         num_pieces=num_pieces,
         pow2prime_idx=pow2prime_idx,
         kdf_param_id=kdf_param_id,
-        hash_len_bytes=hash_len_bytes,
+        key_len_bytes=key_len_bytes,
         **config,
     )
 
@@ -311,14 +321,29 @@ def params2bytes(p: params.Params) -> bytes:
 
     Since these fields are part of the salt,
     we try to keep the serialized params small
-    and leave more room for the randomness.
+    and leave more room for randomness.
     """
-    hash_len_num = p.hash_len_bytes // 4 - 1
+    hash_len_num = p.key_len_bytes // 4 - 1
     assert 0 <= hash_len_num < 2 ** 4
 
-    sbk_version = 0
-    field0      = (sbk_version << 4) + hash_len_num
-    return struct.pack("BBB", field0, p.threshold, p.kdf_param_id)
+    threshold_num = p.threshold - 1
+    assert 0 <= threshold_num  < 2 ** 8
+    assert 0 <= p.kdf_param_id < 2 ** 8
+
+    if threshold_num < 2 ** 3 and p.kdf_param_id < 2 ** 5:
+        sbk_version = 0
+    else:
+        sbk_version = 1
+
+    field0 = (sbk_version << 4) + hash_len_num
+
+    if sbk_version == 0:
+        field1 = (threshold_num << 5) + p.kdf_param_id
+        return struct.pack("BB", field0, field1)
+    else:
+        field1 = threshold_num
+        field2 = p.kdf_param_id
+        return struct.pack("BBB", field0, field1, field2)
 
 
 def bytes2gfpoint(data: bytes, gf: polynom.GF) -> polynom.GFPoint:

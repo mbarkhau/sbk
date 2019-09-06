@@ -16,9 +16,11 @@ import threading
 import typing as typ
 import pathlib2 as pl
 import itertools as it
+import subprocess as sp
 
-import click
 import qrcode
+import click
+import click_repl
 
 import sbk
 
@@ -27,6 +29,7 @@ from . import params
 from . import primes
 from . import polynom
 from . import enc_util as eu
+from . import electrum_mnemonic
 
 
 # To enable pretty tracebacks:
@@ -127,22 +130,12 @@ class ThreadWithReturnData(threading.Thread):
         return rv
 
 
-def _derive_key(
-    brainkey_data: bytes,
-    salt_data    : bytes,
-    kdf_param_id : params.KDFParamId,
-    key_len      : int,
-    label        : str,
-) -> bytes:
-    eta_sec = PARAM_CTX.est_times_by_id[kdf_param_id]
+def _derive_key(brainkey_data: bytes, salt_data: bytes, label: str) -> bytes:
+    param_cfg = eu.bytes2params(salt_data)
+    eta_sec   = PARAM_CTX.est_times_by_id[param_cfg.kdf_param_id]
+    hash_len  = param_cfg.key_len_bytes - 1
 
-    # NOTE: Since we encode the x value of a point in the top byte,
-    #   and since the key we derive (the y value) has to be smaller
-    #   than the prime with key_len * 8 - 8 bits, we have to cut off
-    #   the top byte here too.
-    hash_len = key_len - 1
-
-    kdf_args   = (brainkey_data, salt_data, kdf_param_id, hash_len)
+    kdf_args   = (brainkey_data, salt_data, param_cfg.kdf_param_id, hash_len)
     kdf_thread = ThreadWithReturnData(target=kdf.derive_key, args=kdf_args)
     # daemon means the thread is killed if user hits Ctrl-C
     kdf_thread.daemon = True
@@ -168,12 +161,10 @@ def _derive_key(
             )
             progress_bar.update(int(elapsed * 1000))
         elif progress_bar:
-            if remaining_pct < 10:
-                progress_bar.update(int(step * 200))
-            elif remaining_pct < 20:
-                progress_bar.update(int(step * 400))
-            elif remaining_pct < 50:
-                progress_bar.update(int(step * 700))
+            if remaining_pct < 1:
+                progress_bar.update(int(step * 100))
+            elif remaining_pct < 5:
+                progress_bar.update(int(step * 500))
             else:
                 progress_bar.update(int(step * 1000))
 
@@ -183,8 +174,13 @@ def _derive_key(
     kdf_thread.join()
 
     hash_data = kdf_thread.retval
-    key_data  = b"\x00" + hash_data
-    assert len(key_data) == key_len, len(key_data)
+
+    # NOTE: We encode the x value of a point in the first byte, and
+    #   since the key we derive (the y value) has to be smaller
+    #   than the prime with key_len * 8 - 8 bits, we set the first
+    #   byte here (the x value) to zero.
+    key_data = b"\x00" + hash_data
+    assert len(key_data) == param_cfg.key_len_bytes
     return key_data
 
 
@@ -365,7 +361,7 @@ _email_option = click.option(
 
 THRESHOLD_OPTION_HELP = "Number of pieces required to recover the key"
 
-DEFAULT_THRESHOLD = 2
+DEFAULT_THRESHOLD = 3
 
 _threshold_option = click.option(
     '-t',
@@ -378,7 +374,7 @@ _threshold_option = click.option(
 
 NUM_PIECES_OPTION_HELP = "Number of pieces to split the key into"
 
-DEFAULT_NUM_PIECES = 3
+DEFAULT_NUM_PIECES = 5
 
 _num_pieces_option = click.option(
     '-n',
@@ -417,7 +413,7 @@ _key_len_option = click.option(
 
 BRAINKEY_LEN_OPTION_HELP = "Length (in bytes) of the Brainkey"
 
-DEFAULT_BRAINKEY_LEN = 48 // 8
+DEFAULT_BRAINKEY_LEN = 64 // 8
 
 _brainkey_len_option = click.option(
     '-b',
@@ -428,6 +424,7 @@ _brainkey_len_option = click.option(
     help=_clean_help(BRAINKEY_LEN_OPTION_HELP),
 )
 
+
 YES_ALL_OPTION_HELP = "Enable non-interactive mode"
 
 _yes_all_option = click.option(
@@ -437,6 +434,17 @@ _yes_all_option = click.option(
     is_flag=True,
     default=False,
     help=_clean_help(YES_ALL_OPTION_HELP),
+)
+
+
+NON_SEGWIT_OPTION_HELP = "Create a non-segwit/legacy wallet."
+
+_non_segwit_option = click.option(
+    '--non-segwit',
+    type=bool,
+    is_flag=True,
+    default=False,
+    help=_clean_help(NON_SEGWIT_OPTION_HELP),
 )
 
 
@@ -475,11 +483,15 @@ def _show_secret(
     echo("\n".join(output_lines) + "\n\n")
 
 
+SecretKey = bytes
+SBKPiece  = bytes
+
+
 def _split_secret_key(
-    secret_key: bytes, threshold: int, num_pieces: int
-) -> typ.Iterable[bytes]:
+    secret_key: SecretKey, threshold: int, num_pieces: int
+) -> typ.Iterable[SBKPiece]:
     key_len = len(secret_key)
-    assert secret_key[0] == 0
+    assert secret_key[:1] == b"\x00"
     secret_int = eu.bytes2int(secret_key[1:])
 
     key_bits  = (key_len - 1) * 8
@@ -494,6 +506,18 @@ def _split_secret_key(
         sbk_piece_data = eu.gfpoint2bytes(gfpoint)
         assert len(sbk_piece_data) == key_len, len(sbk_piece_data)
         yield sbk_piece_data
+
+
+def _join_sbk_pieces(
+    param_cfg: params.Params, sbk_pieces: typ.List[SBKPiece]
+) -> SecretKey:
+    prime  = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
+    gf     = polynom.GF(p=prime)
+    points = [eu.bytes2gfpoint(p, gf) for p in sbk_pieces]
+
+    secret_int = polynom.join(len(points), points)
+    secret_key = b"\x00" + eu.int2bytes(secret_int)
+    return secret_key
 
 
 def _parse_command(in_val: str) -> typ.Optional[str]:
@@ -588,8 +612,12 @@ def _line_marker(idx: int, key_len: int) -> str:
     return f"{marker_char}{marker_id}"
 
 
+IntCodes    = typ.List[eu.IntCode]
+PhraseLines = typ.List[str]
+
+
 def _format_partial_secret(
-    phrase_lines: eu.PhraseLines,
+    phrase_lines: PhraseLines,
     intcodes    : eu.MaybeIntCodes,
     idx         : int,
     key_len     : int,
@@ -620,7 +648,7 @@ def _format_partial_secret(
 
 def _expand_codes_if_recoverable(
     intcodes: eu.MaybeIntCodes, key_len: int
-) -> typ.Optional[typ.Tuple[eu.IntCodes, eu.PhraseLines]]:
+) -> typ.Optional[typ.Tuple[IntCodes, PhraseLines]]:
     if len([ic for ic in intcodes if ic]) < key_len:
         return None
 
@@ -637,7 +665,7 @@ def _expand_codes_if_recoverable(
 
 def _echo_state(
     intcodes    : eu.MaybeIntCodes,
-    phrase_lines: eu.PhraseLines,
+    phrase_lines: PhraseLines,
     idx         : int,
     key_len     : int,
     header_text : str,
@@ -674,16 +702,29 @@ def _sbk_prompt(
 ) -> typ.Optional[eu.IntCodes]:
     block_len = key_len * 2
 
-    phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
-    intcodes    : typ.List[typ.Optional[str]] = [None] * block_len
+    phrase_lines    : PhraseLines = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
+    intcodes        : typ.List[typ.Optional[str]] = [None] * block_len
+    expanded_indexes: typ.Set[int] = []
 
-    idx = 0
+    idx           = 0
+    prev_intcodes = list(intcodes)
 
     while True:
-        expanded = _expand_codes_if_recoverable(intcodes, key_len)
-        if expanded:
-            intcodes     = list(expanded[0])
-            phrase_lines = list(expanded[1])
+        if prev_intcodes != intcodes:
+            expanded = _expand_codes_if_recoverable(intcodes, key_len)
+            if expanded:
+                exp_intcodes, exp_phrase_lines = expanded
+
+                expanded_indexes = {
+                    i
+                    for i, (a, b) in enumerate(zip(intcodes, exp_intcodes))
+                    if a != b
+                }
+
+                intcodes     = exp_intcodes
+                phrase_lines = exp_phrase_lines
+
+        prev_intcodes = list(intcodes)
 
         prompt_msg = _echo_state(
             intcodes, phrase_lines, idx, key_len, header_text
@@ -709,31 +750,32 @@ def _sbk_prompt(
 
             c0, c1, line_data = res
 
+            for eidx in expanded_indexes:
+                intcodes[eidx] = None
+                phrase_lines[idx // 2] = eu.EMPTY_PHRASE_LINE
+            expanded_indexes.clear()
+
             if idx < key_len:
                 phrase_line = eu.bytes2phrase(line_data)
                 phrase_lines[idx // 2] = phrase_line
-            else:
-                # TODO: fill in ecc if possible
-                pass
 
             intcodes[idx] = c0
             intcodes[idx + 1] = c1
             idx += 2
+
             break
 
 
 def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
-    header_text = """Step 2 of 2: Enter your "Brainkey"."""
     header_text = (
-        "\n\tEnter BrainKey"
-        + "\n\tTo skip and enter SBK Pieces instead, type 'abort'"
+        """Step 2 of 2: Enter your "Brainkey".""" + "\n\tEnter BrainKey"
     )
 
     phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
 
     idx = 0
 
-    while idx < key_len:
+    while any(line == eu.EMPTY_PHRASE_LINE for line in phrase_lines):
         phrase_no = idx // 2
         clear()
 
@@ -745,7 +787,7 @@ def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
             echo(prefix + line)
 
         echo()
-        echo("    c/cancel: cancel recovery")
+        echo("    c/cancel: cancel brainkey input, use SBK Pieces instead")
         echo("    p/prev  : move to previous code/phrase")
         echo("    n/next  : move to next code/phrase")
         echo()
@@ -767,18 +809,22 @@ def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
 
             res = _parse_input(idx, in_val)
             if res is None:
-                break
-            c0, c1, line_data = res
-        idx += 2
+                continue
 
-        if all(line != eu.EMPTY_PHRASE_LINE for line in phrase_lines):
-            return b""
-    return None
+            c0, c1, line_data = res
+
+            phrase_line = eu.bytes2phrase(line_data)
+            phrase_lines[idx // 2] = phrase_line
+            idx += 2
+
+            break
+
+    return eu.phrase2bytes("\n".join(phrase_lines))
 
 
 @click.group()
 def cli() -> None:
-    """Cli for SBK."""
+    """CLI for SBK."""
 
 
 @cli.command()
@@ -854,22 +900,27 @@ def new_key(
         echo("Minimum value for --key-len is 8")
         raise click.Abort()
 
+    if kdf_param_id not in params.PARAM_CONFIGS_BY_ID:
+        echo(f"Invalid --kdf-param-id={kdf_param_id}")
+        echo("To see available parameters use: sbk kdf-info ")
+        raise click.Abort()
+
     salt_len = (salt_len + 3) // 4 * 4
     key_len  = (key_len  + 3) // 4 * 4
+
+    param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id, key_len)
+    param_data = eu.params2bytes(param_cfg)
 
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-    param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id, key_len)
-    param_data = eu.params2bytes(param_cfg)
-
     # validate encoding round trip before we use the params
     decoded_param_cfg    = eu.bytes2params(param_data)
     is_param_recoverable = (
-        param_cfg.threshold          == decoded_param_cfg.threshold
-        and param_cfg.kdf_param_id   == decoded_param_cfg.kdf_param_id
-        and param_cfg.hash_len_bytes == decoded_param_cfg.hash_len_bytes
+        param_cfg.threshold         == decoded_param_cfg.threshold
+        and param_cfg.kdf_param_id  == decoded_param_cfg.kdf_param_id
+        and param_cfg.key_len_bytes == decoded_param_cfg.key_len_bytes
     )
 
     if not is_param_recoverable:
@@ -903,11 +954,7 @@ def new_key(
     yes_all or echo(SBK_KEYGEN_TEXT)
 
     secret_key = _derive_key(
-        brainkey_data,
-        param_and_salt_data,
-        kdf_param_id,
-        key_len,
-        label="Deriving Secret Key",
+        brainkey_data, param_and_salt_data, label="Deriving Secret Key"
     )
     assert len(secret_key) % 4 == 0, len(secret_key)
 
@@ -999,10 +1046,12 @@ def recover(key_len: int = DEFAULT_KEY_LEN) -> None:
 @_salt_len_option
 @_brainkey_len_option
 @_yes_all_option
+@_non_segwit_option
 def load_wallet(
     salt_len    : int  = DEFAULT_SALT_LEN,
     brainkey_len: int  = DEFAULT_BRAINKEY_LEN,
     yes_all     : bool = False,
+    non_segwit : bool  = False,
 ) -> None:
     """Open wallet using Salt and Brainkey or Salt and SBK Pieces."""
     salt_len = (salt_len + 3) // 4 * 4
@@ -1011,23 +1060,102 @@ def load_wallet(
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-    brainkey_data = _brainkey_prompt(brainkey_len)
+    header_text = """Enter your "Salt"."""
+    # salt_intcodes = _sbk_prompt(header_text, salt_len)
+    salt_intcodes = [
+        "0257",
+        "1091",
+        "2927",
+        "3416",
+        "4468",
+        "5188",
+        "6456",
+        "7848",
+        "0026",
+        "1119",
+        "2646",
+        "3251",
+        "4685",
+        "5551",
+        "6691",
+        "7348",
+    ]
 
-    header_text   = """Step 1 of 2: Enter your "Salt"."""
-    salt_intcodes = _sbk_prompt(header_text, salt_len)
     if salt_intcodes is None:
-        return
+        click.echo("Salt is required")
+        raise click.Abort()
 
     salt_data = eu.intcode_parts2bytes(salt_intcodes)
-    param_cfg = eu.bytes2params(salt_data)  # noqa
+    param_cfg = eu.bytes2params(salt_data)
 
-    if brainkey_len:
-        brainkey_data = _brainkey_prompt(brainkey_len)
-        if brainkey_data is None:
-            return
+    if brainkey_len == 0:
+        brainkey_data = None
     else:
-        header_text   = """Step 2 of 2: Enter your "SBK Pieces"."""
-        salt_intcodes = _sbk_prompt(header_text, salt_len)
+        brainkey_data = _brainkey_prompt(brainkey_len)
+
+    if brainkey_data is None:
+        # sbk_pieces: typ.List[SBKPiece] = []
+        # while len(sbk_pieces) < param_cfg.threshold:
+        #     piece_num = len(sbk_pieces) + 1
+        #     header_text = f"""
+        #     Enter your SBK-Piece {piece_num} of {param_cfg.threshold}.
+        #     """.strip()
+        #     sbk_piece_intcodes = _sbk_prompt(
+        #         header_text, param_cfg.key_len_bytes
+        #     )
+        #     if sbk_piece_intcodes:
+        #         sbk_piece = eu.intcode_parts2bytes(sbk_piece_intcodes)
+        #         sbk_pieces.append(sbk_piece)
+
+        sbk_pieces = [
+            b"\x01\xd6\x9f\x87Oq\xcd\xf5",
+            b"\x02\xdaN\xd7\x99\xa5>\x8c",
+            b"\x03\x1c\x99\xfbo\xc95\xcb",
+        ]
+
+        # for sbk_piece in sbk_pieces:
+        #     print("...", sbk_piece)
+
+        secret_key = _join_sbk_pieces(param_cfg, sbk_pieces)
+    else:
+        secret_key = _derive_key(
+            brainkey_data, salt_data, label="Deriving Secret Key"
+        )
+
+    assert secret_key == b"\x00\x11\x8c\n\x91.\xe4\x06"
+
+    seed_type = 'standard' if non_segwit else 'segwit'
+
+    int_seed = eu.bytes2int(secret_key)
+    wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
+
+    wallet_path = "/tmp/sbk_electrum_wallet"
+
+    if os.path.exists(wallet_path):
+        os.remove(wallet_path)
+
+    try:
+        cmd     = ["electrum", "restore", "--wallet", wallet_path, wallet_seed]
+        retcode = sp.call(cmd)
+        if retcode != 0:
+            raise click.Abort("Error calling 'electrum restore'")
+
+        cmd     = ["electrum", "gui", "--offline", "--wallet", wallet_path]
+        retcode = sp.call(cmd)
+        if retcode != 0:
+            raise click.Abort("Error calling 'electrum restore'")
+    finally:
+        if os.path.exists(wallet_path):
+            os.remove(wallet_path)
+
+
+@cli.command()
+@click.pass_context
+def repl(ctx):
+    """Start REPL (with completion)"""
+    click.echo(cli.get_help(ctx))
+    prompt_kwargs = {'message': "sbk> "}
+    click_repl.repl(ctx, prompt_kwargs=prompt_kwargs)
 
 
 if __name__ == '__main__':

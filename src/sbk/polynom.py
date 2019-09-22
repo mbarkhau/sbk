@@ -16,11 +16,10 @@ https://crypto.stackexchange.com/a/2718
 """
 
 import random
-import itertools
 import typing as typ
+import itertools
 
 from . import primes
-
 
 _rand = random.SystemRandom()
 
@@ -241,6 +240,16 @@ def interpolate(points: Points, x: Num) -> Num:
     if len(x_vals) != len(set(x_vals)):
         raise ValueError("Points must be distinct {points}")
 
+    # validate x coordinates
+    for i, p in points:
+        if p.x == 0 or p.x == 255:
+            errmsg = f"Illegal SBK-Piece {i + 1} with x={p.x}. Possible attack."
+            raise Exception(errmsg)
+
+        if not 0 < p.x < 255:
+            errmsg = f"Invalid SBK-Piece {i + 1} with x={p.x}"
+            raise Exception(errmsg)
+
     terms = iter(_interpolation_terms(points, x))
     accu  = next(terms)
     for term in terms:
@@ -300,9 +309,7 @@ def split(prime: int, threshold: int, num_pieces: int, secret: int) -> GFPoints:
         raise ValueError("number of pieces too low, secret would be exposed")
 
     if num_pieces >= prime:
-        raise ValueError(
-            "number of pieces too high, cannot generate distinct points"
-        )
+        raise ValueError("number of pieces too high, cannot generate distinct points")
 
     if threshold > num_pieces:
         raise ValueError("threshold too high, must be <= number of pieces")
@@ -311,16 +318,9 @@ def split(prime: int, threshold: int, num_pieces: int, secret: int) -> GFPoints:
         raise ValueError("Invalid secret, must be a positive integer")
 
     if prime <= secret:
-        raise ValueError(
-            "Invalid prime for secret, must be greater than secret."
-        )
+        raise ValueError("Invalid prime for secret, must be greater than secret.")
 
-    return _split(
-        gf=GF(p=prime),
-        threshold=threshold,
-        num_pieces=num_pieces,
-        secret=secret,
-    )
+    return _split(gf=GF(p=prime), threshold=threshold, num_pieces=num_pieces, secret=secret)
 
 
 def join(threshold: int, points: GFPoints) -> int:

@@ -12,8 +12,8 @@ ts: time since start of the process (actually import time).
 d : execution duration for the code wrapped by the context manager
 """
 import time
-import contextlib
 import typing as typ
+import contextlib
 
 proc_ts_start = time.time() * 1000
 

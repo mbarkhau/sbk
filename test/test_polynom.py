@@ -5,7 +5,6 @@ import pytest
 import sbk.primes
 from sbk.polynom import *
 
-
 # Case 3: xgcd(240, 46)
 # | i |     qi−1     |         ri        |        si       |          ti         |
 # |---|--------------|-------------------|-----------------|---------------------|
@@ -113,12 +112,7 @@ def test_interpolate_deg1_float():
 
 
 def test_interpolate_deg2_float():
-    points = [
-        Point(0.0, 0.0),
-        Point(1.0, 1.0),
-        Point(2.0, 4.0),
-        Point(3.0, 9.0),
-    ]
+    points = [Point(0.0, 0.0), Point(1.0, 1.0), Point(2.0, 4.0), Point(3.0, 9.0)]
     at_x, at_y = points[-1]
     interp_y = interpolate(points[:-1], at_x)
     assert interp_y == at_y
@@ -150,12 +144,7 @@ def test_gf_arithmetic():
 
 def test_interpolate_gf():
     gf     = GF(7)
-    points = [
-        Point(gf[0], gf[0]),
-        Point(gf[1], gf[1]),
-        Point(gf[2], gf[4]),
-        Point(gf[3], gf[9]),
-    ]
+    points = [Point(gf[0], gf[0]), Point(gf[1], gf[1]), Point(gf[2], gf[4]), Point(gf[3], gf[9])]
     at_x, at_y = points[-1]
     interp_y = interpolate(points[:-1], at_x)
     assert interp_y == at_y
@@ -194,12 +183,7 @@ def test_split_and_join_fuzz():
             'prime'     : prime,
             'secret'    : secret,
         }
-        points = split(
-            prime=prime,
-            threshold=threshold,
-            num_pieces=num_pieces,
-            secret=secret,
-        )
+        points    = split(prime=prime, threshold=threshold, num_pieces=num_pieces, secret=secret)
         actual_xs = [p.x.val for p in points]
         actual_ys = [p.y.val for p in points]
 

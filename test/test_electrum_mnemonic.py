@@ -1,3 +1,5 @@
+import math
+
 from sbk.electrum_mnemonic import *
 
 TEST_SEED_RAW = 51567168450570803019617791242210365249640000000000
@@ -41,8 +43,6 @@ print(mnemonic_decode(test_seed))
 
 seed = seed_raw2phrase()
 
-
-import math
 
 print(160 / 8)
 

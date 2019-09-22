@@ -1,18 +1,27 @@
-# Large portions of this module are naturally based on the
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
+#
+# Large portions of this module are based on the
 # electrum implementation itself in particular on:
 # https://github.com/spesmilo/electrum/blob/master/electrum/mnemonic.py
 #
 # Changes are limited to minimal type checking, automatic
-# formatting and the hardcoded wordlist.
+# formatting and the hardcoded wordlists.
+#
+# Electrum - lightweight Bitcoin client
+# Copyright (C) 2016 Thomas Voegtlin
+#
+# SPDX-License-Identifier: MIT
+"""Electrum mnemonic encoding and decoding functions.
 
+These are replicated so that SBK can invoke "electrum restore <mnemonic>".
+"""
 import os
 import hmac
 import string
+import typing as typ
 import hashlib
 import binascii
-import unicodedata
-
-import typing as typ
 
 wordlist = [
     "abandon",
@@ -3794,8 +3803,9 @@ bfh = bytes.fromhex
 hfu = binascii.hexlify
 
 
-def bh2u(x):
-    """
+def bh2u(x: bytes) -> str:
+    """Convert bytes to hex str.
+
     str with hex representation of a bytes-like object
 
     >>> x = bytes((1, 2, 10))
@@ -3808,12 +3818,9 @@ def bh2u(x):
     return hfu(x).decode('ascii')
 
 
-hmac_sha_512 = lambda x, y: hmac.new(x, y, hashlib.sha512).digest()
-
-
 def is_old_seed(seed: str) -> bool:
-    seed                = normalize_text(seed)
-    words               = seed.split()
+    seed  = normalize_text(seed)
+    words = seed.split()
 
     try:
         # checks here are deliberately left weak for legacy reasons, see #3149
@@ -3832,7 +3839,10 @@ def is_old_seed(seed: str) -> bool:
 
 def is_new_seed(x: str, prefix: str = SEED_PREFIX) -> bool:
     x = normalize_text(x)
-    s = bh2u(hmac_sha_512(b"Seed version", x.encode('utf8')))
+
+    message   = x.encode('utf8')
+    hmac_data = hmac.new(b"Seed version", message, hashlib.sha512).digest()
+    s         = bh2u(hmac_data)
     return s.startswith(prefix)
 
 

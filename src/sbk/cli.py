@@ -6,20 +6,20 @@
 # SPDX-License-Identifier: MIT
 
 """CLI/Imperative shell for SBK."""
-import os
 import io
+import os
 import math
 import time
 import random
-import hashlib
-import threading
 import typing as typ
-import pathlib2 as pl
+import hashlib
 import itertools as it
+import threading
 import subprocess as sp
 
-import qrcode
 import click
+import qrcode
+import pathlib2 as pl
 import click_repl
 
 import sbk
@@ -30,7 +30,6 @@ from . import primes
 from . import polynom
 from . import enc_util as eu
 from . import electrum_mnemonic
-
 
 # To enable pretty tracebacks:
 #   echo "export ENABLE_BACKTRACE=1;" >> ~/.bashrc
@@ -63,9 +62,7 @@ PARAM_ID_DEFAULT = PARAM_CTX.param_id_default
 
 
 def _clean_help(helmsg: str) -> str:
-    return " ".join(
-        line.strip() for line in helmsg.splitlines() if line.strip()
-    )
+    return " ".join(line.strip() for line in helmsg.splitlines() if line.strip())
 
 
 # NOTE mb: Wrappers for click funtions for the idom: `yes_all or clear`
@@ -92,11 +89,7 @@ def confirm(msg: str) -> bool:
 
 def anykey_confirm(message: str) -> bool:
     click.prompt(
-        message.strip(),
-        default="",
-        show_choices=False,
-        show_default=False,
-        prompt_suffix="",
+        message.strip(), default="", show_choices=False, show_default=False, prompt_suffix=""
     )
     return False
 
@@ -156,9 +149,7 @@ def _derive_key(brainkey_data: bytes, salt_data: bytes, label: str) -> bytes:
         remaining_pct = 100 * remaining / eta_sec
 
         if progress_bar is None and elapsed > 0.2:
-            progress_bar = click.progressbar(
-                label=label, length=total, show_eta=True
-            )
+            progress_bar = click.progressbar(label=label, length=total, show_eta=True)
             progress_bar.update(int(elapsed * 1000))
         elif progress_bar:
             if remaining_pct < 1:
@@ -225,9 +216,11 @@ The security of your system is important. Please make sure that:
 
 For more information on setting up a secure system see:
 
-    TODO TODO TODO TODO
-    TODO TODO TODO TODO
-    TODO TODO TODO TODO
+    https://www.schneier.com/blog/archives/2013/10/air_gaps.html
+    https://tiny.cc/r9wbcz
+
+    http://viccuad.me/blog/Revisited-secure-yourself-part-1-airgapped-computer-and-gpg-smartcards
+    https://tiny.cc/eo0bcz
 
 """
 
@@ -287,16 +280,16 @@ competent to keep this SBK Piece safe and secret.
 """
 
 RECOVERY_TEXT = r"""
-Your "secret key" is recovered by collecting a minimum of {threshold}
-pieces.
+Your "master seed" is recovered by collecting a minimum of
+{threshold} pieces.
 
-                   Split Secret Key
-          Split                    . Recovery
+                 Split Master Seed
+          Split                    . Join
                \.-> SBK Piece 1 -./
-    Secret Key -O-> SBK Piece 2  +-> Secret Key
+   Master Seed -O-> SBK Piece 2  +-> Master Seed
                 '-> SBK Piece 3 -'
 
-    Secret Key + Salt -> Wallet
+   Master Seed + Salt -> Wallet
 """
 
 SBK_PIECE_PROMPT = r"""
@@ -304,12 +297,12 @@ Please make a physical copy of SBK Piece {piece_no}/{num_pieces}.
 """
 
 BRAINKEY_INFO_TEXT = r"""
-Your "brainkey" and "salt" are combined to produce your "secret key".
-Your secret key in turn is combined with your salt to recover your
+Your "brainkey" and "salt" are combined to produce your "master seed".
+Your master seed in turn is combined with your salt to recover your
 "wallet".
 
-    Brainkey + Salt -> Secret Key
-    Secret Key + Salt -> Wallet
+    Brainkey + Salt -> Master Seed
+    Master Seed + Salt -> Wallet
 
 Put more simply, as long as you can remember your brainkey, and as
 long as you have access to your salt, you will be able to recover your
@@ -337,26 +330,16 @@ If you do not yet feel confident in your memory:
 Press enter to hide your brainkey and to continue
 """
 
-KDF_PARAM_ID_HELP = (
-    "KDF difficulty selection. Use 'sbk kdf-info' to see valid options"
-)
+KDF_PARAM_ID_HELP = "KDF difficulty selection. Use 'sbk kdf-info' to see valid options"
 
 _kdf_param_id_option = click.option(
-    '-p',
-    '--kdf-param-id',
-    default=PARAM_ID_DEFAULT,
-    type=int,
-    help=_clean_help(KDF_PARAM_ID_HELP),
+    '-p', '--kdf-param-id', default=PARAM_ID_DEFAULT, type=int, help=_clean_help(KDF_PARAM_ID_HELP)
 )
 
 EMAIL_OPTION_HELP = "Email which is used as a salt"
 
 _email_option = click.option(
-    '-e',
-    '--email',
-    type=str,
-    required=True,
-    help=_clean_help(EMAIL_OPTION_HELP),
+    '-e', '--email', type=str, required=True, help=_clean_help(EMAIL_OPTION_HELP)
 )
 
 THRESHOLD_OPTION_HELP = "Number of pieces required to recover the key"
@@ -387,7 +370,7 @@ _num_pieces_option = click.option(
 
 SALT_LEN_OPTION_HELP = "Length (in bytes) of the Salt"
 
-DEFAULT_SALT_LEN = 192 // 8
+DEFAULT_SALT_LEN = 160 // 8
 
 _salt_len_option = click.option(
     '-s',
@@ -400,7 +383,7 @@ _salt_len_option = click.option(
 
 KEY_LEN_OPTION_HELP = "Length (in bytes) of the Key/SBK Piece"
 
-DEFAULT_KEY_LEN = 192 // 8
+DEFAULT_KEY_LEN = 160 // 8
 
 _key_len_option = click.option(
     '-k',
@@ -428,29 +411,18 @@ _brainkey_len_option = click.option(
 YES_ALL_OPTION_HELP = "Enable non-interactive mode"
 
 _yes_all_option = click.option(
-    '-y',
-    '--yes-all',
-    type=bool,
-    is_flag=True,
-    default=False,
-    help=_clean_help(YES_ALL_OPTION_HELP),
+    '-y', '--yes-all', type=bool, is_flag=True, default=False, help=_clean_help(YES_ALL_OPTION_HELP)
 )
 
 
 NON_SEGWIT_OPTION_HELP = "Create a non-segwit/legacy wallet."
 
 _non_segwit_option = click.option(
-    '--non-segwit',
-    type=bool,
-    is_flag=True,
-    default=False,
-    help=_clean_help(NON_SEGWIT_OPTION_HELP),
+    '--non-segwit', type=bool, is_flag=True, default=False, help=_clean_help(NON_SEGWIT_OPTION_HELP)
 )
 
 
-def _show_secret(
-    label: str, data: bytes, codes: bool = True, qr: bool = False
-) -> None:
+def _show_secret(label: str, data: bytes, codes: bool = True, qr: bool = False) -> None:
     if codes:
         assert len(data) % 4 == 0, len(data)
         output_lines = list(eu.format_secret_lines(data))
@@ -459,10 +431,7 @@ def _show_secret(
 
     if qr:
         qr_renderer = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
+            version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4
         )
         qr_renderer.add_data(data)
         buf = io.StringIO()
@@ -497,10 +466,7 @@ def _split_secret_key(
     key_bits  = (key_len - 1) * 8
     prime     = primes.get_pow2prime(key_bits)
     gf_points = polynom.split(
-        prime=prime,
-        threshold=threshold,
-        num_pieces=num_pieces,
-        secret=secret_int,
+        prime=prime, threshold=threshold, num_pieces=num_pieces, secret=secret_int
     )
     for gfpoint in gf_points:
         sbk_piece_data = eu.gfpoint2bytes(gfpoint)
@@ -508,13 +474,10 @@ def _split_secret_key(
         yield sbk_piece_data
 
 
-def _join_sbk_pieces(
-    param_cfg: params.Params, sbk_pieces: typ.List[SBKPiece]
-) -> SecretKey:
-    prime  = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
-    gf     = polynom.GF(p=prime)
-    points = [eu.bytes2gfpoint(p, gf) for p in sbk_pieces]
-
+def _join_sbk_pieces(param_cfg: params.Params, sbk_pieces: typ.List[SBKPiece]) -> SecretKey:
+    prime      = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
+    gf         = polynom.GF(p=prime)
+    points     = [eu.bytes2gfpoint(p, gf) for p in sbk_pieces]
     secret_int = polynom.join(len(points), points)
     secret_key = b"\x00" + eu.int2bytes(secret_int)
     return secret_key
@@ -535,9 +498,7 @@ def _parse_command(in_val: str) -> typ.Optional[str]:
         return None
 
 
-def _parse_input(
-    idx: int, in_val: str
-) -> typ.Optional[typ.Tuple[str, str, bytes]]:
+def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, str, bytes]]:
     maybe_code = in_val.replace(" ", "")
     if maybe_code.isdigit():
         if len(maybe_code) < 8:
@@ -617,10 +578,7 @@ PhraseLines = typ.List[str]
 
 
 def _format_partial_secret(
-    phrase_lines: PhraseLines,
-    intcodes    : eu.MaybeIntCodes,
-    idx         : int,
-    key_len     : int,
+    phrase_lines: PhraseLines, intcodes: eu.MaybeIntCodes, idx: int, key_len: int
 ) -> str:
     marker = _line_marker(idx, key_len)
     lines  = eu.format_partial_secret_lines(phrase_lines, intcodes)
@@ -664,11 +622,7 @@ def _expand_codes_if_recoverable(
 
 
 def _echo_state(
-    intcodes    : eu.MaybeIntCodes,
-    phrase_lines: PhraseLines,
-    idx         : int,
-    key_len     : int,
-    header_text : str,
+    intcodes: eu.MaybeIntCodes, phrase_lines: PhraseLines, idx: int, key_len: int, header_text: str
 ) -> str:
     clear()
 
@@ -697,9 +651,11 @@ def _echo_state(
         return f"Enter a command or ECC code for {marker}"
 
 
-def _sbk_prompt(
-    header_text: str, key_len: int = DEFAULT_KEY_LEN
-) -> typ.Optional[eu.IntCodes]:
+def _parse_sbk_prompt(in_val):
+    pass
+
+
+def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optional[eu.IntCodes]:
     block_len = key_len * 2
 
     phrase_lines    : PhraseLines = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
@@ -716,9 +672,7 @@ def _sbk_prompt(
                 exp_intcodes, exp_phrase_lines = expanded
 
                 expanded_indexes = {
-                    i
-                    for i, (a, b) in enumerate(zip(intcodes, exp_intcodes))
-                    if a != b
+                    i for i, (a, b) in enumerate(zip(intcodes, exp_intcodes)) if a != b
                 }
 
                 intcodes     = exp_intcodes
@@ -726,9 +680,7 @@ def _sbk_prompt(
 
         prev_intcodes = list(intcodes)
 
-        prompt_msg = _echo_state(
-            intcodes, phrase_lines, idx, key_len, header_text
-        )
+        prompt_msg = _echo_state(intcodes, phrase_lines, idx, key_len, header_text)
 
         while True:
             in_val = click.prompt(prompt_msg)
@@ -767,9 +719,7 @@ def _sbk_prompt(
 
 
 def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
-    header_text = (
-        """Step 2 of 2: Enter your "Brainkey".""" + "\n\tEnter BrainKey"
-    )
+    header_text = """Step 2 of 2: Enter your "Brainkey".""" + "\n\tEnter BrainKey"
 
     phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
 
@@ -835,13 +785,7 @@ def version() -> None:
 
 
 @cli.command()
-@click.option(
-    '-a',
-    '--show-all',
-    is_flag=True,
-    default=False,
-    help=_clean_help(SHOW_ALL_HELP),
-)
+@click.option('-a', '--show-all', is_flag=True, default=False, help=_clean_help(SHOW_ALL_HELP))
 def kdf_info(show_all: bool = False) -> None:
     """Show info for each available parameter config."""
     min_mem_kb = PARAM_CTX.sys_info.total_kb * MIN_MEM_RATIO
@@ -924,9 +868,7 @@ def new_key(
     )
 
     if not is_param_recoverable:
-        raise Exception(
-            "Integrity error. Aborting to prevent use of invald salt."
-        )
+        raise Exception("Integrity error. Aborting to prevent use of invald salt.")
 
     hasher = hashlib.sha256()
     hasher.update(email.encode("utf-8"))
@@ -953,28 +895,20 @@ def new_key(
     yes_all or echo(SBK_KEYGEN_TITLE.strip())
     yes_all or echo(SBK_KEYGEN_TEXT)
 
-    secret_key = _derive_key(
-        brainkey_data, param_and_salt_data, label="Deriving Secret Key"
-    )
+    secret_key = _derive_key(brainkey_data, param_and_salt_data, label="Deriving Secret Key")
     assert len(secret_key) % 4 == 0, len(secret_key)
 
     echo("\n")
     yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
 
-    _sbk_pieces = _split_secret_key(
-        secret_key, threshold=threshold, num_pieces=num_pieces
-    )
-    sbk_pieces = list(_sbk_pieces)
+    _sbk_pieces = _split_secret_key(secret_key, threshold=threshold, num_pieces=num_pieces)
+    sbk_pieces  = list(_sbk_pieces)
 
     # secret pieces
     for i, sbk_piece_data in enumerate(sbk_pieces):
         piece_no = i + 1
         yes_all or clear()
-        info = {
-            'piece_no'  : piece_no,
-            'threshold' : threshold,
-            'num_pieces': num_pieces,
-        }
+        info             = {'piece_no': piece_no, 'threshold': threshold, 'num_pieces': num_pieces}
         sbk_piece_title  = SBK_PIECE_TITLE.format(**info).strip()
         sbk_piece_prompt = SBK_PIECE_PROMPT.format(**info)
 
@@ -1051,7 +985,7 @@ def load_wallet(
     salt_len    : int  = DEFAULT_SALT_LEN,
     brainkey_len: int  = DEFAULT_BRAINKEY_LEN,
     yes_all     : bool = False,
-    non_segwit : bool  = False,
+    non_segwit  : bool = False,
 ) -> None:
     """Open wallet using Salt and Brainkey or Salt and SBK Pieces."""
     salt_len = (salt_len + 3) // 4 * 4
@@ -1060,26 +994,8 @@ def load_wallet(
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-    header_text = """Enter your "Salt"."""
-    # salt_intcodes = _sbk_prompt(header_text, salt_len)
-    salt_intcodes = [
-        "0257",
-        "1091",
-        "2927",
-        "3416",
-        "4468",
-        "5188",
-        "6456",
-        "7848",
-        "0026",
-        "1119",
-        "2646",
-        "3251",
-        "4685",
-        "5551",
-        "6691",
-        "7348",
-    ]
+    header_text   = """Enter your "Salt"."""
+    salt_intcodes = _sbk_prompt(header_text, salt_len)
 
     if salt_intcodes is None:
         click.echo("Salt is required")
@@ -1094,39 +1010,24 @@ def load_wallet(
         brainkey_data = _brainkey_prompt(brainkey_len)
 
     if brainkey_data is None:
-        # sbk_pieces: typ.List[SBKPiece] = []
-        # while len(sbk_pieces) < param_cfg.threshold:
-        #     piece_num = len(sbk_pieces) + 1
-        #     header_text = f"""
-        #     Enter your SBK-Piece {piece_num} of {param_cfg.threshold}.
-        #     """.strip()
-        #     sbk_piece_intcodes = _sbk_prompt(
-        #         header_text, param_cfg.key_len_bytes
-        #     )
-        #     if sbk_piece_intcodes:
-        #         sbk_piece = eu.intcode_parts2bytes(sbk_piece_intcodes)
-        #         sbk_pieces.append(sbk_piece)
-
-        sbk_pieces = [
-            b"\x01\xd6\x9f\x87Oq\xcd\xf5",
-            b"\x02\xdaN\xd7\x99\xa5>\x8c",
-            b"\x03\x1c\x99\xfbo\xc95\xcb",
-        ]
-
-        # for sbk_piece in sbk_pieces:
-        #     print("...", sbk_piece)
+        sbk_pieces: typ.List[SBKPiece] = []
+        while len(sbk_pieces) < param_cfg.threshold:
+            piece_num = len(sbk_pieces) + 1
+            header_text = f"""
+            Enter your SBK-Piece {piece_num} of {param_cfg.threshold}.
+            """.strip()
+            sbk_piece_intcodes = _sbk_prompt(header_text, param_cfg.key_len_bytes)
+            if sbk_piece_intcodes:
+                sbk_piece = eu.intcode_parts2bytes(sbk_piece_intcodes)
+                sbk_pieces.append(sbk_piece)
 
         secret_key = _join_sbk_pieces(param_cfg, sbk_pieces)
     else:
-        secret_key = _derive_key(
-            brainkey_data, salt_data, label="Deriving Secret Key"
-        )
-
-    assert secret_key == b"\x00\x11\x8c\n\x91.\xe4\x06"
+        secret_key = _derive_key(brainkey_data, salt_data, label="Deriving Secret Key")
 
     seed_type = 'standard' if non_segwit else 'segwit'
 
-    int_seed = eu.bytes2int(secret_key)
+    int_seed    = eu.bytes2int(secret_key)
     wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
 
     wallet_path = "/tmp/sbk_electrum_wallet"
@@ -1146,13 +1047,14 @@ def load_wallet(
             raise click.Abort("Error calling 'electrum restore'")
     finally:
         if os.path.exists(wallet_path):
+            # TODO: bleachbit ?
             os.remove(wallet_path)
 
 
 @cli.command()
 @click.pass_context
 def repl(ctx):
-    """Start REPL (with completion)"""
+    """Start REPL (with completion)."""
     click.echo(cli.get_help(ctx))
     prompt_kwargs = {'message': "sbk> "}
     click_repl.repl(ctx, prompt_kwargs=prompt_kwargs)

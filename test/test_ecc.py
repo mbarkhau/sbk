@@ -1,5 +1,6 @@
 import os
 import random
+
 import sbk.ecc
 import sbk.enc_util
 
@@ -138,10 +139,8 @@ def test_decode_packets_missing():
     packets = sbk.ecc.block2packets(block)
 
     for o in range(4):
-        partial_packets = [
-            p if i < 4 + o else None for i, p in enumerate(packets)
-        ]
-        decoded = sbk.ecc.decode_packets(partial_packets)
+        partial_packets = [p if i < 4 + o else None for i, p in enumerate(packets)]
+        decoded         = sbk.ecc.decode_packets(partial_packets)
         assert decoded == data
 
     partial_packets = [p if i < 4 else None for i, p in enumerate(packets)]

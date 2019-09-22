@@ -7,10 +7,8 @@
 """Prime constants."""
 
 import random
-
-import hashlib
 import typing as typ
-
+import hashlib
 
 # https://oeis.org/A000040/list
 SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59]
@@ -115,9 +113,7 @@ def validate_pow2_prime_params() -> None:
     for p2pp in POW2_PRIME_PARAMS:
         sha256.update(str((p2pp.exp, p2pp.k)).encode('ascii'))
 
-    has_changed = (
-        len(POW2_PRIME_PARAMS) != 50 or sha256.hexdigest() != _V1_SHA256
-    )
+    has_changed = len(POW2_PRIME_PARAMS) != 50 or sha256.hexdigest() != _V1_SHA256
 
     if has_changed:
         raise Exception("Integrity error: POW2_PRIMES changed!")

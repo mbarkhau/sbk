@@ -5,27 +5,26 @@
 # SPDX-License-Identifier: MIT
 """Logic related to KDF parameters."""
 import os
-import time
 import enum
 import json
-import logging
-import hashlib
+import time
 import typing as typ
-import pathlib2 as pl
+import hashlib
+import logging
 
 import argon2
+import pathlib2 as pl
 
 from . import primes
-
 
 log = logging.getLogger(__name__)
 
 
 class HashAlgo(enum.Enum):
 
+    ARGON2_V19_D  = 0
     ARGON2_V19_I  = 1
-    ARGON2_V19_D  = 2
-    ARGON2_V19_ID = 3
+    ARGON2_V19_ID = 2
 
 
 HASH_ALGO_NAMES = {
@@ -56,15 +55,10 @@ class Params(typ.NamedTuple):
 
 
 def init_params(
-    threshold    : int,
-    num_pieces   : int,
-    kdf_param_id : KDFParamId,
-    key_len_bytes: int,
+    threshold: int, num_pieces: int, kdf_param_id: KDFParamId, key_len_bytes: int
 ) -> Params:
     if threshold > num_pieces:
-        err_msg = (
-            f"threshold must be <= num_pieces, got {threshold} > {num_pieces}"
-        )
+        err_msg = f"threshold must be <= num_pieces, got {threshold} > {num_pieces}"
         raise ValueError(err_msg)
 
     # NOTE: we need one byte for the x value
@@ -121,7 +115,7 @@ ParamsByConfigId = typ.Dict[KDFParamId, ParamConfig]
 # In order to preserve compatability of generated keys, historical
 # entries of PARAM_CONFIGS_BY_ID are hashed. This provides a safety
 # net against inadvertant changes to the _init_configs function.
-PARAM_CONFIG_HASHES = {0x3FFFFFFA: '6f72e14f0422806b1a1c29ec611e1b17b284d53e'}
+PARAM_CONFIG_HASHES = {0x3FFFFFFA: 'fb9d230cf4ae56bc9b0a09e6e6dbca3a47fb589d'}
 
 DEFAULT_PARAM_TIME_SEC_THRESHOLD  = 100
 DEFAULT_PARAM_MEM_RATIO_THRESHOLD = 0.75
@@ -162,9 +156,7 @@ def _init_configs() -> ParamsByConfigId:
     assert min(param_configs_by_id) >= 0
     assert max(param_configs_by_id) < 32
 
-    debug_bitfield = sum(
-        1 << param_id for param_id in param_configs_by_id.keys()
-    )
+    debug_bitfield = sum(1 << param_id for param_id in param_configs_by_id.keys())
     # print(hex(debug_bitfield).upper())
 
     checked_config_ids: typ.Set[KDFParamId] = set()
@@ -179,8 +171,8 @@ def _init_configs() -> ParamsByConfigId:
         params_hash = hashlib.sha1(params_str.encode('ascii')).hexdigest()
 
         # print("???", hex(ids_bitfield).upper())
-        # print(">>>", params_hash)
-        # print("<<<", expected_hash)
+        # print("calculated ", params_hash)
+        # print("expected   ", expected_hash)
         if params_hash != expected_hash:
             err_msg = (
                 "Params hash changed! To prevent existing hashes from "
@@ -304,16 +296,20 @@ def estimate_config_cost(sys_info: SystemInfo) -> SecondsByConfigId:
     return time_costs
 
 
-def parse_algo_type(hash_algo: int) -> int:
-    if hash_algo == HashAlgo.ARGON2_V19_I.value:
-        return argon2.low_level.Type.I
+def parse_argon2_type(hash_algo: int) -> int:
     if hash_algo == HashAlgo.ARGON2_V19_D.value:
         return argon2.low_level.Type.D
+    if hash_algo == HashAlgo.ARGON2_V19_I.value:
+        return argon2.low_level.Type.I
     if hash_algo == HashAlgo.ARGON2_V19_ID.value:
         return argon2.low_level.Type.ID
 
     err_msg = f"Unknown hash_algo={hash_algo}"
     raise ValueError(err_msg)
+
+
+def parse_argon2_version(hash_algo: int) -> int:
+    return 19
 
 
 # The first of the parameters with the most memory that has an
@@ -322,9 +318,7 @@ def parse_algo_type(hash_algo: int) -> int:
 
 
 DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
-XDG_CONFIG_HOME         = pl.Path(
-    os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME)
-)
+XDG_CONFIG_HOME         = pl.Path(os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME))
 
 SBK_APP_DIR         = XDG_CONFIG_HOME / "sbk"
 SYSINFO_CACHE_FNAME = "sys_info_cache.json"
@@ -421,11 +415,9 @@ def _load_cached_sys_info(cache_path: pl.Path) -> SystemInfo:
             else:
                 min_measurements[key] = md['d']
 
-        measurements = [
-            Measurement(m, t, d) for (m, t), d in min_measurements.items()
-        ]
-        total_kb = typ.cast(KibiBytes, sys_info_data['total_kb'])
-        sys_info = SystemInfo(total_kb, n, measurements)
+        measurements = [Measurement(m, t, d) for (m, t), d in min_measurements.items()]
+        total_kb     = typ.cast(KibiBytes, sys_info_data['total_kb'])
+        sys_info     = SystemInfo(total_kb, n, measurements)
         dump_sys_info(sys_info, cache_path)
     except Exception as ex:
         log.warning(f"Error reading cache file {cache_path}: {ex}")
@@ -435,9 +427,7 @@ def _load_cached_sys_info(cache_path: pl.Path) -> SystemInfo:
     return sys_info
 
 
-def load_sys_info(
-    app_dir: pl.Path = SBK_APP_DIR, ignore_cache: bool = False
-) -> SystemInfo:
+def load_sys_info(app_dir: pl.Path = SBK_APP_DIR, ignore_cache: bool = False) -> SystemInfo:
     global _SYS_INFO
     if _SYS_INFO:
         return _SYS_INFO
@@ -467,10 +457,7 @@ class ParamContext(typ.NamedTuple):
 def get_param_ctx(app_dir: pl.Path) -> ParamContext:
     sys_info = load_sys_info(app_dir)
 
-    avail_configs = {
-        param_id: PARAM_CONFIGS_BY_ID[param_id]
-        for param_id in get_avail_config_ids()
-    }
+    avail_configs = {param_id: PARAM_CONFIGS_BY_ID[param_id] for param_id in get_avail_config_ids()}
 
     param_id_default = 1
 
@@ -498,6 +485,4 @@ def get_param_ctx(app_dir: pl.Path) -> ParamContext:
 
             param_id_default = current_config_id
 
-    return ParamContext(
-        sys_info, avail_configs, param_id_default, est_times_by_id
-    )
+    return ParamContext(sys_info, avail_configs, param_id_default, est_times_by_id)

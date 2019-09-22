@@ -77,6 +77,8 @@ DOCKER_BASE_IMAGE := registry.gitlab.com/mbarkhau/sbk/base
 GIT_HEAD_REV = $(shell git rev-parse --short HEAD)
 DOCKER_IMAGE_VERSION = $(shell date -u +'%Y%m%dt%H%M%S')_$(GIT_HEAD_REV)
 
+MAX_LINE_LEN = $(shell grep 'max-line-length' setup.cfg | sed 's![^0-9]\{1,\}!!')
+
 
 build/envs.txt: requirements/conda.txt
 	@mkdir -p build/;
@@ -305,17 +307,29 @@ git_hooks:
 ## Run flake8 linter
 .PHONY: lint
 lint:
-	@printf "flake8 ..\n"
-	@$(DEV_ENV)/bin/flake8 src/
+	@printf "isort ..\n"
+	@$(DEV_ENV)/bin/isort \
+		--check-only \
+		--force-single-line-imports \
+		--length-sort \
+		--recursive \
+		--line-width=$(MAX_LINE_LEN) \
+		--project $(PKG_NAME) \
+		src/ test/
 	@printf "\e[1F\e[9C ok\n"
+
 	@printf "sjfmt ..\n"
 	@$(DEV_ENV)/bin/sjfmt \
 		--target-version py36 \
 		--skip-string-normalization \
-		--line-length=80 \
+		--line-length=$(MAX_LINE_LEN) \
 		--check \
 		--quiet \
 		src/ test/
+	@printf "\e[1F\e[9C ok\n"
+
+	@printf "flake8 ..\n"
+	@$(DEV_ENV)/bin/flake8 src/
 	@printf "\e[1F\e[9C ok\n"
 
 
@@ -385,11 +399,19 @@ test:
 ## Run code formatter on src/ and test/
 .PHONY: fmt
 fmt:
+	@$(DEV_ENV)/bin/isort \
+		--force-single-line-imports \
+		--length-sort \
+		--recursive \
+		--line-width=$(MAX_LINE_LEN) \
+		--project $(PKG_NAME) \
+		src/ test/;
+
 	@$(DEV_ENV)/bin/sjfmt \
 		--target-version py36 \
 		--skip-string-normalization \
-		--line-length=80 \
-		src/ test/
+		--line-length=$(MAX_LINE_LEN) \
+		src/ test/;
 
 
 

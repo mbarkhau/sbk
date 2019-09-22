@@ -1,6 +1,6 @@
 import os
-import string
 import random
+import string
 import itertools
 
 import pylev
@@ -8,7 +8,6 @@ import pytest
 
 import sbk.polynom as polynom
 from sbk.enc_util import *
-
 
 TEST_PHRASE_LINES = [
     "The BRAVE  BAKER  at the BERLIN BEACH.",
@@ -272,13 +271,7 @@ TEST_PHRASE_LINES = [
 TEST_DATAS = [bytes([i]) + bytes([i]) for i in range(2 ** 8)]
 
 
-corpus_distance_test_cases = [
-    (ADJECTIVES, 3),
-    (TITLES    , 3),
-    (CITIES    , 3),
-    (PLACES    , 3),
-    (WORDS     , 2),
-]
+corpus_distance_test_cases = [(ADJECTIVES, 3), (TITLES, 3), (CITIES, 3), (PLACES, 3), (WORDS, 2)]
 
 
 @pytest.mark.parametrize("corpus, min_dist", corpus_distance_test_cases)
@@ -372,9 +365,7 @@ def test_bytes2int_fuzz():
 
 
 def test_params2bytes():
-    p = params.init_params(
-        threshold=12, num_pieces=14, kdf_param_id=16, key_len_bytes=48
-    )
+    p = params.init_params(threshold=12, num_pieces=14, kdf_param_id=16, key_len_bytes=48)
 
     pow2prime_idx = primes.get_pow2prime_index(p.key_len_bytes * 8)
     result_data   = params2bytes(p)

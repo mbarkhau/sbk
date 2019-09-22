@@ -1,84 +1,131 @@
-# [Split Bitcoin Keys][repo_ref]
-
-## DISCLAIMER
-
-SBK is still in development and has not had sufficient review to be trusted! Do not use this software for any purpose other than to review and provide feedback or if you would like to contribute. Use this software only if you are prepared to lose access to a wallet that you create with it. For further information about risks of using this software, see [risks and mitigations](#risks_and_mitigations)
 
 
-## Update 2019-09-05
 
-A project with similar functionality was recently released by SatoshiLabs: [Shamir Backup][href_satoshilabs_sharmirbackup_overview]. The standardization efforts by SatoshiLabs are great I hope future versions SBK can implemenet them.
+`IANYMIGOAYDAYR`: I am not your mother, I only give advice, your decisions are your responsibility.
 
-The main reasons to continue this project are:
-
- - SBK does not require a hardware
- - SBK wallets can be restored with a brainkey
-
-If neither of these are an issue for you, I highly reccomend you buy a [Trezor Model T][href_trezor_modelt] and use it to [create a Shamir Backup][href_satoshilabs_sharmirbackup_wiki].
-
-[href_satoshilabs_sharmirbackup_overview]: https://blog.trezor.io/shamir-backup-a-new-security-standard-3aa42a6ebb5f
-
-[href_trezor_modelt]: https://shop.trezor.io/product/trezor-model-t?offer_id=15&aff_id=3376
-
-[href_satoshilabs_sharmirbackup_wiki]: https://wiki.trezor.io/User_manual-Creating_a_wallet_with_Shamir_Backup
-
-
-# Overview
-
-SBK is intended for highly secure cold-storage Bitcoin wallets. Secure means:
-
- - Your house can burn down, buring your wallet seed and destroying all of your devices and you will still be able to access your coins.
- - A theif/hacker might steal all your documents and copy all your files and they will still not be able steal your coins.
- - You may trust some people wrongfully (not too many though) and they will still not be able steal your coins.
- - Something might happen to you and it will nonetheless be possible for the beneficiaries of your estate to access coins.
-
-SBK is not wallet software itself, instead SBK is only used to generate and recover wallet seeds.
-
-> Aside: SBK currently only supports [Electrum][href_electrum_org]). The SBK project is
-> not associated in any way with the Electrum Bitoin Wallet or Electrum Technologies
-> GmbH.
-
-
-Project/Repo:
-
-[![MIT License][license_img]][license_ref]
-[![Supported Python Versions][pyversions_img]][pyversions_ref]
-[![PyCalVer v201906.0001-alpha][version_img]][version_ref]
-[![PyPI Version][pypi_img]][pypi_ref]
-[![PyPI Downloads][downloads_img]][downloads_ref]
-
-Code Quality/CI:
-
-[![Build Status][build_img]][build_ref]
-[![Type Checked with mypy][mypy_img]][mypy_ref]
-[![Code Coverage][codecov_img]][codecov_ref]
-[![Code Style: sjfmt][style_img]][style_ref]
-
-
-|                 Name                |        role       |  since  | until |
-|-------------------------------------|-------------------|---------|-------|
-| Manuel Barkhau (mbarkhau@gmail.com) | author/maintainer | 2019-06 | -     |
-
-
-<!--
-  To update the TOC:
-  $ pip install md-toc
-  $ md_toc -i gitlab README.md
--->
-
-
-[](TOC)
-
-[](TOC)
 
 ## Introduction
 
-SBK has two methods to recover a wallet seed:
+SBK has two ways to keep your keys safe.
 
- A. Salt + SBK-Pieces: This method is a backup in case the brainkey is forgotten and so the wallet can be recovered by beneficiaries of the owners estate.
- B. Salt + Brainkey: This method is intended for regular use by the owner of the wallet.
+ - A Brainkey which only you know
+ - A backup using [Shamir's Secret Sharing][href_wiki_sss]
 
-> Aside: SBK exists in part to provide the executor of a will (who may be a layperson wrt. Bitcoin), a well documented resource on how to recover
+Here is some pseudocode to show how the wallet seed and backup sbk-pieces are derived:
+
+```python
+# 64 bits (small enough to memorize)
+brainkey = os.urandom(8)
+brainkey_mnemonic = mnemonic_encode(brainkey)
+print(f"Memorize brainkey: {brainkey_mnemonic}")
+
+class Params:
+
+    version         : int
+    key_length      : int
+    shamir_threshold: int
+    shamir_prime    : int
+    memory_cost     : int
+    time_cost       : int
+
+
+def kdf(secret: bytes, salt: bytes, params: Params) -> bytes:
+    """"Key Derivation Function using argon2."""
+    return argon2(
+        secret=brainkey,
+        salt=salt,
+        memory_cost=params.memory_cost,
+        time_cost=params.time_cost,
+        hash_len=params.key_length,
+    )
+
+params = Params(...)
+param_data: bytes = params.encode()
+
+# The salt is actually both the salt as well
+# as the serialized parameters.
+raw_salt = os.urandom(18)
+salt = param_data + raw_salt
+
+salt_text = mnemonic_encode(salt)
+print(f"Write down salt: {salt_text}")
+
+# derive the master key
+master_seed = kdf(brainkey, salt, params)
+
+sbk_pieces = shamir_split(
+    master_seed,
+    params.threshold,
+    params.num_pieces,
+    params.shamir_prime,
+)
+for i, piece in enumerate(sbk_pieces):
+    piece_text = mnemonic_encode(piece)
+    print(f"Write down piece {i + 1}: {piece_text}")
+```
+
+There are two methods to restore a Bitcoin wallet using SBK:
+
+ A. Salt + SBK-Pieces: This method is a backup in case the brainkey is lost or forgotten.
+ B. Salt + Brainkey: This method is intended for regular use.
+
+Wallet recovery using Method A (Salt + SBK-Pieces):
+
+```python
+salt_text: str = input("Enter salt> ")
+salt: bytes = mnemonic_decode(salt_text)
+params = Params.parse(salt)
+
+pieces: List[bytes] = []
+while len(pieces) < params.threshold:
+    piece_text = input("Enter SBK-Piece> ")
+    piece = mnemonic_decode(piece_text)
+    pieces.append(piece)
+
+master_seed = shamir_join(pieces, params)
+wallet_name_text: str = intput("Enter (optional) wallet name> ")
+wallet_name = wallet_name_text.encode("utf-8")
+wallet_seed = kdf(master_seed, wallet_name, params)
+```
+
+Wallet recovery using Method B (Salt + Brainkey):
+
+```python
+salt: bytes = input("Enter salt> ")
+params = Params.parse(salt)
+
+brainkey: bytes = input("Enter brainkey> ")
+master_seed = kdf(brainkey, salt, params)
+
+wallet_name_text: str = intput("Enter (optional) wallet name> ")
+wallet_name = wallet_name_text.encode("utf-8")
+wallet_seed = kdf(master_seed, wallet_name, params)
+```
+
+### Terms
+
+The above code uses some concepts that deserve elaboration. Each will be explained in more detail, but 
+
+ - Brainkey: This is a relatively small piece of data, short enough to be memorized by a person, ie. to be held in their brain. This is a bit like a password for your wallet, except that the password technically not not used to decrypt anyting, instead it is used to deterministically (re)create your wallet. The main problem with a brainkey is that attackers might be able to do a brute force search for all wallets generated with such small brainkeys. If such attacks can be effectively mitigated and if the brainkey is not used for anything other than for the wallet, the owner can be certain that 
+ - Key Derivation Function (KDF):
+ - Salt: 
+ - Shamir Split/Join:
+ - Parameters: 
+    - Threshold
+    - Shamir Prime
+    - Memory/Time Cost
+# Since the params and the salt are both required
+# for any recovery, we combine them so they are
+# always kept together.
+ - SBK-Piece:
+ - Mnemonic:
+ - Secret Key:
+ - Wallet name: The wallet name is a convenient way to generate multiple wallets from the same brainkey. You can treat this as a passphrase, on the other hand, a passphrase is another single point of failure in the same way that a traditional 12 word wallet seed is. If you are going to write this phrase down only once and put it in a safe, you might as well skip the use of SBK and just write down a traditional wallet seed instead.
+ - This is an added factor of protection. Please be aware that such a passphrase suffers from all of the problems of a brainkey, but has none of the protections. There is no backup and there is no protection against typos. 
+
+## Passphrase Reccomendations
+
+ If you use passphrases, I would reccomend to write them down and make multiple copies and keep some of those copies in places . IANYMIGOAYDAYR. The balance here is between the risk of these passphrases being lost and the risk of being forced to grant access 
 
 Neither of the above two methods are particularly complicated, they are somewhat tedious however, especially method A. For regular daily use, it is a reasonable convenience/security trade-off to have a hot-wallet with small and only access your cold-storage wallet a few times per year.
 
@@ -193,9 +240,61 @@ There are three areas of risk to be aware of:
  - Game theoretical risks
  - Compromised Software
 
+> Aside: SBK exists in part to provide the executor of a will (who may be a layperson wrt. Bitcoin), a well documented resource on how to recover
+
 
 ## Lost of Secrets
 
+
+## Ranty Pitch
+
+There is moniker in the Bitcoin/Crypto community that goes something like this: If you're not the one or not the only one who has the private keys to your wallet, then you don't own your bitcoin and you're doing it wrong and you should feel bad and you only have yourself to blame if your coins get stolen.
+
+This advice is fine as far as it goes. It falls short of course in that it doesn't say what a good way is to "be your own bank". You forget your wallet phrase or it gets destroyed: "well, that's just too bad, you should have been more responsible". You used your wallet on a windows machine and your wallet got swept by a virus: "well that's just too bad you shouldn't keep your wallet on an insecure system like windows". You used a paper wallet but for some reason it was empty after you only took a little bit form it, "well that's just too bad, you should have known about change addresses and used better wallet software".
+
+I view all of this as an tech-elitism or a revenge of the nerds: "You're not tech savey enough to be your own bank? Well tough luck dudebro, I guess you're to stupid to be a part of the crypto revolution. Oh, you're coins got stolen by a frappuccino slurping frenchman? Well tough luck jock, serves you right for trusting the same exchange everybody else was using."
+
+The goal of the SBK project is to be your own bank for mere mortals. In principle it is quite similar to [How Jason Bourne Stores His Bitcoin](http://maxtaco.github.io/bitcoin/2014/01/16/how-jason-bourne-stores-his-bitcoin/) by [Max Krohn](http://maxtaco.github.io/)
+
+The main arguments against this approach are:
+
+https://news.ycombinator.com/item?id=7083393
+
+ - Why not Multisig
+ - [Brute force attack (by wrench)](https://xkcd.com/538/)
+ - Loss of access to the SBK software or the Air Gapped Machine (AGM)
+    - Perhaps use M-Disc
+    - Documentation of Format
+
+
+
+
+## Related Work
+
+Considering that SBK is not yet ready to be used, here are some other related projects that may serve your purposes better for the time being.
+
+### Warp Wallet
+
+Warp [href_keybase_warp]
+
+[href_keybase_warp]: https://keybase.io/warp/
+
+### Trezor Shamir Backup
+
+A project with similar functionality was recently released by SatoshiLabs: [Shamir Backup][href_satoshilabs_sharmirbackup_overview]. The standardization efforts by SatoshiLabs are great I hope future versions SBK can implemenet them.
+
+The main reasons to consider SBK are:
+
+ - SBK does not require a hardware wallet
+ - SBK wallets can be restored with a brainkey
+
+If neither of these are an issue for you, I highly reccomend you buy a [Trezor Model T][href_trezor_modelt] and use it to [create a Shamir Backup][href_satoshilabs_sharmirbackup_wiki].
+
+[href_satoshilabs_sharmirbackup_overview]: https://blog.trezor.io/shamir-backup-a-new-security-standard-3aa42a6ebb5f
+
+[href_trezor_modelt]: https://shop.trezor.io/product/trezor-model-t?offer_id=15&aff_id=3376
+
+[href_satoshilabs_sharmirbackup_wiki]: https://wiki.trezor.io/User_manual-Creating_a_wallet_with_Shamir_Backup
 
 
 
@@ -231,4 +330,5 @@ There are three areas of risk to be aware of:
 
 [pyversions_img]: https://img.shields.io/pypi/pyversions/sbk.svg
 [pyversions_ref]: https://pypi.python.org/pypi/sbk
+
 

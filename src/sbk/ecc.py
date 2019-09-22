@@ -13,8 +13,8 @@ The first implementation can correct single byte errors and detect two
 byte errors.
 """
 
-import collections
 import typing as typ
+import collections
 
 Seq  = typ.Sequence
 Iter = typ.Iterable
@@ -148,10 +148,7 @@ class Residual:
     sources: SourceIndexes
 
     def __init__(
-        self,
-        data   : bytes,
-        indexes: BlockIndexes,
-        sources: typ.Optional[SourceIndexes] = None,
+        self, data: bytes, indexes: BlockIndexes, sources: typ.Optional[SourceIndexes] = None
     ) -> None:
         self.data    = data
         self.indexes = indexes
@@ -190,17 +187,10 @@ class Residual:
         )
 
     def __hash__(self) -> int:
-        return (
-            hash(self.data)
-            ^ hash(self.indexes)
-            ^ hash(tuple(sorted(self.sources)))
-        )
+        return hash(self.data) ^ hash(self.indexes) ^ hash(tuple(sorted(self.sources)))
 
     def __lt__(self, other: 'Residual') -> bool:
-        return (
-            len(self.indexes) < len(other.indexes)
-            or self.indexes < other.indexes
-        )
+        return len(self.indexes) < len(other.indexes) or self.indexes < other.indexes
 
 
 def _maybe_expand(x: Residual, y: Residual) -> typ.Optional[Residual]:
@@ -264,9 +254,7 @@ def _maybe_candidate(r: Residual) -> typ.Optional[PacketCandidate]:
         return None
 
 
-def _iter_packet_candidates(
-    indexed_packets: IndexedPackets
-) -> Iter[PacketCandidate]:
+def _iter_packet_candidates(indexed_packets: IndexedPackets) -> Iter[PacketCandidate]:
     residuals = set(_iter_base_residuals(indexed_packets))
     for r in residuals:
         c = _maybe_candidate(r)
@@ -309,9 +297,7 @@ def _index_counts(top_candidates: TopMessageCandidates) -> IndexCounts:
 CANDIDATE_COUNTS_BY_NUM_PACKETS = {4: 8, 5: 38, 6: 114, 7: 283, 8: 636}
 
 
-def is_complete(
-    idx_counts: IndexCounts, msg_len: int, num_packets: int
-) -> bool:
+def is_complete(idx_counts: IndexCounts, msg_len: int, num_packets: int) -> bool:
     if len(idx_counts) < msg_len:
         return False
 

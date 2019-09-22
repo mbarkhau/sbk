@@ -7,8 +7,8 @@
 
 import re
 import math
-import struct
 import base64
+import struct
 import typing as typ
 import itertools as it
 
@@ -18,7 +18,6 @@ from . import ecc
 from . import params
 from . import primes
 from . import polynom
-
 
 ADJECTIVES = [
     "brave",
@@ -114,14 +113,12 @@ EMPTY_PHRASE_LINE = "The ______ ______ at the ______ ______."
 
 
 PERSON_PARTS = [
-    f"The {adj.upper():<6} {title.upper():<6}"
-    for adj, title in it.product(ADJECTIVES, TITLES)
+    f"The {adj.upper():<6} {title.upper():<6}" for adj, title in it.product(ADJECTIVES, TITLES)
 ]
 
 
 PLACE_PARTS = [
-    f" at the {city.upper():<6} {place.upper()}.\n"
-    for city, place in it.product(CITIES, PLACES)
+    f" at the {city.upper():<6} {place.upper()}.\n" for city, place in it.product(CITIES, PLACES)
 ]
 
 assert len(PERSON_PARTS) == 2 ** 8
@@ -169,8 +166,7 @@ def _phrase2parts(cleaned_parts: typ.List[str]) -> typ.Iterable[str]:
             yield part
         else:
             dist_part_pairs = [
-                (dist_fn(corpus_word, part), corpus_word)
-                for corpus_word in corpus_words
+                (dist_fn(corpus_word, part), corpus_word) for corpus_word in corpus_words
             ]
             dist_part_pairs.sort()
             dist, corpus_word = dist_part_pairs[0]
@@ -263,9 +259,7 @@ def bytes_hex(data: bytes) -> str:
     """
     chars           = (data[i : i + 1] for i in range(len(data)))
     char_hex        = [bytes2hex(c).lower() for c in chars]
-    char_hex_padded = (
-        c if i % 2 == 0 else c + " " for i, c in enumerate(char_hex)
-    )
+    char_hex_padded = (c if i % 2 == 0 else c + " " for i, c in enumerate(char_hex))
     return "".join(char_hex_padded).strip()
 
 
@@ -394,9 +388,7 @@ def _parity(num: int) -> int:
     return result
 
 
-def bytes2intcode_parts(
-    data: bytes, idx_offset: int = 0
-) -> typ.Iterable[IntCode]:
+def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> typ.Iterable[IntCode]:
     for i in range(len(data)):
         idx      = idx_offset + i
         part_val = _char_at(data, i)
@@ -417,9 +409,7 @@ def bytes2intcode(data: bytes) -> IntCode:
     return "\n".join(bytes2intcode_parts(data_with_ecc))
 
 
-def intcodes2parts(
-    intcodes: MaybeIntCodes, idx_offset: int = 0
-) -> typ.Iterable[Part]:
+def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> typ.Iterable[Part]:
     """Decode part index and part values."""
     expected_part_no = idx_offset & 0b111
     part_no_offset   = idx_offset - expected_part_no
@@ -456,9 +446,7 @@ def intcodes2parts(
         expected_part_no = next_part_no
 
 
-def intcode_parts2packets(
-    intcodes: MaybeIntCodes, packet_size: int
-) -> typ.List[bytes]:
+def intcode_parts2packets(intcodes: MaybeIntCodes, packet_size: int) -> typ.List[bytes]:
     num_packets = len(intcodes) // packet_size
     packets     = [b""] * num_packets
     for idx, part_val in intcodes2parts(intcodes):
@@ -469,9 +457,7 @@ def intcode_parts2packets(
 def intcode_parts2bytes(intcodes: MaybeIntCodes) -> bytes:
     block_len = len(intcodes)
     if block_len % 8 != 0:
-        errmsg = (
-            f"Invalid len(intcodes)={len(intcodes)}, must be divisible by 8"
-        )
+        errmsg = f"Invalid len(intcodes)={len(intcodes)}, must be divisible by 8"
         raise ValueError(errmsg)
 
     packet_size = block_len // 8  # aka. parts per packet
@@ -480,9 +466,7 @@ def intcode_parts2bytes(intcodes: MaybeIntCodes) -> bytes:
     # NOTE: It is unfortunate that missing one part makes
     #   the whole packet ivalid. A better ECC algo would
     #   make use of all available parts.
-    maybe_packets: ecc.MaybePackets = [
-        pkt if len(pkt) == packet_size else None for pkt in packets
-    ]
+    maybe_packets: ecc.MaybePackets = [pkt if len(pkt) == packet_size else None for pkt in packets]
     return ecc.decode_packets(maybe_packets)
 
 
@@ -530,9 +514,7 @@ Lines = typ.Iterable[str]
 PhraseLines = typ.Sequence[str]
 
 
-def format_partial_secret_lines(
-    phrase_lines: PhraseLines, intcodes: MaybeIntCodes
-) -> Lines:
+def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: MaybeIntCodes) -> Lines:
     ecc_offset      = len(intcodes    ) // 2
     spacer_offset   = len(phrase_lines) // 2
     phrases_padding = max(map(len, phrase_lines))

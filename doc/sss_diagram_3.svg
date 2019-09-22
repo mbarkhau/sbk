@@ -1,0 +1,198 @@
+<svg class="bob" font-family="arial" font-size="14" height="224" width="328" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="triangle" markerHeight="8" markerWidth="8" orient="auto" refX="4" refY="2" viewBox="0 0 8 4">
+<polygon class="fg_fill" points="0,0 0,4 8,2 0,0"/>
+</marker>
+<marker id="clear_triangle" markerHeight="10" markerWidth="10" orient="auto" refX="1" refY="7" viewBox="0 0 20 14">
+<polygon class="bg_fill fg_stroke" points="2,2 2,12 18,7 2,2"/>
+</marker>
+<marker id="circle" markerHeight="5" markerWidth="5" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<circle class="fg_fill" cx="10" cy="10" r="8"/>
+</marker>
+<marker id="square" markerHeight="5" markerWidth="5" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<rect class="fg_fill" height="20" width="20" x="0" y="0"/>
+</marker>
+<marker id="open_circle" markerHeight="10" markerWidth="10" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<circle class="bg_fill fg_stroke" cx="10" cy="10" r="4"/>
+</marker>
+<marker id="big_open_circle" markerHeight="20" markerWidth="20" orient="auto" refX="20" refY="20" viewBox="0 0 40 40">
+<circle class="bg_fill fg_stroke" cx="20" cy="20" r="6"/>
+</marker>
+</defs>
+<style type="text/css">
+
+rect.backdrop {
+    fill: white;
+}
+
+.fg_fill {
+    fill: black;
+}
+
+
+.bg_fill {
+    fill: white;
+}
+
+.fg_stroke {
+    stroke: black;
+    stroke-width: 2;
+}
+
+.no_fill {
+    fill: none;
+}
+
+.dashed {
+    stroke-dasharray: 5;
+}
+
+
+text{
+    fill: black;
+}
+
+line, path {
+    stroke-linecap: round;
+    stroke-linejoin: miter;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+}
+
+
+
+
+tspan.head{
+    fill: none;
+    stroke: none;
+}
+    
+</style>
+<rect class="backdrop" height="224" width="328" x="0" y="0"/>
+<g>
+<line class="fg_stroke" x1="20" x2="20" y1="60" y2="116"/>
+<path class="fg_stroke no_fill" d="M 24 56 A 4 4 0 0 0 20 60"/>
+</g>
+<g>
+<line class="fg_stroke" x1="20" x2="20" y1="156" y2="196"/>
+<path class="fg_stroke no_fill" d="M 20 196 A 4 4 0 0 0 24 200"/>
+</g>
+<g>
+<line class="fg_stroke" marker-end="url(#circle)" x1="40" x2="52" y1="32" y2="56"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="52" x2="52" y1="56" y2="48"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="52" x2="52" y1="56" y2="64"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="52" x2="56" y1="56" y2="56"/>
+<line class="fg_stroke" marker-end="url(#circle)" marker-start="url(#circle)" x1="52" x2="76" y1="56" y2="104"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="76" x2="80" y1="104" y2="104"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="76" x2="114" y1="104" y2="180"/>
+<line class="fg_stroke dashed" x1="52" x2="52" y1="32" y2="48"/>
+<line class="fg_stroke dashed" x1="52" x2="52" y1="64" y2="192"/>
+<line class="fg_stroke dashed" x1="56" x2="72" y1="56" y2="56"/>
+<line class="fg_stroke dashed" x1="80" x2="96" y1="104" y2="104"/>
+<path class="fg_stroke no_fill" d="M 114 180 A 8 8 0 0 0 120 184"/>
+</g>
+<g>
+<line class="fg_stroke" marker-end="url(#triangle)" x1="52" x2="52" y1="32" y2="20"/>
+</g>
+<g>
+<line class="fg_stroke" x1="52" x2="52" y1="200" y2="192"/>
+<line class="fg_stroke" x1="52" x2="56" y1="200" y2="200"/>
+<line class="fg_stroke dashed" x1="56" x2="192" y1="200" y2="200"/>
+</g>
+<g>
+<line class="fg_stroke" x1="120" x2="136" y1="184" y2="184"/>
+<path class="fg_stroke no_fill" d="M 136 184 A 8 8 0 0 0 142 180"/>
+</g>
+<g>
+<line class="fg_stroke" x1="152" x2="148" y1="168" y2="168"/>
+<line class="fg_stroke dashed" x1="152" x2="168" y1="168" y2="168"/>
+</g>
+<g>
+<line class="fg_stroke" marker-start="url(#circle)" x1="164" x2="142" y1="136" y2="180"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="164" x2="168" y1="136" y2="136"/>
+<line class="fg_stroke" marker-end="url(#circle)" marker-start="url(#circle)" x1="188" x2="164" y1="88" y2="136"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="188" x2="192" y1="88" y2="88"/>
+<line class="fg_stroke" marker-start="url(#circle)" x1="188" x2="200" y1="88" y2="64"/>
+<line class="fg_stroke dashed" x1="168" x2="192" y1="136" y2="136"/>
+<line class="fg_stroke dashed" x1="192" x2="216" y1="88" y2="88"/>
+</g>
+<g>
+<line class="fg_stroke" marker-end="url(#triangle)" x1="192" x2="196" y1="200" y2="200"/>
+</g>
+<g>
+<line class="fg_stroke dashed" x1="24" x2="32" y1="56" y2="56"/>
+</g>
+<g>
+<line class="fg_stroke dashed" x1="24" x2="32" y1="200" y2="200"/>
+</g>
+<g>
+<text class="fg_fill" x="9" y="140">
+y=s
+</text>
+</g>
+<g>
+<text class="fg_fill" x="33" y="28">
+y
+</text>
+</g>
+<g>
+<text class="fg_fill" x="49" y="220">
+0
+</text>
+</g>
+<g>
+<text class="fg_fill" x="73" y="220">
+1
+</text>
+</g>
+<g>
+<text class="fg_fill" x="81" y="60">
+S(x=1, y=s)
+</text>
+</g>
+<g>
+<text class="fg_fill" x="97" y="220">
+2
+</text>
+</g>
+<g>
+<text class="fg_fill" x="105" y="108">
+A(...)
+</text>
+</g>
+<g>
+<text class="fg_fill" x="121" y="220">
+3
+</text>
+</g>
+<g>
+<text class="fg_fill" x="145" y="220">
+4
+</text>
+</g>
+<g>
+<text class="fg_fill" x="169" y="172">
+y = ix² + jx + k
+</text>
+</g>
+<g>
+<text class="fg_fill" x="169" y="220">
+5
+</text>
+</g>
+<g>
+<text class="fg_fill" x="201" y="140">
+B(x=2, y=b)
+</text>
+</g>
+<g>
+<text class="fg_fill" x="209" y="204">
+x
+</text>
+</g>
+<g>
+<text class="fg_fill" x="225" y="92">
+C(x=2, y=c)
+</text>
+</g>
+</svg>

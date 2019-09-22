@@ -129,6 +129,10 @@ export live_os="debian";
 		mv sbklive.iso sbklive_old.iso;
 	fi
 
+    # NOTE: Uncomment this line if you want don't want to
+    #   rebuild from scratch every time.
+    # rm "iso_extract_unsquash.ok"
+
     if ! [ -f "iso_extract_unsquash.ok" ]; then
 		rm -rf extracted;
 		rm -rf squashfs-root;
@@ -252,8 +256,7 @@ export live_os="debian";
 
  	# xterm -e "$SHELL -c '$CHROOT /prepare ;HOME=/root LC_ALL=C $CHROOT;exec $SHELL'" 2>/dev/null
  	# $CHROOT /prepare $prepare_args;
- 	# $CHROOT mkdir -p /home/user/Desktop
- 	# $CHROOT date >> /home/user/Desktop/test.txt
+
  	$CHROOT apt-get update
 
  	$CHROOT apt-get install -y lxde-core;
@@ -286,13 +289,20 @@ export live_os="debian";
     cp ../sbk-live-data/sbk_repl.desktop edit/usr/local/share/applications/;
     cp edit/usr/local/electrum/electrum.desktop edit/usr/local/share/applications/;
 
+    chmod 644 edit/usr/share/icons/*.png
+
  	$CHROOT python3 -m pip install /usr/local/sbk/${sbk_whl_file};
+
+    # NOTE: it does not appear that removing any of these has an
+    #   effect on image size. The base image is perhaps not modified
+    #   at all and instead there is some kind of overlay on the file
+    #   system.
 
  	# HOME=/root LC_ALL=C $CHROOT bash
 
- 	$CHROOT apt-get remove -y "doc-debian"
- 	$CHROOT apt-get remove -y "debian-faq"
- 	$CHROOT apt-get remove -y "debian-faq-*"
+ 	# $CHROOT apt-get remove -y "doc-debian"
+ 	# $CHROOT apt-get remove -y "debian-faq"
+ 	# $CHROOT apt-get remove -y "debian-faq-*"
  	# $CHROOT apt-get remove -y "openssh-*"
 
  	# $CHROOT apt-get remove -y "libreoffice-*"
@@ -307,9 +317,9 @@ export live_os="debian";
  	# $CHROOT apt-get remove -y "fonts-noto-*"
  	# $CHROOT apt-get remove -y "ppp*"
 
- 	$CHROOT apt-get autoremove -y
- 	$CHROOT apt-get clean -y
- 	$CHROOT bash -c "rm -f /var/lib/apt/lists/*_Packages"
+ 	# $CHROOT apt-get autoremove -y
+ 	# $CHROOT apt-get clean -y
+ 	# $CHROOT bash -c "rm -f /var/lib/apt/lists/*_Packages"
 
     $CHROOT adduser user --gecos GECOS --home /home/user --disabled-password
     $CHROOT adduser user sudo

@@ -103,21 +103,31 @@ def test_ffpoly_eval_fuzz():
 
 
 def test_interpolate_deg1_float():
-    points = [Point(0.0, 0.0), Point(1.0, 2.0), Point(2.0, 4.0)]
+    def f(x: float) -> float:
+        return 2 * x + 1
+
+    points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0]]
+
     at_x, at_y = points[-1]
     interp_y = interpolate(points[:-1], at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], x=0.5) == 1.00
+    assert interpolate(points[:-1], x=0.5) == 2.00
+    assert interpolate(points[1:], x=0.5) == 2.00
 
 
 def test_interpolate_deg2_float():
-    points = [Point(0.0, 0.0), Point(1.0, 1.0), Point(2.0, 4.0), Point(3.0, 9.0)]
+    def f(x: float) -> float:
+        return 3 * x * x + 2 * x + 1
+
+    points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0, 4.0]]
+
     at_x, at_y = points[-1]
     interp_y = interpolate(points[:-1], at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], x=0.5) == 0.25
+    assert interpolate(points[:-1], x=0.5) == f(0.5)
+    assert interpolate(points[1:], x=0.5) == f(0.5)
 
 
 def test_gf_arithmetic():
@@ -144,7 +154,7 @@ def test_gf_arithmetic():
 
 def test_interpolate_gf():
     gf     = GF(7)
-    points = [Point(gf[0], gf[0]), Point(gf[1], gf[1]), Point(gf[2], gf[4]), Point(gf[3], gf[9])]
+    points = [Point(gf[1], gf[0]), Point(gf[2], gf[1]), Point(gf[3], gf[4]), Point(gf[4], gf[9])]
     at_x, at_y = points[-1]
     interp_y = interpolate(points[:-1], at_x)
     assert interp_y == at_y

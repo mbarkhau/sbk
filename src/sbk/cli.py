@@ -498,29 +498,25 @@ def _parse_command(in_val: str) -> typ.Optional[str]:
         return None
 
 
-def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, str, bytes]]:
+def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, bytes]]:
     maybe_code = in_val.replace(" ", "")
     if maybe_code.isdigit():
-        if len(maybe_code) < 8:
+        if len(maybe_code) < 6:
             echo("Invalid code. Missing digits.")
             return None
 
-        if len(maybe_code) > 8:
+        if len(maybe_code) > 6:
             echo("Invalid code. Too many digits.")
             return None
 
-        c0 = maybe_code[:4]
-        c1 = maybe_code[4:]
-
         try:
-            parts = eu.intcodes2parts([c0, c1], idx)
-            (p0_idx, p0_val), (p1_idx, p1_val) = parts
+            parts = eu.intcodes2parts([maybe_code], idx)
         except ValueError as err:
             echo(*err.args)
             echo(" Type 'skip' if you cannot read the code")
             return None
 
-        line_data = p0_val + p1_val
+        line_data = b"".join(parts)
     else:
         try:
             phrase_parts = eu.phrase2parts(in_val)
@@ -537,9 +533,12 @@ def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, str, byte
             return None
 
         line_data = eu.phrase2bytes(" ".join(phrase_parts))
-        c0, c1 = eu.bytes2intcode_parts(line_data, idx)
 
-    return c0, c1, line_data
+    intcodes = list(eu.bytes2intcode_parts(line_data, idx))
+    assert len(intcodes) == 1
+    intcode = intcodes[0]
+
+    return intcode, line_data
 
 
 MaybeIntCodes = typ.List[typ.Optional[eu.IntCode]]
@@ -552,8 +551,7 @@ def _recover_full_data(intcodes: eu.MaybeIntCodes) -> typ.Optional[eu.IntCodes]:
         return None
 
     # abort if any recovered codes disagree with the input
-    recovered_intcode_lines = eu.bytes2intcode(recovered_data)
-    recovered_intcodes      = recovered_intcode_lines.splitlines()
+    recovered_intcodes = eu.bytes2intcodes(recovered_data)
     if not all(recovered_intcodes):
         return None
 
@@ -610,9 +608,11 @@ def _expand_codes_if_recoverable(
     if len([ic for ic in intcodes if ic]) < key_len:
         return None
 
-    recoverd_intcodes = _recover_full_data(intcodes)
-    if recoverd_intcodes is None:
+    maybe_recoverd_intcodes = _recover_full_data(intcodes)
+    if maybe_recoverd_intcodes is None:
         return None
+
+    recoverd_intcodes = list(maybe_recoverd_intcodes)
 
     data = eu.intcode_parts2bytes(recoverd_intcodes)
 
@@ -660,7 +660,7 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
 
     phrase_lines    : PhraseLines = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
     intcodes        : typ.List[typ.Optional[str]] = [None] * block_len
-    expanded_indexes: typ.Set[int] = []
+    expanded_indexes: typ.Set[int] = set()
 
     idx           = 0
     prev_intcodes = list(intcodes)
@@ -675,7 +675,7 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
                     i for i, (a, b) in enumerate(zip(intcodes, exp_intcodes)) if a != b
                 }
 
-                intcodes     = exp_intcodes
+                intcodes     = list(exp_intcodes)
                 phrase_lines = exp_phrase_lines
 
         prev_intcodes = list(intcodes)
@@ -690,30 +690,29 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
             elif cmd == 'cancel':
                 return None
             elif cmd == 'prev':
-                idx = max(0, idx - 2)
+                idx = max(0, idx - 1)
                 break
             elif cmd == 'next':
-                idx = min(key_len * 2 - 2, idx + 2)
+                idx = min(key_len - 1, idx + 1)
                 break
 
             res = _parse_input(idx, in_val)
             if res is None:
                 continue
 
-            c0, c1, line_data = res
+            intcode, line_data = res
 
             for eidx in expanded_indexes:
                 intcodes[eidx] = None
-                phrase_lines[idx // 2] = eu.EMPTY_PHRASE_LINE
+                phrase_lines[idx] = eu.EMPTY_PHRASE_LINE
             expanded_indexes.clear()
 
             if idx < key_len:
                 phrase_line = eu.bytes2phrase(line_data)
-                phrase_lines[idx // 2] = phrase_line
+                phrase_lines[idx] = phrase_line
 
-            intcodes[idx] = c0
-            intcodes[idx + 1] = c1
-            idx += 2
+            intcodes[idx] = intcode
+            idx += 1
 
             break
 
@@ -761,7 +760,7 @@ def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
             if res is None:
                 continue
 
-            c0, c1, line_data = res
+            _intcode, line_data = res
 
             phrase_line = eu.bytes2phrase(line_data)
             phrase_lines[idx // 2] = phrase_line

@@ -3705,8 +3705,8 @@ old_wordlist = [
 ]
 
 
-n = len(old_wordlist)
-assert n == 1626
+N = len(old_wordlist)
+assert N == 1626
 
 
 # Note about US patent no 5892470: Here each word does not represent a given digit.
@@ -3714,28 +3714,30 @@ assert n == 1626
 #
 # US patent no 5892470 has expired in the meantime.
 
+Mnemonic = typ.List[str]
 
-def old_mn_encode(message):
+
+def old_mn_encode(message: str) -> Mnemonic:
     assert len(message) % 8 == 0
-    out = []
+    out: Mnemonic = []
     for i in range(len(message) // 8):
         word = message[8 * i : 8 * i + 8]
         x    = int(word, 16)
-        w1   = x % n
-        w2   = ((x // n) + w1) % n
-        w3   = ((x // n // n) + w2) % n
+        w1   = x % N
+        w2   = ((x // N) + w1) % N
+        w3   = ((x // N // N) + w2) % N
         out += [old_wordlist[w1], old_wordlist[w2], old_wordlist[w3]]
     return out
 
 
-def old_mn_decode(wlist):
+def old_mn_decode(wlist: Mnemonic) -> str:
     out = ''
     for i in range(len(wlist) // 3):
         word1, word2, word3 = wlist[3 * i : 3 * i + 3]
         w1 = old_wordlist.index(word1)
-        w2 = (old_wordlist.index(word2)) % n
-        w3 = (old_wordlist.index(word3)) % n
-        x  = w1 + n * ((w2 - w1) % n) + n * n * ((w3 - w2) % n)
+        w2 = (old_wordlist.index(word2)) % N
+        w3 = (old_wordlist.index(word3)) % N
+        x  = w1 + N * ((w2 - w1) % N) + N * N * ((w3 - w2) % N)
         out += "%08x" % x
     return out
 
@@ -3809,7 +3811,7 @@ def bh2u(x: bytes) -> str:
     str with hex representation of a bytes-like object
 
     >>> x = bytes((1, 2, 10))
-    >>> bh2u(x)
+    >>> bh2u(x).upper()
     '01020A'
 
     :param x: bytes
@@ -3829,8 +3831,8 @@ def is_old_seed(seed: str) -> bool:
     except Exception:
         uses_only_old_words = False
     try:
-        seed   = bfh(seed)
-        is_hex = len(seed) == 16 or len(seed) == 32
+        seed_data = bfh(seed)
+        is_hex    = len(seed_data) == 16 or len(seed_data) == 32
     except Exception:
         is_hex = False
 
@@ -3842,14 +3844,13 @@ def is_new_seed(x: str, prefix: str = SEED_PREFIX) -> bool:
 
     message   = x.encode('utf8')
     hmac_data = hmac.new(b"Seed version", message, hashlib.sha512).digest()
-    s         = bh2u(hmac_data)
-    return s.startswith(prefix)
+    return bh2u(hmac_data).startswith(prefix)
 
 
 ElectrumSeed = str
 
 
-def seed_raw2phrase(int_seed: int, seed_type='segwit') -> RawSeed:
+def seed_raw2phrase(int_seed: RawSeed, seed_type='segwit') -> SeedPhrase:
     # based on Mnemonic.make_seed
     prefix = seed_prefix(seed_type)
 

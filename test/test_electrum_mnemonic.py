@@ -2,7 +2,7 @@ import math
 
 from sbk.electrum_mnemonic import *
 
-TEST_SEED_RAW = 51567168450570803019617791242210365249640000000000
+TEST_SEED_RAW = 5156716845057080301961779124221036524964
 
 TEST_SEED = " ".join(
     [
@@ -23,30 +23,35 @@ TEST_SEED = " ".join(
 
 
 def test_is_seed_type():
-    assert is_new_seed(test_seed, prefix=SEED_PREFIX_SW)
-    assert not is_new_seed(test_seed, prefix=SEED_PREFIX)
-    assert is_old_seed(test_seed, prefix=SEED_PREFIX_SW)
-    assert not is_old_seed(test_seed, prefix=SEED_PREFIX)
+    assert is_new_seed(TEST_SEED, prefix=SEED_PREFIX_SW)
+    assert not is_new_seed(TEST_SEED, prefix=SEED_PREFIX)
+    # assert is_old_seed(TEST_SEED)
+    # assert not is_old_seed(TEST_SEED)
 
 
 def test_mnemonic():
     raw    = TEST_SEED_RAW
-    phrase = " ".join(TEST_SEED)
+    phrase = TEST_SEED
     assert mnemonic_decode(phrase) == raw
     assert mnemonic_encode(raw   ) == phrase
 
-    expected = " ".join(TEST_SEED)
+    expected = TEST_SEED
     assert mnemonic_encode(TEST_SEED_RAW) == expected
 
 
-print(mnemonic_decode(test_seed))
+def main():
+    raw = mnemonic_decode(TEST_SEED)
+    print(raw)
 
-seed = seed_raw2phrase()
+    seed = seed_raw2phrase(raw)
+
+    print(160 / 8)
+
+    for _ in range(20):
+        i = gen_int_seed(160)
+        print(i)
+        print(mnemonic_encode(i))
 
 
-print(160 / 8)
-
-for _ in range(20):
-    i = gen_int_seed(160)
-    print(i)
-    print(mnemonic_encode(i))
+if __name__ == '__main__':
+    main()

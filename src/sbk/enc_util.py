@@ -212,6 +212,12 @@ def bytes2hex(data: bytes) -> str:
     return base64.b16encode(data).decode('ascii').lower()
 
 
+def bytes2bytesrepr(data: bytes) -> str:
+    """Same as bytes.__repr__ but uses \\x even for valid ascii bytes."""
+    hexstr = bytes2hex(data)
+    return "".join(("\\x" + hexstr[i : i + 2] for i in range(0, len(hexstr), 2)))
+
+
 def hex2bytes(hex_str: str) -> bytes:
     """Convert bytes to a hex string."""
     hex_str = hex_str.upper().zfill(2 * ((len(hex_str) + 1) // 2))
@@ -370,108 +376,110 @@ def gfpoint2bytes(point: polynom.GFPoint) -> bytes:
 
 PartIndex = int
 PartVal   = bytes
-Part      = typ.Tuple[PartIndex, PartVal]
-
+PartVals  = typ.Sequence[PartVal]
 
 IntCode       = str
 IntCodes      = typ.Sequence[IntCode]
 MaybeIntCodes = typ.Sequence[typ.Optional[IntCode]]
-IntCodeParts  = typ.Sequence[Part]
-
-
-def _parity(num: int) -> int:
-    result = 0
-    while num > 0:
-        if num & 1 == 1:
-            result += 1
-        num = num >> 1
-    return result
 
 
 def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> typ.Iterable[IntCode]:
-    for i in range(len(data)):
-        idx      = idx_offset + i
-        part_val = _char_at(data, i)
-        part_no  = idx & 0b111
-        parity   = _parity((idx << 10) + part_val) & 0b11
-        part_num = (part_no << 10) + (parity << 8) + part_val
-        assert part_num < 10000
-        yield f"{part_num:04}"
+    if len(data) % 2 != 0:
+        errmsg = f"Invalid data, must be divisible by 2, got: {len(data)}"
+        raise ValueError(errmsg)
+
+    for i in range(len(data) // 2):
+        idx     = idx_offset + i
+        chk_idx = idx % 13
+
+        byte0 = _char_at(data, i * 2 + 0)
+        byte1 = _char_at(data, i * 2 + 1)
+
+        bits = chk_idx << 16
+        bits |= byte0 << 8
+        bits |= byte1
+        assert bits <= 999999
+        yield f"{bits:06}"
 
 
-def bytes2intcode(data: bytes) -> IntCode:
+def bytes2intcodes(data: bytes) -> IntCodes:
     """Encode data to intcode.
 
     The main purpose of the intcode format is to be
     compact, redundant and resilient to input errors.
     """
     data_with_ecc = ecc.encode(data)
-    return "\n".join(bytes2intcode_parts(data_with_ecc))
+    return list(bytes2intcode_parts(data_with_ecc))
 
 
-def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> typ.Iterable[Part]:
-    """Decode part index and part values."""
-    expected_part_no = idx_offset & 0b111
-    part_no_offset   = idx_offset - expected_part_no
+def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
+    """Decode and and validate intcodes to parts."""
+    expected_chk_idx = idx_offset % 13
+    chk_idx_offset   = idx_offset - expected_chk_idx
 
-    for part in intcodes:
-        next_part_no = (expected_part_no + 1) & 0b111
-        if part:
-            part_num = int(part, 10)
-            part_val = part_num & 0xFF
-            part_no  = (part_num >> 10) & 0b111
+    part_vals = [b""] * (len(intcodes) * 2)
 
-            idx = part_no_offset + part_no
+    for intcode in intcodes:
+        next_chk_idx = (expected_chk_idx + 1) % 13
+        if intcode:
+            bits = int(intcode, 10)
 
-            if part_no != expected_part_no:
+            chk_idx = bits >> 16
+            byte0   = (bits >> 8) & 0xFF
+            byte1   = bits & 0xFF
+
+            idx = chk_idx_offset + chk_idx
+
+            if chk_idx != expected_chk_idx:
                 raise ValueError("Invalid code: Bad order.")
 
-            part_parity     = (part_num >> 8) & 0b11
-            expected_parity = _parity((idx << 10) + part_val) & 0b11
+            part_vals[idx * 2 + 0] = bytes([byte0])
+            part_vals[idx * 2 + 1] = bytes([byte1])
 
-            if part_parity != expected_parity:
-                raise ValueError("Invalid code: Bad parity.")
-
-            yield idx, bytes([part_val])
-
-        if next_part_no < expected_part_no:
+        if next_chk_idx < expected_chk_idx:
             # Since the range for part numbers is
             # limited, we assume consecutive input
-            # to validate part_no.
+            # to validate chk_idx.
             #
-            # part_no  ... 5, 6, 7, 0, 1, 2  ...
-            # part_idx ... 5, 6, 7, 8, 9, 10 ...
-            part_no_offset += 8
+            # chk_idx  ... 11, 12,  0,  1,  2 ...
+            # part_idx ... 11, 12, 13, 14, 15 ...
+            chk_idx_offset += 13
 
-        expected_part_no = next_part_no
+        expected_chk_idx = next_chk_idx
+
+    return part_vals
 
 
-def intcode_parts2packets(intcodes: MaybeIntCodes, packet_size: int) -> typ.List[bytes]:
-    num_packets = len(intcodes) // packet_size
-    packets     = [b""] * num_packets
-    for idx, part_val in intcodes2parts(intcodes):
-        packets[idx // packet_size] += part_val
-    return packets
+def parts2packets(parts: PartVals, packet_len: int) -> ecc.MaybePackets:
+    num_packets = len(parts) // packet_len
+    assert num_packets == 8
+
+    packets = [b""] * num_packets
+    for idx, part_val in enumerate(parts):
+        if part_val != b"":
+            packets[idx // packet_len] += part_val
+
+    # NOTE: It is unfortunate that only a full packet is
+    #   considered valid. A better ECC algo would make
+    #   use of all available data.
+
+    return [(pkt if len(pkt) == packet_len else None) for pkt in packets]
 
 
 def intcode_parts2bytes(intcodes: MaybeIntCodes) -> bytes:
-    block_len = len(intcodes)
+    data_with_ecc = intcodes2parts(intcodes)
+    block_len     = len(data_with_ecc)
     if block_len % 8 != 0:
-        errmsg = f"Invalid len(intcodes)={len(intcodes)}, must be divisible by 8"
+        errmsg = f"Invalid len(data_with_ecc)={len(data_with_ecc)}, must be divisible by 8"
         raise ValueError(errmsg)
 
-    packet_size = block_len // 8  # aka. parts per packet
-    packets     = intcode_parts2packets(intcodes, packet_size)
+    packet_len    = block_len // 8  # aka. parts per packet
+    maybe_packets = parts2packets(data_with_ecc, packet_len)
 
-    # NOTE: It is unfortunate that missing one part makes
-    #   the whole packet ivalid. A better ECC algo would
-    #   make use of all available parts.
-    maybe_packets: ecc.MaybePackets = [pkt if len(pkt) == packet_size else None for pkt in packets]
     return ecc.decode_packets(maybe_packets)
 
 
-def intcode2bytes(intcode: IntCode) -> bytes:
-    intcodes = typ.cast(IntCodes, intcode.splitlines())
+def intcodes2bytes(intcodes: IntCodes) -> bytes:
     return intcode_parts2bytes(intcodes)
 
 
@@ -487,12 +495,10 @@ def is_completed_intcodes(intcodes: MaybeIntCodes) -> bool:
         return False
 
 
-# https://regex101.com/r/iQKt5L/2
+# https://regex101.com/r/iQKt5L/3
 FORMATTED_LINE_PATTERN = r"""
 [AB]\d:[ ]
-    (\d{4})
-    [ ]
-    (\d{4})
+    (\d{6})
 \s+
 The[ ]
     ([A-Z]+)\s+([A-Z]+)
@@ -500,9 +506,7 @@ The[ ]
     ([A-Z]+)\s+([A-Z]+)\.
 \s+
 [CD]\d:[ ]
-    (\d{4})
-    [ ]
-    (\d{4})
+    (\d{6})
 """
 
 
@@ -526,28 +530,22 @@ def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: MaybeIntCod
         if i == spacer_offset:
             yield ""
 
-        d0 = intcodes[i * 2]
-        d1 = intcodes[i * 2 + 1]
+        ecc_idx      = ecc_offset + i
+        data_intcode = intcodes[i]
+        ecc_intcode  = intcodes[ecc_idx]
 
-        ecc_idx = ecc_offset + i * 2
-
-        e0 = intcodes[ecc_idx]
-        e1 = intcodes[ecc_idx + 1]
-
-        data_0 = "____" if d0 is None else d0
-        data_1 = "____" if d1 is None else d1
-        ecc_0  = "____" if e0 is None else e0
-        ecc_1  = "____" if e1 is None else e1
+        data = "______" if data_intcode is None else data_intcode
+        ecc  = "______" if ecc_intcode  is None else ecc_intcode
 
         marker_id = i % spacer_offset
         prefix_id = f"A{marker_id}" if i < spacer_offset else f"B{marker_id}"
         suffix_id = f"C{marker_id}" if i < spacer_offset else f"D{marker_id}"
 
-        prefix = f"{prefix_id}: {data_0} {data_1}"
-        suffix = f"{suffix_id}: {ecc_0} {ecc_1}"
+        prefix = f"{prefix_id}: {data} "
+        suffix = f"{suffix_id}: {ecc} "
 
         phrase_line = EMPTY_PHRASE_LINE if pl is None else pl
-        out_line    = f"{prefix}   {phrase_line:<{phrases_padding}}   {suffix}"
+        out_line    = f"{prefix}  {phrase_line:<{phrases_padding}}  {suffix}"
         yield out_line
 
 
@@ -559,9 +557,8 @@ def format_secret_lines(data: bytes, add_ecc=True) -> Lines:
     intcodes: MaybeIntCodes
 
     if add_ecc:
-        intcode  = bytes2intcode(data)
-        intcodes = intcode.splitlines()
-        assert intcode2bytes(intcode) == data
+        intcodes = bytes2intcodes(data)
+        assert intcodes2bytes(intcodes) == data
     else:
         # This allows the function to be used when
         # only part of the secret has been input.
@@ -577,14 +574,14 @@ def format_secret(data: bytes, add_ecc=True) -> str:
 
 class ParsedSecret(typ.NamedTuple):
     phrases   : typ.List[str]
-    data_codes: typ.List[str]
-    ecc_codes : typ.List[str]
+    data_codes: typ.List[IntCode]
+    ecc_codes : typ.List[IntCode]
 
 
 def parse_formatted_secret(text: str) -> ParsedSecret:
-    phrases   : typ.List[str] = []
-    data_codes: typ.List[str] = []
-    ecc_codes : typ.List[str] = []
+    phrases   : typ.List[str    ] = []
+    data_codes: typ.List[IntCode] = []
+    ecc_codes : typ.List[IntCode] = []
 
     for i, line in enumerate(text.splitlines()):
         if line.strip().startswith("Data"):
@@ -598,10 +595,10 @@ def parse_formatted_secret(text: str) -> ParsedSecret:
             err_msg = f"Invalid input at line {line_no}: {line}"
             raise Exception(err_msg)
 
-        (data_0, data_1, p0, p1, p2, p3, ecc_0, ecc_1) = match.groups()
+        (data, p0, p1, p2, p3, ecc) = match.groups()
 
-        data_codes.extend([data_0, data_1])
+        data_codes.append(data)
         phrases.extend([p0, p1, p2, p3])
-        ecc_codes.extend([ecc_0, ecc_1])
+        ecc_codes.append(ecc)
 
     return ParsedSecret(phrases, data_codes, ecc_codes)

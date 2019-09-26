@@ -17,6 +17,7 @@ https://crypto.stackexchange.com/a/2718
 
 import random
 import typing as typ
+import functools
 import itertools
 
 from . import primes
@@ -82,6 +83,7 @@ def val_of(other: Num) -> int:
 Coefficients = typ.Sequence[Num]
 
 
+@functools.total_ordering
 class GFNum:
 
     val: int
@@ -145,13 +147,43 @@ class GFNum:
     def __hash__(self) -> int:
         return hash(self.val) ^ hash(self.p)
 
-    def __eq__(self, other: object) -> bool:
+    def _check_comparable(self, other: object) -> None:
+        if isinstance(other, int):
+            if not 0 <= other <= 256:
+                errmsg = f"GF comparison with integer is only valid for 0 <= x <= 256"
+                raise ValueError(errmsg)
+            return
+
         if not isinstance(other, GFNum):
-            raise NotImplementedError
+            errmsg = f"Cannot compare GFNum with {type(other)}"
+            raise NotImplementedError(errmsg)
+
         if self.p != other.p:
             raise ValueError("Numbers inf different fields are not comparable")
 
+    def __eq__(self, other: object) -> bool:
+        self._check_comparable(other)
+        if isinstance(other, int):
+            return self.val == other
+
+        assert isinstance(other, GFNum)
         return self.val == other.val
+
+    def __ne__(self, other: object) -> bool:
+        self._check_comparable(other)
+        if isinstance(other, int):
+            return self.val != other
+
+        assert isinstance(other, GFNum)
+        return self.val != other.val
+
+    def __lt__(self, other: object) -> bool:
+        self._check_comparable(other)
+        if isinstance(other, int):
+            return self.val < other
+
+        assert isinstance(other, GFNum)
+        return self.val < other.val
 
     def __repr__(self) -> str:
         return f"GFNum({self.val}, p={self.p})"
@@ -241,7 +273,7 @@ def interpolate(points: Points, x: Num) -> Num:
         raise ValueError("Points must be distinct {points}")
 
     # validate x coordinates
-    for i, p in points:
+    for i, p in enumerate(points):
         if p.x == 0 or p.x == 255:
             errmsg = f"Illegal SBK-Piece {i + 1} with x={p.x}. Possible attack."
             raise Exception(errmsg)

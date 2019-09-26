@@ -75,22 +75,22 @@ def packet_block_indexes(msg_len: int) -> PacketBlockIndexes:
     Note that the format/layout on paper is
     sideways compared to the above.
 
-         Data            Phrases              ECC
-    A0: a0  a1    Phrase  0 Phrase  1    C0: e0  e1
-    A1: a2  a3    Phrase  2 Phrase  3    C1: e2  e3
-    A2: a4  a5    Phrase  4 Phrase  5    C2: e4  e5
-    A3: b0  b1    Phrase  6 Phrase  7    C3: f0  f1
-    A4: b2  b3    Phrase  8 Phrase  9    C4: f2  f3
-    A5: b4  b5    Phrase 10 Phrase 11    C5: f4  f5
+        Data          Phrases               ECC
+    A0: a0 a1    Phrase  0 Phrase  1    C0: e0 e1
+    A1: a2 a3    Phrase  2 Phrase  3    C1: e2 e3
+    A2: a4 a5    Phrase  4 Phrase  5    C2: e4 e5
+    A3: b0 b1    Phrase  6 Phrase  7    C3: f0 f1
+    A4: b2 b3    Phrase  8 Phrase  9    C4: f2 f3
+    A5: b4 b5    Phrase 10 Phrase 11    C5: f4 f5
 
-    B0: c0  c1    Phrase 12 Phrase 13    D0: g0  g1
-    B1: c2  c3    Phrase 14 Phrase 15    D1: g2  g3
-    B2: c4  c5    Phrase 16 Phrase 17    D2: g4  g5
-    B3: d0  d1    Phrase 18 Phrase 19    D3: h0  h1
-    B4: d2  d3    Phrase 20 Phrase 21    D4: h2  h3
-    B5: d4  d5    Phrase 22 Phrase 23    D5: h4  h5
+    B0: c0 c1    Phrase 12 Phrase 13    D0: g0 g1
+    B1: c2 c3    Phrase 14 Phrase 15    D1: g2 g3
+    B2: c4 c5    Phrase 16 Phrase 17    D2: g4 g5
+    B3: d0 d1    Phrase 18 Phrase 19    D3: h0 h1
+    B4: d2 d3    Phrase 20 Phrase 21    D4: h2 h3
+    B5: d4 d5    Phrase 22 Phrase 23    D5: h4 h5
     """
-    assert msg_len % 4 == 0
+    assert msg_len % 4 == 0, msg_len
     pkt_len = msg_len // 4
 
     a = (BlockIndex(pkt_len * 0, pkt_len * 1),)
@@ -373,7 +373,9 @@ def _top_candidates(indexed_packets: IndexedPackets) -> bytes:
 
 def decode_packets(maybe_packets: MaybePackets) -> Message:
     """Decode packets to original message."""
-    assert len(maybe_packets) == 8
+    if len(maybe_packets) != 8:
+        errmsg = f"Invalid argument, len(maybe_packets) must 8 but was: {len(maybe_packets)}"
+        raise ValueError(errmsg)
 
     indexed_packets: IndexedPackets = {
         idx: pkt for idx, pkt in enumerate(maybe_packets) if pkt is not None

@@ -6,7 +6,8 @@ import itertools
 import pylev
 import pytest
 
-import sbk.polynom as polynom
+import sbk.ecc
+import sbk.polynom
 from sbk.enc_util import *
 
 TEST_PHRASE_LINES = [
@@ -326,6 +327,12 @@ def test_bytes2hex():
     assert hex2bytes(text.lower()) == data
 
 
+def test_bytes2bytesrepr():
+    data = b"\x01\x23\x45\x67\x89\xAB\xCD\xEF"
+    assert bytes2bytesrepr(data) == r"\x01\x23\x45\x67\x89\xAB\xCD\xEF".lower()
+    assert bytes2bytesrepr(b"09AZ") == r"\x30\x39\x41\x5A".lower()
+
+
 def test_hex2bytes_fuzz():
     for i in range(100):
         data     = os.urandom(10)
@@ -384,28 +391,29 @@ def test_params2bytes():
 def test_bytes2gfpoint():
     data_len = 32
     prime    = primes.get_pow2prime(data_len * 8 - 8)
-    gf       = polynom.GF(p=prime)
+    gf       = sbk.polynom.GF(p=prime)
 
-    in_point   = polynom.Point(gf[7], gf[1234567890])
+    in_point   = sbk.polynom.Point(gf[7], gf[1234567890])
     point_data = gfpoint2bytes(in_point)
     assert len(point_data) == data_len
     assert bytes2gfpoint(point_data, gf) == in_point
 
 
 def test_intcode_fuzz():
-    bytes2intcode(os.urandom(8))
+    bytes2intcodes(os.urandom(8))
+
     for i in range(0, 50, 4):
         data_len = i % 20 + 4
         data     = os.urandom(data_len)
-        intcode  = bytes2intcode(data)
-        decoded  = intcode2bytes(intcode)
+        intcodes = bytes2intcodes(data)
+        decoded  = intcodes2bytes(intcodes)
         assert decoded == data
 
-        lines = intcode.splitlines()
-        assert all(len(l) == 4 for l in lines)
-        assert len(lines) == data_len * 2
-        if intcode:
-            assert "".join(lines).isdigit()
+        assert all(len(intcode) == 6 for intcode in intcodes)
+        assert all(intcode.isdigit() for intcode in intcodes)
+
+        # NOTE: each intcode encodes 2 bytes but there are 2x the intcodes to include the ecc data
+        assert len(intcodes) == data_len
 
 
 TEST_DATA = (string.ascii_letters + "0123456789").encode('ascii')
@@ -414,57 +422,52 @@ TEST_DATA = (string.ascii_letters + "0123456789").encode('ascii')
 @pytest.mark.parametrize("data_len", range(16, 33, 4))
 def test_intcode_fuzz_loss(data_len):
     for _ in range(5):
-        data    = TEST_DATA[:data_len]
-        intcode = bytes2intcode(data)
-        decoded = intcode2bytes(intcode)
+        data     = TEST_DATA[:data_len]
+        intcodes = bytes2intcodes(data)
+        decoded  = intcodes2bytes(intcodes)
         assert decoded == data
 
-        parts     = intcode.split("\n")
-        block_len = len(parts)
+        parts     = intcodes[:]
         clear_idx = random.randrange(0, len(parts))
         parts[clear_idx] = None
         decoded = intcode_parts2bytes(parts)
         assert decoded == data
 
 
-def test_intcode_order_fail():
-    data    = os.urandom(8)
-    intcode = bytes2intcode(data)
-    codes   = intcode.splitlines()
-    decoded = intcode2bytes("\n".join(codes))
+@pytest.mark.parametrize("data_len", range(4, 33, 4))
+def test_intcode_order_fail(data_len):
+    data     = os.urandom(data_len)
+    intcodes = bytes2intcodes(data)
+    decoded  = intcodes2bytes(intcodes)
     assert decoded == data
 
-    codes[0], codes[-1] = codes[-1], codes[0]
+    for _ in range(len(data)):
+        i = random.randint(0, data_len - 1)
+        j = random.randint(0, data_len - 1)
 
-    try:
-        intcode2bytes("\n".join(codes))
-        assert False
-    except ValueError as err:
-        assert "Bad order" in str(err)
+        intcodes_kaputt = intcodes[:]
+        intcodes_kaputt[i], intcodes_kaputt[j] = intcodes_kaputt[j], intcodes_kaputt[i]
 
-
-def test_intcode_parity_fail():
-    data    = os.urandom(8)
-    intcode = bytes2intcode(data)
-    codes   = intcode.splitlines()
-    decoded = intcode2bytes("\n".join(codes))
-    assert decoded == data
-
-    i = random.randrange(8)
-
-    broken_code = int(codes[i], 10) ^ 1
-    codes[i] = f"{broken_code:04}"
-    try:
-        intcode2bytes("\n".join(codes))
-        assert False
-    except ValueError as err:
-        assert "Bad parity" in str(err)
+        if i % 13 == j % 13:
+            # In this case the ecc data should either save us or fail
+            try:
+                decoded = intcodes2bytes(intcodes_kaputt)
+                assert decoded == data
+            except sbk.ecc.DecodeError:
+                pass
+        else:
+            try:
+                intcodes2bytes(intcodes_kaputt)
+                # should have raised ValueError
+                assert False
+            except ValueError as err:
+                assert "Bad order" in str(err)
 
 
 def test_format_secret():
-    data_len    = 24
-    block_len   = data_len * 2
-    packet_size = block_len // 8
+    data_len   = 24
+    block_len  = data_len * 2
+    packet_len = block_len // 8
 
     data      = os.urandom(data_len)
     formatted = format_secret(data)
@@ -472,10 +475,10 @@ def test_format_secret():
     parsed = parse_formatted_secret(formatted)
 
     assert phrase2bytes(" ".join(parsed.phrases)) == data
-    packets = intcode_parts2packets(parsed.data_codes, packet_size)
-    assert b"".join(packets) == data
-
-    codes = parsed.data_codes + parsed.ecc_codes
-    assert len(codes) == block_len
-    decoded = intcode_parts2bytes(codes)
+    intcodes = parsed.data_codes + parsed.ecc_codes
+    assert len(intcodes) * 2 == block_len
+    decoded = intcode_parts2bytes(intcodes)
     assert decoded == data
+
+    packets = intcodes2parts(parsed.data_codes)
+    assert b"".join(packets[:data_len]) == data

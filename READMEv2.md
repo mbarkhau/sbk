@@ -192,15 +192,27 @@ You might satisfy 1. for example by writing all wallet names down on each SBK-Pi
 
 ## Encoding Secrets: Mnemonics and Intcodes
 
-> Aside: The work done in this section preceeded the release of Trezor Shamir Backup, which has similar features based on similar reasoning. The forward error correction used is based on [Reed Solomon Codes][href_wiki_rscodes], which are superiour to the more simple [Luby Transform Codes][href_wiki_ltcodes] used in the current implementation of SBK.
+> Aside: The work done in this section preceeded the release of Trezor Shamir Backup, which has many similarities to it. Shamir Backup uses [Reed Solomon Codes][href_wiki_rscodes] to generate a checksum for error detection. SBK uses more simple [Luby Transform Codes][href_wiki_ltcodes] to implement forward error correction. The wordlists of both are composed with similar considerations for length, edit distance and phonetic distinctness.
 
-The main reason to introduce a new encoding is to 
+The main reasons to introduce a new encoding are:
 
  1. To aid in memorization of the `brainkey`
  2. Provide protection against input errors
  3. Provide [forward error correction][href_wiki_fec] 
 
-In addition to the mnemonic encoding, the `sbk-pieces` use a more compact encoding of the same data in the form of `intcodes`. In addition to the raw data encoded with the mnemonics, this encoding the same data as the `brainkey` but are more compact and provide the additional failsafe.
+In addition to the mnemonic encoding, the `salt` and the `sbk-pieces` use a more compact encoding of the same data in the form of numeric `intcodes`. These encode not only the same raw data as the mnemonic encoding, but also positional indexes and an error correction code. This provides additional protection against degradation and the compact encoding is more suitable for use with [billfodl](https://billfodl.com/], [cryptostell](https://cryptosteel.com) or number punch metal stamps.
+
+```
+     Data                       Phrases                      ECC
+A0: 2601366   The BRAVE  KING   at the LONDON GARDEN.   C0: 3935499
+A1: 1793279   The HONEST DRIVER at the SEOUL  TEMPLE.   C1: 2477686
+A2: 5685746   The SCARY  MOTHER at the MIAMI  CASTLE.   C2: 4361261
+B0: 8827669   The UGLY   DOCTOR at the VIENNA FOREST.   D0: 6033993
+B1: 4061997   The LONELY LEADER at the SEOUL  SCHOOL.   D1: 1055856
+B2: 6183612   The EVIL   PRINCE at the CAIRO  OPERA.    D2: 9357672
+```
+
+This corresponds to these raw bytes: `\x04\x56\x83\xcf\xd8\x72\xe2\xf5\x96\xcd\x3a\x1c`.
 
 [href_wiki_rscodes]: https://en.wikipedia.org/wiki/Reed%E2%80%93Solomon_error_correction
 
@@ -240,11 +252,29 @@ Sparta doesn't really exist anymore of course, and even when it did, it wasn't n
 
 ### Integer Codes
 
-In addition to the mnemonic encoding, SBK uses a more 
+Each intcode consists of 6 decimal digits and represents two bytes of data. The data of each code can be obtained by parsing the code as a decimal integer masking with `& 0xFFFF` and an index of each code can be obtained by bit shifting with `>> 16`.
 
-Since recovery involves the input of multiple `sbk-pieces` and the key derivation takes time, a lack of protection against intput errors would make it time consuming to discover which `sbk-piece` was entered incorrectly. SBK also encodes the correct order of inputs in each `sbk-piece` to protect against words being skipped or entered in the wrong order.
+```
+117502 & 0xFFFF == 0xCAFE
+117502 >> 16 == 1
+768702 & 0xFFFF == 0xBABE
+768702 >> 16 == 11
+```
 
-TODO: implementation details
+The encoding for a single intcode has the following layout:
+
+```
+ii: index
+b0: data byte0
+b1: data byte1 
+
+[       ~20 bits       ]
+iiii b0b0 b0b0 b1b1 b1b1
+```
+
+The eagle-eyed may observe that `2 ** 20 == 1048576`, which is slightly larger than `10 ** 7 - 1 == 999999`. So while the binary representation consumes 20 bits, the decimal representation never exceets 6 digits.
+
+Since recovery involves the input of multiple `sbk-pieces` and the key derivation takes time, a lack of protection against intput errors would make it time consuming to discover which `sbk-piece` was entered incorrectly. To mitigate such issues, each incode encodes it's position to protect against words being skipped or entered in the wrong order. The maximum index is 13 which is adequate to check for skipped inputs even before the ECC data has been endered.
 
 
 ### FEC: Luby Transform Codes
@@ -377,7 +407,7 @@ The primary responsibility of an agent is to recover the wallets of the owner wi
 
 The trustees should be watching and scruitinizing you. Provide them with any information they ask for, do not ask them for any information whatsoever. 
 
- - There should be a mutual understanding among all participants what will happen to the coins
+ - There should be a mutual understanding among all participants what will happen to the coins. If wallet balances are already known, you should prepare a payment request for each transaction that is to occur. 
  - 
 
 
@@ -406,7 +436,8 @@ There are three areas of risk to be aware of:
  - Lost of Secrets
  - Game theoretical risks
     - Holdouts
-    - 
+    - Decoy `sbk-pieces`
+    - Insecure hardware
  - Compromised Software
 
 > Aside: SBK exists in part to provide documentation to the owners trustees and agents, who may be laypeople wrt. cryptocurrency.

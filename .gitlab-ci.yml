@@ -5,7 +5,7 @@ stages:
 
 unit:
   stage: test
-  image: registry.gitlab.com/mbarkhau/ssbs/base
+  image: registry.gitlab.com/mbarkhau/sbk/base
   script:
     - make lint
     - make mypy

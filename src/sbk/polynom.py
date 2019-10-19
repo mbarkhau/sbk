@@ -51,6 +51,8 @@ Num = typ.TypeVar('Num', int, 'GFNum')
 # e.g., 21 = 5 × 105 + (−2) × 252. The fact that the GCD can always be
 # expressed in this way is known as Bézout's identity.
 
+# Rijndael irreducible polynomial x^8 + x^4 + x^3 + x + 1,
+
 
 class XGCDResult(typ.NamedTuple):
     g: int
@@ -305,7 +307,7 @@ GFPoint = Point[GFNum]
 GFPoints = typ.Sequence[GFPoint]
 
 
-def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
+def _split(gf: GF, threshold: int, num_shares: int, secret) -> GFPoints:
     # The coefficients of the polynomial are ordered in ascending
     # powers of x, so poly = [2, 5, 3] represents 2x° + 5x¹ + 3x²
     #
@@ -320,8 +322,8 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
 
     eval_at = poly_eval_fn(poly)
 
-    points = [Point(gf[x], gf[eval_at(x)]) for x in range(1, num_pieces + 1)]
-    assert len(points) == num_pieces
+    points = [Point(gf[x], gf[eval_at(x)]) for x in range(1, num_shares + 1)]
+    assert len(points) == num_shares
 
     # make sure we only return pieces that we can join again
     recoverd_secret = join(threshold, points)
@@ -334,16 +336,16 @@ def _split(gf: GF, threshold: int, num_pieces: int, secret) -> GFPoints:
     return points
 
 
-def split(prime: int, threshold: int, num_pieces: int, secret: int) -> GFPoints:
+def split(prime: int, threshold: int, num_shares: int, secret: int) -> GFPoints:
     """Generate points of a split secret."""
 
-    if num_pieces <= 1:
+    if num_shares <= 1:
         raise ValueError("number of pieces too low, secret would be exposed")
 
-    if num_pieces >= prime:
+    if num_shares >= prime:
         raise ValueError("number of pieces too high, cannot generate distinct points")
 
-    if threshold > num_pieces:
+    if threshold > num_shares:
         raise ValueError("threshold too high, must be <= number of pieces")
 
     if secret < 0:
@@ -352,7 +354,7 @@ def split(prime: int, threshold: int, num_pieces: int, secret: int) -> GFPoints:
     if prime <= secret:
         raise ValueError("Invalid prime for secret, must be greater than secret.")
 
-    return _split(gf=GF(p=prime), threshold=threshold, num_pieces=num_pieces, secret=secret)
+    return _split(gf=GF(p=prime), threshold=threshold, num_shares=num_shares, secret=secret)
 
 
 def join(threshold: int, points: GFPoints) -> int:

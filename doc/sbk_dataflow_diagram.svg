@@ -298,7 +298,7 @@ tspan.head{
 </g>
 <g>
 <text class="fg_fill" x="17" y="28">
-User Input/Output
+User Visible Data
 </text>
 </g>
 <g>
@@ -697,8 +697,18 @@ KDF
 </text>
 </g>
 <g>
+<text class="fg_fill" x="313" y="28">
+1. Key Generation
+</text>
+</g>
+<g>
 <text class="fg_fill" x="313" y="236">
 .
+</text>
+</g>
+<g>
+<text class="fg_fill" x="313" y="268">
+2. Key Recovery
 </text>
 </g>
 <g>
@@ -707,8 +717,8 @@ KDF
 </text>
 </g>
 <g>
-<text class="fg_fill" x="321" y="28">
-Generate Secrets
+<text class="fg_fill" x="313" y="428">
+3. Load Wallet
 </text>
 </g>
 <g>
@@ -717,18 +727,8 @@ Generate Secrets
 </text>
 </g>
 <g>
-<text class="fg_fill" x="329" y="268">
-Recover Secrets
-</text>
-</g>
-<g>
 <text class="fg_fill" x="329" y="396">
 .
-</text>
-</g>
-<g>
-<text class="fg_fill" x="337" y="428">
-Load Wallet
 </text>
 </g>
 <g>

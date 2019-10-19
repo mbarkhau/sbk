@@ -6,29 +6,27 @@
 # SPDX-License-Identifier: MIT
 
 """CLI/Imperative shell for SBK."""
-import io
+
 import os
-import math
-import time
 import random
 import typing as typ
 import hashlib
-import itertools as it
-import threading
 import subprocess as sp
 
 import click
-import qrcode
 import pathlib2 as pl
 import click_repl
 
 import sbk
 
 from . import kdf
+from . import cli_io
 from . import params
 from . import primes
 from . import polynom
-from . import enc_util as eu
+from . import cli_util
+from . import enc_util
+from . import mnemonic
 from . import electrum_mnemonic
 
 # To enable pretty tracebacks:
@@ -94,76 +92,15 @@ def anykey_confirm(message: str) -> bool:
     return False
 
 
-class ThreadWithReturnData(threading.Thread):
-
-    _return: typ.Optional[bytes]
-
-    def __init__(self, target=None, args=(), kwargs=None) -> None:
-        threading.Thread.__init__(self, target=target, args=args, kwargs=kwargs)
-        self._target = target
-        self._args   = args
-        self._kwargs = kwargs
-        self._return = None
-
-    def run(self) -> None:
-        tgt = self._target
-        assert tgt is not None
-        kwargs       = self._kwargs or {}
-        self._return = tgt(*self._args, **kwargs)
-
-    def join(self, *args) -> None:
-        threading.Thread.join(self, *args)
-        if self._return is None:
-            raise Exception("Missing return value after Thread.join")
-
-    @property
-    def retval(self) -> bytes:
-        rv = self._return
-        assert rv is not None
-        return rv
-
-
 def _derive_key(brainkey_data: bytes, salt_data: bytes, label: str) -> bytes:
-    param_cfg = eu.bytes2params(salt_data)
+    param_cfg = enc_util.bytes2params(salt_data)
     eta_sec   = PARAM_CTX.est_times_by_id[param_cfg.kdf_param_id]
     hash_len  = param_cfg.key_len_bytes - 1
 
-    kdf_args   = (brainkey_data, salt_data, param_cfg.kdf_param_id, hash_len)
-    kdf_thread = ThreadWithReturnData(target=kdf.derive_key, args=kdf_args)
-    # daemon means the thread is killed if user hits Ctrl-C
-    kdf_thread.daemon = True
-    kdf_thread.start()
-
-    progress_bar = None
-
-    tzero = time.time()
-    total = int(eta_sec * 1000)
-
-    step = 0.1
-
-    while kdf_thread.is_alive():
-        time.sleep(step)
-        tnow          = time.time()
-        elapsed       = tnow    - tzero
-        remaining     = eta_sec - elapsed
-        remaining_pct = 100 * remaining / eta_sec
-
-        if progress_bar is None and elapsed > 0.2:
-            progress_bar = click.progressbar(label=label, length=total, show_eta=True)
-            progress_bar.update(int(elapsed * 1000))
-        elif progress_bar:
-            if remaining_pct < 1:
-                progress_bar.update(int(step * 100))
-            elif remaining_pct < 5:
-                progress_bar.update(int(step * 500))
-            else:
-                progress_bar.update(int(step * 1000))
-
-    if progress_bar:
-        progress_bar.update(total)
-
-    kdf_thread.join()
-
+    kdf_args   = (brainkey_data, salt_data, kdf_params, hash_len)
+    KDFThread  = cli_util.EvalWithProgressbar[bytes]
+    kdf_thread = KDFThread(target=kdf.derive_key, args=kdf_args)
+    kdf_thread.start_and_wait(eta_sec, label)
     hash_data = kdf_thread.retval
 
     # NOTE: We encode the x value of a point in the first byte, and
@@ -234,7 +171,7 @@ SALT_INFO_TITLE = r'Step 1 of 5: Copy your "Salt".'
 
 SBK_KEYGEN_TITLE = r"Step 2 of 5: Deriving Secret Key"
 
-SBK_PIECE_TITLE = r"Step 3 of 5: Copy SBK Piece {piece_no}/{num_pieces}."
+SBK_SHARE_TITLE = r"Step 3 of 5: Copy SBK-Share {share_no}/{num_shares}."
 
 BRAINKEY_INFO_TITLE = r"Step 4 of 5: Copy Brainkey."
 
@@ -272,28 +209,29 @@ example if they are a trustee).
 SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue"
 
 
-SBK_PIECE_TEXT = r"""
-Give this "SBK Piece" one of your trustees. Your trustees should not
-only be trustworthy in the sense that they will act in your best
-interests, they should also be trustworthy in the sense that they are
-competent to keep this SBK Piece safe and secret.
+SBK_SHARE_TEXT = r"""
+Hide this "Share" in a safe place or give it to one of your
+trustees. Your trustees should not only be trustworthy in the
+sense that they will act in your best interests, they should also
+be trustworthy in the sense that they are competent to keep this
+SBK Piece safe and secret.
 """
 
 RECOVERY_TEXT = r"""
 Your "master seed" is recovered by collecting a minimum of
-{threshold} pieces.
+{threshold} shares.
 
                  Split Master Seed
           Split                    . Join
-               \.-> SBK Piece 1 -./
-   Master Seed -O-> SBK Piece 2  +-> Master Seed
-                '-> SBK Piece 3 -'
+               \.-> Share 1 -./
+   Master Seed -O-> Share 2  +-> Master Seed
+                '-> Share 3 -'
 
    Master Seed + Salt -> Wallet
 """
 
-SBK_PIECE_PROMPT = r"""
-Please make a physical copy of SBK Piece {piece_no}/{num_pieces}.
+SBK_SHARE_PROMPT = r"""
+Please make a physical copy of Share {share_no}/{num_shares}.
 """
 
 BRAINKEY_INFO_TEXT = r"""
@@ -336,15 +274,26 @@ _kdf_param_id_option = click.option(
     '-p', '--kdf-param-id', default=PARAM_ID_DEFAULT, type=int, help=_clean_help(KDF_PARAM_ID_HELP)
 )
 
-EMAIL_OPTION_HELP = "Email which is used as a salt"
+DEFAULT_THRESHOLD = 3
 
-_email_option = click.option(
-    '-e', '--email', type=str, required=True, help=_clean_help(EMAIL_OPTION_HELP)
+DEFAULT_NUM_SHARES = 5
+
+DEFAULT_SCHEME = f"{DEFAULT_THRESHOLD}of{DEFAULT_NUM_SHARES}"
+
+SCHEME_OPTION_HELP = """
+"""
+
+_scheme_option = click.option(
+    '-s',
+    '--scheme',
+    type=str,
+    default=DEFAULT_SCHEME,
+    show_default=True,
+    help=_clean_help(SCHEME_OPTION_HELP),
 )
 
-THRESHOLD_OPTION_HELP = "Number of pieces required to recover the key"
+THRESHOLD_OPTION_HELP = "Number of shares required to recover the key"
 
-DEFAULT_THRESHOLD = 3
 
 _threshold_option = click.option(
     '-t',
@@ -355,24 +304,36 @@ _threshold_option = click.option(
     help=_clean_help(THRESHOLD_OPTION_HELP),
 )
 
-NUM_PIECES_OPTION_HELP = "Number of pieces to split the key into"
+NUM_SHARES_OPTION_HELP = "Number of shares generate"
 
-DEFAULT_NUM_PIECES = 5
-
-_num_pieces_option = click.option(
+_num_shares_option = click.option(
     '-n',
-    '--num-pieces',
+    '--num-shares',
     type=int,
-    default=DEFAULT_NUM_PIECES,
+    default=DEFAULT_NUM_SHARES,
     show_default=True,
-    help=_clean_help(NUM_PIECES_OPTION_HELP),
+    help=_clean_help(NUM_SHARES_OPTION_HELP),
 )
 
-SALT_LEN_OPTION_HELP = "Length (in bytes) of the Salt"
+BRAINKEY_LEN_OPTION_HELP = "Length of the Brainkey (in words/bytes)"
 
-DEFAULT_SALT_LEN = 160 // 8
+DEFAULT_BRAINKEY_LEN = 4
 
-_salt_len_option = click.option(
+_brainkey_lvl_option = click.option(
+    '-b',
+    '--brainkey-len',
+    type=int,
+    default=DEFAULT_BRAINKEY_LEN,
+    show_default=True,
+    help=_clean_help(BRAINKEY_LEN_OPTION_HELP),
+)
+
+
+SALT_LEN_OPTION_HELP = "Length of the Salt (in words/bytes)"
+
+DEFAULT_SALT_LEN = 10
+
+_salt_lvl_option = click.option(
     '-s',
     '--salt-len',
     type=int,
@@ -381,30 +342,16 @@ _salt_len_option = click.option(
     help=_clean_help(SALT_LEN_OPTION_HELP),
 )
 
-KEY_LEN_OPTION_HELP = "Length (in bytes) of the Key/SBK Piece"
+SHARE_LEN_OPTION_HELP = "Length of the share (in words/bytes) "
 
-DEFAULT_KEY_LEN = 160 // 8
+DEFAULT_SHARE_LEN = (DEFAULT_BRAINKEY_LEN + DEFAULT_SALT_LEN) * 2
 
-_key_len_option = click.option(
-    '-k',
-    '--key-len',
+_share_len_option = click.option(
+    '--share-len',
     type=int,
-    default=DEFAULT_KEY_LEN,
+    default=DEFAULT_SHARE_LEN,
     show_default=True,
-    help=_clean_help(KEY_LEN_OPTION_HELP),
-)
-
-BRAINKEY_LEN_OPTION_HELP = "Length (in bytes) of the Brainkey"
-
-DEFAULT_BRAINKEY_LEN = 64 // 8
-
-_brainkey_len_option = click.option(
-    '-b',
-    '--brainkey-len',
-    type=int,
-    default=DEFAULT_BRAINKEY_LEN,
-    show_default=True,
-    help=_clean_help(BRAINKEY_LEN_OPTION_HELP),
+    help=_clean_help(SHARE_LEN_OPTION_HELP),
 )
 
 
@@ -422,65 +369,39 @@ _non_segwit_option = click.option(
 )
 
 
-def _show_secret(label: str, data: bytes, codes: bool = True, qr: bool = False) -> None:
+def _show_secret(label: str, data: bytes, codes: bool = True) -> None:
     if codes:
         assert len(data) % 4 == 0, len(data)
-        output_lines = list(eu.format_secret_lines(data))
+        output_lines = list(cli_util.format_secret_lines(data))
     else:
-        output_lines = list(eu.bytes2phrase(data).splitlines())
+        output_lines = list(mnemonic.bytes2phrase(data).splitlines())
 
-    if qr:
-        qr_renderer = qrcode.QRCode(
-            version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4
-        )
-        qr_renderer.add_data(data)
-        buf = io.StringIO()
-        qr_renderer.print_ascii(out=buf, invert=True)
-        qr_lines = buf.getvalue().splitlines()
-    else:
-        qr_lines = []
-
-    # TODO mb: Don't interleave if terminal is too narrow.
     len_padding = max(map(len, output_lines))
-
-    output_lines = [
-        ((a or "").ljust(len_padding)) + "     " + (b or "")
-        for a, b in it.zip_longest(output_lines, qr_lines)
-    ]
 
     echo(f"{label:^{len_padding}}")
     echo("\n".join(output_lines) + "\n\n")
 
 
 SecretKey = bytes
-SBKPiece  = bytes
+ShareData = bytes
 
 
 def _split_secret_key(
-    secret_key: SecretKey, threshold: int, num_pieces: int
-) -> typ.Iterable[SBKPiece]:
+    secret_key: SecretKey, threshold: int, num_shares: int
+) -> typ.Iterable[ShareData]:
     key_len = len(secret_key)
     assert secret_key[:1] == b"\x00"
-    secret_int = eu.bytes2int(secret_key[1:])
+    secret_int = enc_util.bytes2int(secret_key[1:])
 
     key_bits  = (key_len - 1) * 8
     prime     = primes.get_pow2prime(key_bits)
     gf_points = polynom.split(
-        prime=prime, threshold=threshold, num_pieces=num_pieces, secret=secret_int
+        prime=prime, threshold=threshold, num_shares=num_shares, secret=secret_int
     )
     for gfpoint in gf_points:
-        sbk_piece_data = eu.gfpoint2bytes(gfpoint)
-        assert len(sbk_piece_data) == key_len, len(sbk_piece_data)
-        yield sbk_piece_data
-
-
-def _join_sbk_pieces(param_cfg: params.Params, sbk_pieces: typ.List[SBKPiece]) -> SecretKey:
-    prime      = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
-    gf         = polynom.GF(p=prime)
-    points     = [eu.bytes2gfpoint(p, gf) for p in sbk_pieces]
-    secret_int = polynom.join(len(points), points)
-    secret_key = b"\x00" + eu.int2bytes(secret_int)
-    return secret_key
+        share_data = enc_util.gfpoint2bytes(gfpoint)
+        assert len(share_data) == key_len, len(share_data)
+        yield share_data
 
 
 def _parse_command(in_val: str) -> typ.Optional[str]:
@@ -499,7 +420,7 @@ def _parse_command(in_val: str) -> typ.Optional[str]:
 
 
 def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, bytes]]:
-    maybe_code = in_val.replace(" ", "")
+    maybe_code = in_val.replace(" ", "").replace("-", "")
     if maybe_code.isdigit():
         if len(maybe_code) < 6:
             echo("Invalid code. Missing digits.")
@@ -510,48 +431,48 @@ def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, bytes]]:
             return None
 
         try:
-            parts = eu.intcodes2parts([maybe_code], idx)
+            phrases = cli_util.intcodes2phrases([maybe_code], idx)
         except ValueError as err:
             echo(*err.args)
             echo(" Type 'skip' if you cannot read the code")
             return None
 
-        line_data = b"".join(parts)
+        line_data = b"".join(phrases)
     else:
         try:
-            phrase_parts = eu.phrase2parts(in_val)
+            words = list(mnemonic.phrase2words(in_val))
         except ValueError as err:
-            echo(f"Unknown word: {err.args[1]}")
+            echo(f"Invalid Input: {err.args[1]}")
             return None
 
-        if len(phrase_parts) < 4:
+        if len(words) < 4:
             echo(f"Invalid Phrase. Missing words (expected 4)")
             return None
 
-        if len(phrase_parts) > 4:
+        if len(words) > 4:
             echo(f"Invalid Phrase. Too many words (expected 4)")
             return None
 
-        line_data = eu.phrase2bytes(" ".join(phrase_parts))
+        line_data = mnemonic.phrase2bytes(" ".join(words))
 
-    intcodes = list(eu.bytes2intcode_parts(line_data, idx))
+    intcodes = list(cli_util.bytes2intcode_parts(line_data, idx))
     assert len(intcodes) == 1
     intcode = intcodes[0]
 
     return intcode, line_data
 
 
-MaybeIntCodes = typ.List[typ.Optional[eu.IntCode]]
+MaybeIntCodes = typ.List[typ.Optional[cli_util.IntCode]]
 
 
-def _recover_full_data(intcodes: eu.MaybeIntCodes) -> typ.Optional[eu.IntCodes]:
+def _recover_full_data(intcodes: cli_util.MaybeIntCodes) -> typ.Optional[cli_util.IntCodes]:
     try:
-        recovered_data = eu.intcode_parts2bytes(intcodes)
+        recovered_data = cli_util.intcode_parts2bytes(intcodes)
     except Exception:
         return None
 
     # abort if any recovered codes disagree with the input
-    recovered_intcodes = eu.bytes2intcodes(recovered_data)
+    recovered_intcodes = cli_util.bytes2intcodes(recovered_data)
     if not all(recovered_intcodes):
         return None
 
@@ -571,15 +492,15 @@ def _line_marker(idx: int, key_len: int) -> str:
     return f"{marker_char}{marker_id}"
 
 
-IntCodes    = typ.List[eu.IntCode]
+IntCodes    = typ.List[cli_util.IntCode]
 PhraseLines = typ.List[str]
 
 
 def _format_partial_secret(
-    phrase_lines: PhraseLines, intcodes: eu.MaybeIntCodes, idx: int, key_len: int
+    phrase_lines: PhraseLines, intcodes: cli_util.MaybeIntCodes, idx: int, key_len: int
 ) -> str:
     marker = _line_marker(idx, key_len)
-    lines  = eu.format_partial_secret_lines(phrase_lines, intcodes)
+    lines  = cli_util.format_partial_secret_lines(phrase_lines, intcodes)
 
     marked_lines = []
     l_idx        = 0
@@ -603,7 +524,7 @@ def _format_partial_secret(
 
 
 def _expand_codes_if_recoverable(
-    intcodes: eu.MaybeIntCodes, key_len: int
+    intcodes: cli_util.MaybeIntCodes, key_len: int
 ) -> typ.Optional[typ.Tuple[IntCodes, PhraseLines]]:
     if len([ic for ic in intcodes if ic]) < key_len:
         return None
@@ -614,15 +535,19 @@ def _expand_codes_if_recoverable(
 
     recoverd_intcodes = list(maybe_recoverd_intcodes)
 
-    data = eu.intcode_parts2bytes(recoverd_intcodes)
+    data = cli_util.intcode_parts2bytes(recoverd_intcodes)
 
-    recovered_phrase       = eu.bytes2phrase(data)
+    recovered_phrase       = mnemonic.bytes2phrase(data)
     recovered_phrase_lines = recovered_phrase.splitlines()
     return recoverd_intcodes, recovered_phrase_lines
 
 
 def _echo_state(
-    intcodes: eu.MaybeIntCodes, phrase_lines: PhraseLines, idx: int, key_len: int, header_text: str
+    intcodes    : cli_util.MaybeIntCodes,
+    phrase_lines: PhraseLines,
+    idx         : int,
+    key_len     : int,
+    header_text : str,
 ) -> str:
     clear()
 
@@ -637,7 +562,7 @@ def _echo_state(
     echo("    p/prev  : move to previous code/phrase")
     echo("    n/next  : move to next code/phrase")
 
-    if eu.is_completed_intcodes(intcodes):
+    if cli_util.is_completed_intcodes(intcodes):
         echo("    a/accept: accept input")
 
     echo()
@@ -645,20 +570,16 @@ def _echo_state(
     marker = _line_marker(idx, key_len)
     if idx < key_len:
         return f"Enter a command, data code or phrase {marker}"
-    elif eu.is_completed_intcodes(intcodes):
+    elif cli_util.is_completed_intcodes(intcodes):
         return f"Accept input (or continue entering update ECC {marker})"
     else:
         return f"Enter a command or ECC code for {marker}"
 
 
-def _parse_sbk_prompt(in_val):
-    pass
-
-
-def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optional[eu.IntCodes]:
+def _prompt_for_secret(header_text: str, key_len: int = 0) -> typ.Optional[cli_util.IntCodes]:
     block_len = key_len * 2
 
-    phrase_lines    : PhraseLines = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
+    phrase_lines    : PhraseLines = [cli_util.EMPTY_PHRASE_LINE] * (key_len // 2)
     intcodes        : typ.List[typ.Optional[str]] = [None] * block_len
     expanded_indexes: typ.Set[int] = set()
 
@@ -685,8 +606,8 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
         while True:
             in_val = click.prompt(prompt_msg)
             cmd    = _parse_command(in_val)
-            if cmd == 'done' and eu.is_completed_intcodes(intcodes):
-                return typ.cast(eu.IntCodes, intcodes)
+            if cmd == 'done' and cli_util.is_completed_intcodes(intcodes):
+                return typ.cast(cli_util.IntCodes, intcodes)
             elif cmd == 'cancel':
                 return None
             elif cmd == 'prev':
@@ -704,11 +625,11 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
 
             for eidx in expanded_indexes:
                 intcodes[eidx] = None
-                phrase_lines[idx] = eu.EMPTY_PHRASE_LINE
+                phrase_lines[idx] = cli_util.EMPTY_PHRASE_LINE
             expanded_indexes.clear()
 
             if idx < key_len:
-                phrase_line = eu.bytes2phrase(line_data)
+                phrase_line = mnemonic.bytes2phrase(line_data)
                 phrase_lines[idx] = phrase_line
 
             intcodes[idx] = intcode
@@ -720,11 +641,11 @@ def _sbk_prompt(header_text: str, key_len: int = DEFAULT_KEY_LEN) -> typ.Optiona
 def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
     header_text = """Step 2 of 2: Enter your "Brainkey".""" + "\n\tEnter BrainKey"
 
-    phrase_lines: typ.List[str] = [eu.EMPTY_PHRASE_LINE] * (key_len // 2)
+    phrase_lines: typ.List[str] = [cli_util.EMPTY_PHRASE_LINE] * (key_len // 2)
 
     idx = 0
 
-    while any(line == eu.EMPTY_PHRASE_LINE for line in phrase_lines):
+    while any(line == cli_util.EMPTY_PHRASE_LINE for line in phrase_lines):
         phrase_no = idx // 2
         clear()
 
@@ -736,7 +657,7 @@ def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
             echo(prefix + line)
 
         echo()
-        echo("    c/cancel: cancel brainkey input, use SBK Pieces instead")
+        echo("    c/cancel: cancel brainkey input, use SBK Shares instead")
         echo("    p/prev  : move to previous code/phrase")
         echo("    n/next  : move to next code/phrase")
         echo()
@@ -762,13 +683,13 @@ def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
 
             _intcode, line_data = res
 
-            phrase_line = eu.bytes2phrase(line_data)
+            phrase_line = mnemonic.bytes2phrase(line_data)
             phrase_lines[idx // 2] = phrase_line
             idx += 2
 
             break
 
-    return eu.phrase2bytes("\n".join(phrase_lines))
+    return mnemonic.phrase2bytes("\n".join(phrase_lines))
 
 
 @click.group()
@@ -812,54 +733,70 @@ def kdf_info(show_all: bool = False) -> None:
             echo(" ".join(parts))
 
 
+def _validate_salt_len(salt_len: int) -> None:
+    if salt_len < 1:
+        echo("Minimum value for -s/--salt-len is 1")
+        raise click.Abort()
+
+    if salt_len > 16:
+        echo("Maximum value for -s/--salt-len is 16")
+        raise click.Abort()
+
+    if salt_len % 4 != 0:
+        echo(f"Invalid value -s/--salt-len={salt_len} must be a multiple of 4")
+        raise click.Abort()
+
+
+def _validate_brainkey_len(brainkey_len: int) -> None:
+    if brainkey_len < 4:
+        echo("Input Error: Minimum value for -b/--brainkey-len is 4")
+        raise click.Abort()
+
+    if brainkey_len > 32:
+        echo("Input Error: Maximum value for -b/--brainkey-len is 32")
+        raise click.Abort()
+
+    if brainkey_len % 2 != 0:
+        echo("Input Error: Parameter -b/--brainkey-len must be a multiple of 2")
+        raise click.Abort()
+
+
 @cli.command()
+@_scheme_option
+@_salt_lvl_option
+@_brainkey_lvl_option
 @_kdf_param_id_option
-@_email_option
-@_threshold_option
-@_num_pieces_option
-@_salt_len_option
-@_key_len_option
-@_brainkey_len_option
 @_yes_all_option
-def new_key(
-    email       : str,
-    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
-    threshold   : int               = DEFAULT_THRESHOLD,
-    num_pieces  : int               = DEFAULT_NUM_PIECES,
+def create(
+    scheme      : str               = DEFAULT_SCHEME,
     salt_len    : int               = DEFAULT_SALT_LEN,
-    key_len     : int               = DEFAULT_KEY_LEN,
     brainkey_len: int               = DEFAULT_BRAINKEY_LEN,
+    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
     yes_all     : bool              = False,
 ) -> None:
-    """Generate a new key and split it to pieces."""
+    """Generate a new brainkey+salt and split them into shares."""
+    _validate_salt_len(salt_len)
+    _validate_brainkey_len(brainkey_len)
 
-    # length that use ecc must be multiples of 4
-    # round up to nearest multiple.
-    if salt_len < 8:
-        echo("Minimum value for --salt-len is 8")
-        raise click.Abort()
-
-    if key_len < 8:
-        echo("Minimum value for --key-len is 8")
-        raise click.Abort()
+    threshold, num_shares = cli_util.parse_scheme(scheme)
 
     if kdf_param_id not in params.PARAM_CONFIGS_BY_ID:
         echo(f"Invalid --kdf-param-id={kdf_param_id}")
         echo("To see available parameters use: sbk kdf-info ")
         raise click.Abort()
 
-    salt_len = (salt_len + 3) // 4 * 4
-    key_len  = (key_len  + 3) // 4 * 4
+    key_len = salt_len + brainkey_len
+    key_len = (key_len + 3) // 4 * 4
 
-    param_cfg  = params.init_params(threshold, num_pieces, kdf_param_id, key_len)
-    param_data = eu.params2bytes(param_cfg)
+    param_cfg  = params.init_params(threshold, num_shares, kdf_param_id, key_len)
+    param_data = enc_util.params2bytes(param_cfg)
 
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
     # validate encoding round trip before we use the params
-    decoded_param_cfg    = eu.bytes2params(param_data)
+    decoded_param_cfg    = enc_util.bytes2params(param_data)
     is_param_recoverable = (
         param_cfg.threshold         == decoded_param_cfg.threshold
         and param_cfg.kdf_param_id  == decoded_param_cfg.kdf_param_id
@@ -870,7 +807,6 @@ def new_key(
         raise Exception("Integrity error. Aborting to prevent use of invald salt.")
 
     hasher = hashlib.sha256()
-    hasher.update(email.encode("utf-8"))
     hasher.update(urandom(salt_len * 2))
 
     # The main reason to combine these is just so that the user
@@ -883,7 +819,7 @@ def new_key(
     yes_all or clear()
 
     echo(SALT_INFO_TITLE)
-    _show_secret("Salt", param_and_salt_data, qr=False)
+    _show_secret("Salt", param_and_salt_data)
     echo(SALT_INFO_TEXT)
     yes_all or anykey_confirm(SALT_INFO_PROMPT)
 
@@ -900,23 +836,21 @@ def new_key(
     echo("\n")
     yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
 
-    _sbk_pieces = _split_secret_key(secret_key, threshold=threshold, num_pieces=num_pieces)
-    sbk_pieces  = list(_sbk_pieces)
+    share_datas = list(_split_secret_key(secret_key, threshold=threshold, num_shares=num_shares))
 
-    # secret pieces
-    for i, sbk_piece_data in enumerate(sbk_pieces):
-        piece_no = i + 1
+    for i, share_data in enumerate(share_datas):
+        share_no = i + 1
         yes_all or clear()
-        info             = {'piece_no': piece_no, 'threshold': threshold, 'num_pieces': num_pieces}
-        sbk_piece_title  = SBK_PIECE_TITLE.format(**info).strip()
-        sbk_piece_prompt = SBK_PIECE_PROMPT.format(**info)
+        info             = {'share_no': share_no, 'threshold': threshold, 'num_shares': num_shares}
+        sbk_share_title  = SBK_SHARE_TITLE.format(**info).strip()
+        sbk_share_prompt = SBK_SHARE_PROMPT.format(**info)
 
-        echo(sbk_piece_title)
-        echo(SBK_PIECE_TEXT)
+        echo(sbk_share_title)
+        echo(SBK_SHARE_TEXT)
 
-        _show_secret(f"Secret Piece {piece_no}/{num_pieces}", sbk_piece_data)
+        _show_secret(f"Secret Share {share_no}/{num_shares}", share_data)
 
-        yes_all or anykey_confirm(sbk_piece_prompt)
+        yes_all or anykey_confirm(sbk_share_prompt)
 
     # brainkey
     yes_all or clear()
@@ -937,47 +871,81 @@ def new_key(
     yes_all or clear()
 
     if not yes_all:
-        _validate_copies(param_and_salt_data, sbk_pieces)
+        _validate_copies(param_and_salt_data, share_datas)
 
 
 def _validate_data(data: bytes, header_text: str) -> None:
     full_header_text = RECOVERY_VALIDATION_TITLE + "\n\n\t" + header_text
     data_len         = len(data)
     while True:
-        recovered_intcodes = _sbk_prompt(full_header_text, data_len)
+        recovered_intcodes = _prompt_for_secret(full_header_text, data_len)
         if recovered_intcodes is None:
             return
 
-        recovered_data = eu.intcode_parts2bytes(recovered_intcodes)
+        recovered_data = cli_util.intcode_parts2bytes(recovered_intcodes)
         if data == recovered_data:
             return
 
         anykey_confirm("Invalid input. Data mismatch.")
 
 
-def _validate_copies(salt_data: bytes, sbk_pieces: typ.Sequence[bytes]) -> None:
+def _validate_copies(salt_data: bytes, share_datas: typ.Sequence[ShareData]) -> None:
     _validate_data(salt_data, "Validate your copy of the Salt")
 
-    num_pieces = len(sbk_pieces)
+    num_shares = len(share_datas)
 
-    for i, sbk_piece_data in enumerate(sbk_pieces):
-        piece_no   = i + 1
-        title_text = f"Validate your copy of SBK Piece {piece_no}/{num_pieces}"
-        _validate_data(sbk_piece_data, title_text)
-
-
-@cli.command()
-@_key_len_option
-def recover(key_len: int = DEFAULT_KEY_LEN) -> None:
-    """Recover an SBK Piece or Salt."""
-    # length that use ecc must be multiples of 4
-    key_len = int(math.ceil(key_len / 4.0) * 4)
-    _sbk_prompt("Recovery of SBK Piece/Salt", key_len)
+    for i, share_data in enumerate(share_datas):
+        share_no   = i + 1
+        title_text = f"Validate your copy of Share {share_no}/{num_shares}"
+        _validate_data(share_data, title_text)
 
 
 @cli.command()
-@_salt_len_option
-@_brainkey_len_option
+def recover_params() -> None:
+    cli_io.prompt(cli_io.INPUT_TYPE_PARAMS, data_len=4)
+
+
+@cli.command()
+@click.option('--salt-len', type=int, help=_clean_help(SALT_LEN_OPTION_HELP))
+def recover_salt(salt_len: int = None) -> None:
+    """Recover a partially readable Salt."""
+    if salt_len is None:
+        params_data = cli_io.prompt(cli_io.INPUT_TYPE_PARAMS, data_len=4)
+        params      = enc_util.bytes2params(params_data)
+        salt_len    = params.salt_len
+
+    key_len = salt_len
+    if key_len >= 4 and key_len % 4 == 0:
+        cli_io.prompt(cli_io.INPUT_TYPE_SALT, data_len=key_len)
+    else:
+        click.echo(f"Invalid -s/--salt-len={key_len} must be divisible by 4.")
+        raise click.Abort()
+
+
+@cli.command()
+@_share_len_option
+def recover_share(share_len: int = DEFAULT_SHARE_LEN) -> None:
+    """Recover a partially readable share."""
+    key_len = share_len
+    if key_len >= 4 and key_len % 4 == 0:
+        cli_io.prompt(cli_io.INPUT_TYPE_SHARE, data_len=key_len)
+    else:
+        click.echo(f"Invalid --share-len={key_len} must be divisible by 4.")
+        raise click.Abort()
+
+
+def _join_shares(param_cfg: params.Params, share_datas: typ.List[ShareData]) -> SecretKey:
+    prime      = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
+    gf         = polynom.GF(p=prime)
+    points     = [enc_util.bytes2gfpoint(p, gf) for p in share_datas]
+    secret_int = polynom.join(len(points), points)
+    secret_key = b"\x00" + enc_util.int2bytes(secret_int)
+    return secret_key
+
+
+@cli.command()
+@_salt_lvl_option
+@_brainkey_lvl_option
 @_yes_all_option
 @_non_segwit_option
 def load_wallet(
@@ -994,14 +962,14 @@ def load_wallet(
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
     header_text   = """Enter your "Salt"."""
-    salt_intcodes = _sbk_prompt(header_text, salt_len)
+    salt_intcodes = _prompt_for_secret(header_text, salt_len)
 
     if salt_intcodes is None:
         click.echo("Salt is required")
         raise click.Abort()
 
-    salt_data = eu.intcode_parts2bytes(salt_intcodes)
-    param_cfg = eu.bytes2params(salt_data)
+    salt_data = cli_util.intcode_parts2bytes(salt_intcodes)
+    param_cfg = enc_util.bytes2params(salt_data)
 
     if brainkey_len == 0:
         brainkey_data = None
@@ -1009,24 +977,24 @@ def load_wallet(
         brainkey_data = _brainkey_prompt(brainkey_len)
 
     if brainkey_data is None:
-        sbk_pieces: typ.List[SBKPiece] = []
-        while len(sbk_pieces) < param_cfg.threshold:
-            piece_num = len(sbk_pieces) + 1
+        share_datas: typ.List[ShareData] = []
+        while len(share_datas) < param_cfg.threshold:
+            piece_num = len(share_datas) + 1
             header_text = f"""
             Enter your SBK-Piece {piece_num} of {param_cfg.threshold}.
             """.strip()
-            sbk_piece_intcodes = _sbk_prompt(header_text, param_cfg.key_len_bytes)
+            sbk_piece_intcodes = _prompt_for_secret(header_text, param_cfg.key_len_bytes)
             if sbk_piece_intcodes:
-                sbk_piece = eu.intcode_parts2bytes(sbk_piece_intcodes)
-                sbk_pieces.append(sbk_piece)
+                sbk_piece = cli_util.intcode_parts2bytes(sbk_piece_intcodes)
+                share_datas.append(sbk_piece)
 
-        secret_key = _join_sbk_pieces(param_cfg, sbk_pieces)
+        secret_key = _join_shares(param_cfg, share_datas)
     else:
         secret_key = _derive_key(brainkey_data, salt_data, label="Deriving Secret Key")
 
     seed_type = 'standard' if non_segwit else 'segwit'
 
-    int_seed    = eu.bytes2int(secret_key)
+    int_seed    = enc_util.bytes2int(secret_key)
     wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
 
     wallet_path = "/tmp/sbk_electrum_wallet"

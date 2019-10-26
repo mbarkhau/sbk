@@ -147,20 +147,20 @@ assert 6277101735386680763835789423207666416102355444464034512659 in POW2_PRIMES
 PRIMES = sorted(set(SMALL_PRIMES + POW2_PRIMES))
 
 
-def get_pow2prime_index(sbk_bits: int) -> int:
-    if sbk_bits % 8 != 0:
-        raise ValueError(f"Invalid sbk_bits={sbk_bits}, must be divisible by 8")
+def get_pow2prime_index(num_bits: int) -> int:
+    if num_bits % 8 != 0:
+        raise ValueError(f"Invalid num_bits={num_bits}, must be divisible by 8")
 
-    target_exp = sbk_bits
+    target_exp = num_bits
     for p2pp_idx, param in enumerate(POW2_PRIME_PARAMS):
         if param.exp >= target_exp:
             return p2pp_idx
 
-    raise ValueError(f"Invalid sbk_bits={sbk_bits}, no known 2**n-k primes ")
+    raise ValueError(f"Invalid num_bits={num_bits}, no known 2**n-k primes ")
 
 
-def get_pow2prime(sbk_bits: int) -> int:
-    p2pp_idx = get_pow2prime_index(sbk_bits)
+def get_pow2prime(num_bits: int) -> int:
+    p2pp_idx = get_pow2prime_index(num_bits)
     return POW2_PRIMES[p2pp_idx]
 
 

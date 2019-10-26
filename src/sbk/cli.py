@@ -10,23 +10,21 @@
 import os
 import random
 import typing as typ
-import hashlib
 import subprocess as sp
 
 import click
-import pathlib2 as pl
 import click_repl
 
 import sbk
 
+from . import gf
 from . import kdf
 from . import cli_io
 from . import params
 from . import primes
-from . import polynom
+from . import gf_poly
 from . import cli_util
 from . import enc_util
-from . import mnemonic
 from . import electrum_mnemonic
 
 # To enable pretty tracebacks:
@@ -46,17 +44,13 @@ def debug_urandom(size: int) -> bytes:
 
 
 if os.environ.get('SBK_DEBUG_RANDOM') == 'DANGER':
-    polynom._rand = random.Random(0)  # type: ignore
+    gf_poly._rand = random.Random(0)  # type: ignore
     urandom       = debug_urandom
 else:
     urandom = os.urandom
 
 
 click.disable_unicode_literals_warning = True
-
-APP_DIR          = pl.Path(click.get_app_dir("sbk"))
-PARAM_CTX        = params.get_param_ctx(APP_DIR)
-PARAM_ID_DEFAULT = PARAM_CTX.param_id_default
 
 
 def _clean_help(helmsg: str) -> str:
@@ -92,158 +86,142 @@ def anykey_confirm(message: str) -> bool:
     return False
 
 
-def _derive_key(brainkey_data: bytes, salt_data: bytes, label: str) -> bytes:
-    param_cfg = enc_util.bytes2params(salt_data)
-    eta_sec   = PARAM_CTX.est_times_by_id[param_cfg.kdf_param_id]
-    hash_len  = param_cfg.key_len_bytes - 1
+Salt      = bytes
+BrainKey  = bytes
+Share     = bytes
+MasterKey = bytes
 
-    kdf_args   = (brainkey_data, salt_data, kdf_params, hash_len)
+
+def _derive_key(
+    param_cfg: params.ParamConfig, salt: Salt, brainkey: BrainKey, label: str
+) -> MasterKey:
+    eta_sec  = params.estimate_param_cost(param_cfg.sys_info, param_cfg.kdf_params)
+    hash_len = param_cfg.master_key_len
+
+    kdf_kwargs = {
+        'salt_data'  : salt,
+        'secret_data': brainkey,
+        'kdf_params' : param_cfg.kdf_params,
+        'hash_len'   : hash_len,
+    }
+
     KDFThread  = cli_util.EvalWithProgressbar[bytes]
-    kdf_thread = KDFThread(target=kdf.derive_key, args=kdf_args)
+    kdf_thread = KDFThread(target=kdf.derive_key, kwargs=kdf_kwargs)
     kdf_thread.start_and_wait(eta_sec, label)
     hash_data = kdf_thread.retval
 
-    # NOTE: We encode the x value of a point in the first byte, and
-    #   since the key we derive (the y value) has to be smaller
-    #   than the prime with key_len * 8 - 8 bits, we set the first
-    #   byte here (the x value) to zero.
+    # NOTE: We encode the x value of a point in the first byte.
     key_data = b"\x00" + hash_data
-    assert len(key_data) == param_cfg.key_len_bytes
+    assert len(key_data) % 4 == 0
     return key_data
 
 
-MIN_TIME_SEC  = 10
-MIN_MEM_RATIO = 0.1
-
-
-SHOW_ALL_HELP = """
-Show all available KDF parameter choices.
-
-By default only shows reasonable
-choices for the current system.
-"""
-
-
 SECURITY_WARNING_TEXT = """
-The security of your system is important. Please make sure that:
+The security of your system is important. Please ensure the following:
 
- - You are the only person who can view your screen.
+ - Only you can currently view your screen.
 
- - You are running a fresh and secure installation of Linux.
+ - Your computer is not connected to any network.
 
-   Ideally you should boot from an USB Stick with a trusted
-   installation of Linux. If you generate keys using your regular
-   operating system, your keys may be leaked by a virus.
+ - Your computer is booted using a trusted installation of Linux.
 
- - You are using trusted software.
+For more information on setting up a secure air gapped system
+see: http://tiny.cc/sbk-airgap
 
-   The software you are using may be from a scammer. They may have
-   tricked you into downloading a hacked version of Linux, SBK or
-   Electrum. You should only use software from trusted sources. If
-   possible, you should verify signatures of your downloads.
-
- - You are disconnected from the network.
-
-   If your computer has a network cable, unplug it. If your computer
-   has WiFi, activate flight mode. If your computer was connected to a
-   network during startup, disconnect now and reboot. Some kinds of
-   attack depend on a network connection. If you are using insecure
-   software (despite precautions), disconnecting from any networks
-   (aka. air-gap) can sometimes prevent your keys from being leaked.
-
-For more information on setting up a secure system see:
-
-    https://www.schneier.com/blog/archives/2013/10/air_gaps.html
-    https://tiny.cc/r9wbcz
-
-    http://viccuad.me/blog/Revisited-secure-yourself-part-1-airgapped-computer-and-gpg-smartcards
-    https://tiny.cc/eo0bcz
-
+                                  █████████████████████████████████
+                                  █████████████████████████████████
+    █▀▀▀▀▀█ █▄▄▀█▄▀   █▀▀▀▀▀█     ████ ▄▄▄▄▄ █ ▀▀▄ ▀▄███ ▄▄▄▄▄ ████
+    █ ███ █   █▀▀█  ▀ █ ███ █     ████ █   █ ███ ▄▄ ██▄█ █   █ ████
+    █ ▀▀▀ █ █▀▀█  █ ▄ █ ▀▀▀ █     ████ █▄▄▄█ █ ▄▄ ██ █▀█ █▄▄▄█ ████
+    ▀▀▀▀▀▀▀ █ █▄█ █▄▀ ▀▀▀▀▀▀▀     ████▄▄▄▄▄▄▄█ █ ▀ █ ▀▄█▄▄▄▄▄▄▄████
+    ██▀ ▄▀▀▄▀██    █▄▀██▀▄ ██     ████  ▄█▀▄▄▀▄  ████ ▀▄  ▄▀█  ████
+    █▄▀▄ ▄▀▀ ▄ ▀ ▀██▄ ▄ ██▀ ▀     ████ ▀▄▀█▀▄▄█▀█▄█▄  ▀█▀█  ▄█▄████
+    ▀█▀▄ ▀▀ ▀▀ ▀█▄ ▄▀▄██   ▄█     ████▄ ▄▀█▄▄█▄▄█▄ ▀█▀▄▀  ███▀ ████
+    ▀▀█ █ ▀ ▀▀ ▄█▀██ █ █▀▀▀ ▀     ████▄▄ █ █▄█▄▄█▀ ▄  █ █ ▄▄▄█▄████
+    ▀▀ ▀▀ ▀▀█ ▄ ▀ ▄▀█▀▀▀█ ▄▀▄     ████▄▄█▄▄█▄▄ █▀█▄█▀▄ ▄▄▄ █▀▄▀████
+    █▀▀▀▀▀█ ▄▄ ▀▀ ▀▄█ ▀ █▀ ▄▀     ████ ▄▄▄▄▄ █▀▀█▄▄█▄▀ █▄█ ▄█▀▄████
+    █ ███ █  ███▄  ██▀▀███▄█      ████ █   █ ██   ▀██  ▄▄   ▀ █████
+    █ ▀▀▀ █ █▀▄▀  ▄▀██▄▄█  ▀▀     ████ █▄▄▄█ █ ▄▀▄██▀▄  ▀▀ ██▄▄████
+    ▀▀▀▀▀▀▀ ▀▀▀▀▀   ▀▀   ▀  ▀     ████▄▄▄▄▄▄▄█▄▄▄▄▄███▄▄███▄██▄████
+                                  █████████████████████████████████
+                                  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 """
 
 
 SECURITY_WARNING_PROMPT = """
-Do you believe your system is secure?
+Do you believe this system is secure?
 """
 
 
-SALT_INFO_TITLE = r'Step 1 of 5: Copy your "Salt".'
+PARAMS_TITLE = r'Step 1 of 5: Copy "Parameters"'
 
-SBK_KEYGEN_TITLE = r"Step 2 of 5: Deriving Secret Key"
+SALT_TITLE = r'Step 2 of 5: Copy your "Salt".'
 
-SBK_SHARE_TITLE = r"Step 3 of 5: Copy SBK-Share {share_no}/{num_shares}."
+BRAINKEY_TITLE = r"Step 3 of 5: Copy Brainkey."
 
-BRAINKEY_INFO_TITLE = r"Step 4 of 5: Copy Brainkey."
+SHARE_TITLE = r"Step 4 of 5: Copy Share {share_no}/{num_shares}."
 
 RECOVERY_VALIDATION_TITLE = r"Step 5 of 5: Validation"
 
+PARAMS_INFO_TEXT = """
+The "Parameters" encode values needed to recover your secrets. They are:
+
+    - The threshold of Shares required for recovery
+    - The length of the Brainkey and Salt
+    - The cost parameters for the Argon2 KDF
+"""
+
 
 SALT_INFO_TEXT = """
-The purpose of the salt is to prevent a brute-force attack. By itself
-a salt is useless, which means that it is not a big problem if the
-salt is not kept secret and an attacker gets a hold of it. That being
-said, there is no good reason to make it public either.
-
-The main risk for the salt is that it is lost. Without the salt, your
-secret key cannot be recovered. It is best to make a copy of the salt
-for each trustee. This allows your trustees to recover your secret key
-if they cannot access to your files.
-
-Write in clear and readable letters, use non-erasable ink (ideally
-archival ink). Take a picture and store the picture in your Dropbox,
-Google Drive, One Drive or other backup location.
+You will need the salt to load your wallet with your brainkey. Please
+write the salt down in clear writing and keep it in a secure location.
 
 """
 
-SALT_INFO_PROMPT = "Press enter when you have copied the salt"
+PARAMS_PROMPT = 'Press enter when you have copied the "Parameters"'
+
+SALT_PROMPT = 'Press enter when you have copied this "Salt"'
 
 SBK_KEYGEN_TEXT = r"""
-The SBK Secret Key is derived using the computationally and memory
+The Master Key is derived using the computationally and memory
 intensive Argon2 KDF (Key Derivation Function). This ensures that your
-brainkey is secure even if an attacker has access to the salt (for
-example if they are a trustee).
+brainkey is secure even if an attacker has access to the salt.
 
-    (Brainkey + Salt) -> Secret Key
+    (Salt + Brainkey) -> Master Key
 """
 
 SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue"
 
 
-SBK_SHARE_TEXT = r"""
-Hide this "Share" in a safe place or give it to one of your
-trustees. Your trustees should not only be trustworthy in the
-sense that they will act in your best interests, they should also
-be trustworthy in the sense that they are competent to keep this
-SBK Piece safe and secret.
+SHARE_INFO_TEXT = r"""
+Keep this "Share" hidden in a safe place or give it to a trustee
+for them to keep safe. A trustee must trustworthy in two senses:
+
+  1. They are trusted to not collude with others and steal from you.
+  2. They are competent to keep this "Share" safe and secure.
 """
 
 RECOVERY_TEXT = r"""
-Your "master seed" is recovered by collecting a minimum of
+Your "Master Key" is recovered by collecting a minimum of
 {threshold} shares.
 
-                 Split Master Seed
+                 Split Master Key
           Split                    . Join
                \.-> Share 1 -./
-   Master Seed -O-> Share 2  +-> Master Seed
+   Master Key  -O-> Share 2  +-> Master Key
                 '-> Share 3 -'
 
-   Master Seed + Salt -> Wallet
+   argon2_kdf(Master Key, Wallet Name) -> Wallet
 """
 
-SBK_SHARE_PROMPT = r"""
+SHARE_PROMPT = r"""
 Please make a physical copy of Share {share_no}/{num_shares}.
 """
 
 BRAINKEY_INFO_TEXT = r"""
-Your "brainkey" and "salt" are combined to produce your "master seed".
-Your master seed in turn is combined with your salt to recover your
-"wallet".
-
-    Brainkey + Salt -> Master Seed
-    Master Seed + Salt -> Wallet
-
-Put more simply, as long as you can remember your brainkey, and as
-long as you have access to your salt, you will be able to recover your
+Your "Brainkey" and "Salt" are combined to produce your "Master Key".
+As long as you can remember your "Brainkey", and as
+long as you have access to your "Salt", you will be able to recover your
 wallet.
 
 If you forget your brainkey, it will be lost forever. So, you should
@@ -253,7 +231,7 @@ If you forget your brainkey, it will be lost forever. So, you should
  - never tell it to anybody ever!
 """
 
-# Secret Key + Salt -> Wallet
+# Salt + Brainkey + Wallet Name -> Wallet
 
 BRAINKEY_LAST_CHANCE_WARNING_TEXT = """
 This is the last time your brainkey will be shown.
@@ -268,15 +246,21 @@ If you do not yet feel confident in your memory:
 Press enter to hide your brainkey and to continue
 """
 
-KDF_PARAM_ID_HELP = "KDF difficulty selection. Use 'sbk kdf-info' to see valid options"
+KDF_PARALLELISM_HELP = "Argon2 KDF Parallelism (Number of threads)"
+KDF_MEMORY_COST_HELP = "Argon2 KDF Memory Cost (MB)"
+KDF_TIME_COST_HELP   = "Argon2 KDF Time Cost (iterations)"
 
-_kdf_param_id_option = click.option(
-    '-p', '--kdf-param-id', default=PARAM_ID_DEFAULT, type=int, help=_clean_help(KDF_PARAM_ID_HELP)
-)
 
-DEFAULT_THRESHOLD = 3
+_kdf_parallelism_option = click.option('-p', '--parallelism', type=int, help=KDF_PARALLELISM_HELP)
 
-DEFAULT_NUM_SHARES = 5
+_kdf_memory_cost_option = click.option('-m', '--memory-cost', type=int, help=KDF_MEMORY_COST_HELP)
+
+_kdf_time_cost_option = click.option('-t', '--time-cost', type=int, help=KDF_TIME_COST_HELP)
+
+
+DEFAULT_THRESHOLD = 2
+
+DEFAULT_NUM_SHARES = 3
 
 DEFAULT_SCHEME = f"{DEFAULT_THRESHOLD}of{DEFAULT_NUM_SHARES}"
 
@@ -292,17 +276,6 @@ _scheme_option = click.option(
     help=_clean_help(SCHEME_OPTION_HELP),
 )
 
-THRESHOLD_OPTION_HELP = "Number of shares required to recover the key"
-
-
-_threshold_option = click.option(
-    '-t',
-    '--threshold',
-    type=int,
-    default=DEFAULT_THRESHOLD,
-    show_default=True,
-    help=_clean_help(THRESHOLD_OPTION_HELP),
-)
 
 NUM_SHARES_OPTION_HELP = "Number of shares generate"
 
@@ -317,9 +290,9 @@ _num_shares_option = click.option(
 
 BRAINKEY_LEN_OPTION_HELP = "Length of the Brainkey (in words/bytes)"
 
-DEFAULT_BRAINKEY_LEN = 4
+DEFAULT_BRAINKEY_LEN = 8
 
-_brainkey_lvl_option = click.option(
+_brainkey_len_option = click.option(
     '-b',
     '--brainkey-len',
     type=int,
@@ -331,9 +304,9 @@ _brainkey_lvl_option = click.option(
 
 SALT_LEN_OPTION_HELP = "Length of the Salt (in words/bytes)"
 
-DEFAULT_SALT_LEN = 10
+DEFAULT_SALT_LEN = 20
 
-_salt_lvl_option = click.option(
+_salt_len_option = click.option(
     '-s',
     '--salt-len',
     type=int,
@@ -342,9 +315,12 @@ _salt_lvl_option = click.option(
     help=_clean_help(SALT_LEN_OPTION_HELP),
 )
 
+
 SHARE_LEN_OPTION_HELP = "Length of the share (in words/bytes) "
 
-DEFAULT_SHARE_LEN = (DEFAULT_BRAINKEY_LEN + DEFAULT_SALT_LEN) * 2
+SHARE_PADDING = 4
+
+DEFAULT_SHARE_LEN = DEFAULT_SALT_LEN + DEFAULT_BRAINKEY_LEN + SHARE_PADDING
 
 _share_len_option = click.option(
     '--share-len',
@@ -369,327 +345,29 @@ _non_segwit_option = click.option(
 )
 
 
-def _show_secret(label: str, data: bytes, codes: bool = True) -> None:
-    if codes:
-        assert len(data) % 4 == 0, len(data)
-        output_lines = list(cli_util.format_secret_lines(data))
-    else:
-        output_lines = list(mnemonic.bytes2phrase(data).splitlines())
+def _show_secret(label: str, data: bytes, data_type: str) -> None:
+    output_lines = cli_io.format_secret_lines(data_type, data)
 
     len_padding = max(map(len, output_lines))
 
     echo(f"{label:^{len_padding}}")
+    echo()
     echo("\n".join(output_lines) + "\n\n")
 
 
-SecretKey = bytes
-ShareData = bytes
+def _split_into_shares(
+    param_cfg: params.ParamConfig, salt: Salt, brainkey: BrainKey, threshold: int, num_shares: int,
+) -> typ.Iterable[Share]:
+    master_key = salt + brainkey
+    secret_int = enc_util.bytes2int(master_key)
 
-
-def _split_secret_key(
-    secret_key: SecretKey, threshold: int, num_shares: int
-) -> typ.Iterable[ShareData]:
-    key_len = len(secret_key)
-    assert secret_key[:1] == b"\x00"
-    secret_int = enc_util.bytes2int(secret_key[1:])
-
-    key_bits  = (key_len - 1) * 8
-    prime     = primes.get_pow2prime(key_bits)
-    gf_points = polynom.split(
-        prime=prime, threshold=threshold, num_shares=num_shares, secret=secret_int
+    gfpoints = gf_poly.split(
+        prime=param_cfg.prime, threshold=threshold, num_shares=num_shares, secret=secret_int
     )
-    for gfpoint in gf_points:
+    for gfpoint in gfpoints:
         share_data = enc_util.gfpoint2bytes(gfpoint)
-        assert len(share_data) == key_len, len(share_data)
+        assert len(share_data) == param_cfg.share_len, len(share_data)
         yield share_data
-
-
-def _parse_command(in_val: str) -> typ.Optional[str]:
-    in_val  = in_val.strip().lower()
-    is_done = in_val in ('y', 'yes', 'd', 'done', 'a', 'accept')
-    if is_done:
-        return 'done'
-    elif in_val in ('c', 'cancel', 'e', 'exit'):
-        return 'cancel'
-    elif in_val in ('p', 'prev'):
-        return 'prev'
-    elif in_val in ('n', 'next'):
-        return 'next'
-    else:
-        return None
-
-
-def _parse_input(idx: int, in_val: str) -> typ.Optional[typ.Tuple[str, bytes]]:
-    maybe_code = in_val.replace(" ", "").replace("-", "")
-    if maybe_code.isdigit():
-        if len(maybe_code) < 6:
-            echo("Invalid code. Missing digits.")
-            return None
-
-        if len(maybe_code) > 6:
-            echo("Invalid code. Too many digits.")
-            return None
-
-        try:
-            phrases = cli_util.intcodes2phrases([maybe_code], idx)
-        except ValueError as err:
-            echo(*err.args)
-            echo(" Type 'skip' if you cannot read the code")
-            return None
-
-        line_data = b"".join(phrases)
-    else:
-        try:
-            words = list(mnemonic.phrase2words(in_val))
-        except ValueError as err:
-            echo(f"Invalid Input: {err.args[1]}")
-            return None
-
-        if len(words) < 4:
-            echo(f"Invalid Phrase. Missing words (expected 4)")
-            return None
-
-        if len(words) > 4:
-            echo(f"Invalid Phrase. Too many words (expected 4)")
-            return None
-
-        line_data = mnemonic.phrase2bytes(" ".join(words))
-
-    intcodes = list(cli_util.bytes2intcode_parts(line_data, idx))
-    assert len(intcodes) == 1
-    intcode = intcodes[0]
-
-    return intcode, line_data
-
-
-MaybeIntCodes = typ.List[typ.Optional[cli_util.IntCode]]
-
-
-def _recover_full_data(intcodes: cli_util.MaybeIntCodes) -> typ.Optional[cli_util.IntCodes]:
-    try:
-        recovered_data = cli_util.intcode_parts2bytes(intcodes)
-    except Exception:
-        return None
-
-    # abort if any recovered codes disagree with the input
-    recovered_intcodes = cli_util.bytes2intcodes(recovered_data)
-    if not all(recovered_intcodes):
-        return None
-
-    assert len(recovered_intcodes) == len(intcodes)
-
-    for i, intcode in enumerate(intcodes):
-        if intcode and intcode != recovered_intcodes[i]:
-            return None
-
-    return recovered_intcodes
-
-
-def _line_marker(idx: int, key_len: int) -> str:
-    marker_mod  = key_len // 4
-    marker_char = "ABCD"[(idx // 2) // marker_mod]
-    marker_id   = (idx // 2) % marker_mod
-    return f"{marker_char}{marker_id}"
-
-
-IntCodes    = typ.List[cli_util.IntCode]
-PhraseLines = typ.List[str]
-
-
-def _format_partial_secret(
-    phrase_lines: PhraseLines, intcodes: cli_util.MaybeIntCodes, idx: int, key_len: int
-) -> str:
-    marker = _line_marker(idx, key_len)
-    lines  = cli_util.format_partial_secret_lines(phrase_lines, intcodes)
-
-    marked_lines = []
-    l_idx        = 0
-    for line in lines:
-        if "at the" in line:
-            if line.startswith(marker):
-                marked_line = "=> " + line
-            else:
-                marked_line = "   " + line
-
-            if idx >= key_len and idx % key_len == l_idx:
-                marked_line += " <="
-
-            l_idx += 2
-        else:
-            marked_line = ("   " + line).strip()
-
-        marked_lines.append(marked_line)
-
-    return "\n".join(marked_lines)
-
-
-def _expand_codes_if_recoverable(
-    intcodes: cli_util.MaybeIntCodes, key_len: int
-) -> typ.Optional[typ.Tuple[IntCodes, PhraseLines]]:
-    if len([ic for ic in intcodes if ic]) < key_len:
-        return None
-
-    maybe_recoverd_intcodes = _recover_full_data(intcodes)
-    if maybe_recoverd_intcodes is None:
-        return None
-
-    recoverd_intcodes = list(maybe_recoverd_intcodes)
-
-    data = cli_util.intcode_parts2bytes(recoverd_intcodes)
-
-    recovered_phrase       = mnemonic.bytes2phrase(data)
-    recovered_phrase_lines = recovered_phrase.splitlines()
-    return recoverd_intcodes, recovered_phrase_lines
-
-
-def _echo_state(
-    intcodes    : cli_util.MaybeIntCodes,
-    phrase_lines: PhraseLines,
-    idx         : int,
-    key_len     : int,
-    header_text : str,
-) -> str:
-    clear()
-
-    echo(header_text)
-
-    echo()
-    echo(_format_partial_secret(phrase_lines, intcodes, idx, key_len))
-    echo()
-    echo("Available commands:")
-    echo()
-    echo("    c/cancel: cancel recovery")
-    echo("    p/prev  : move to previous code/phrase")
-    echo("    n/next  : move to next code/phrase")
-
-    if cli_util.is_completed_intcodes(intcodes):
-        echo("    a/accept: accept input")
-
-    echo()
-
-    marker = _line_marker(idx, key_len)
-    if idx < key_len:
-        return f"Enter a command, data code or phrase {marker}"
-    elif cli_util.is_completed_intcodes(intcodes):
-        return f"Accept input (or continue entering update ECC {marker})"
-    else:
-        return f"Enter a command or ECC code for {marker}"
-
-
-def _prompt_for_secret(header_text: str, key_len: int = 0) -> typ.Optional[cli_util.IntCodes]:
-    block_len = key_len * 2
-
-    phrase_lines    : PhraseLines = [cli_util.EMPTY_PHRASE_LINE] * (key_len // 2)
-    intcodes        : typ.List[typ.Optional[str]] = [None] * block_len
-    expanded_indexes: typ.Set[int] = set()
-
-    idx           = 0
-    prev_intcodes = list(intcodes)
-
-    while True:
-        if prev_intcodes != intcodes:
-            expanded = _expand_codes_if_recoverable(intcodes, key_len)
-            if expanded:
-                exp_intcodes, exp_phrase_lines = expanded
-
-                expanded_indexes = {
-                    i for i, (a, b) in enumerate(zip(intcodes, exp_intcodes)) if a != b
-                }
-
-                intcodes     = list(exp_intcodes)
-                phrase_lines = exp_phrase_lines
-
-        prev_intcodes = list(intcodes)
-
-        prompt_msg = _echo_state(intcodes, phrase_lines, idx, key_len, header_text)
-
-        while True:
-            in_val = click.prompt(prompt_msg)
-            cmd    = _parse_command(in_val)
-            if cmd == 'done' and cli_util.is_completed_intcodes(intcodes):
-                return typ.cast(cli_util.IntCodes, intcodes)
-            elif cmd == 'cancel':
-                return None
-            elif cmd == 'prev':
-                idx = max(0, idx - 1)
-                break
-            elif cmd == 'next':
-                idx = min(key_len - 1, idx + 1)
-                break
-
-            res = _parse_input(idx, in_val)
-            if res is None:
-                continue
-
-            intcode, line_data = res
-
-            for eidx in expanded_indexes:
-                intcodes[eidx] = None
-                phrase_lines[idx] = cli_util.EMPTY_PHRASE_LINE
-            expanded_indexes.clear()
-
-            if idx < key_len:
-                phrase_line = mnemonic.bytes2phrase(line_data)
-                phrase_lines[idx] = phrase_line
-
-            intcodes[idx] = intcode
-            idx += 1
-
-            break
-
-
-def _brainkey_prompt(key_len: int) -> typ.Optional[bytes]:
-    header_text = """Step 2 of 2: Enter your "Brainkey".""" + "\n\tEnter BrainKey"
-
-    phrase_lines: typ.List[str] = [cli_util.EMPTY_PHRASE_LINE] * (key_len // 2)
-
-    idx = 0
-
-    while any(line == cli_util.EMPTY_PHRASE_LINE for line in phrase_lines):
-        phrase_no = idx // 2
-        clear()
-
-        echo(header_text)
-        echo()
-
-        for i, line in enumerate(phrase_lines):
-            prefix = "=> " if i == phrase_no else "   "
-            echo(prefix + line)
-
-        echo()
-        echo("    c/cancel: cancel brainkey input, use SBK Shares instead")
-        echo("    p/prev  : move to previous code/phrase")
-        echo("    n/next  : move to next code/phrase")
-        echo()
-
-        prompt_msg = f"Enter phrase {(phrase_no) + 1}"
-
-        while True:
-            in_val = click.prompt(prompt_msg)
-
-            cmd = _parse_command(in_val)
-            if cmd == 'cancel':
-                return None
-            elif cmd == 'prev':
-                idx = max(0, idx - 2)
-                break
-            elif cmd == 'next':
-                idx = min(key_len * 2 - 2, idx + 2)
-                break
-
-            res = _parse_input(idx, in_val)
-            if res is None:
-                continue
-
-            _intcode, line_data = res
-
-            phrase_line = mnemonic.bytes2phrase(line_data)
-            phrase_lines[idx // 2] = phrase_line
-            idx += 2
-
-            break
-
-    return mnemonic.phrase2bytes("\n".join(phrase_lines))
 
 
 @click.group()
@@ -705,41 +383,76 @@ def version() -> None:
 
 
 @cli.command()
-@click.option('-a', '--show-all', is_flag=True, default=False, help=_clean_help(SHOW_ALL_HELP))
-def kdf_info(show_all: bool = False) -> None:
+@_kdf_parallelism_option
+@_kdf_memory_cost_option
+@_kdf_time_cost_option
+def kdf_info(
+    parallelism: typ.Optional[params.NumThreads] = None,
+    memory_cost: typ.Optional[params.MebiBytes ] = None,
+    time_cost  : typ.Optional[params.Iterations] = None,
+) -> None:
     """Show info for each available parameter config."""
-    min_mem_kb = PARAM_CTX.sys_info.total_kb * MIN_MEM_RATIO
+    sys_info   = params.load_sys_info()
+    kdf_params = params.get_default_params(sys_info)
+    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
 
-    echo("Id  Mem[MB]  Iters  ~Time[Sec]  Algorithm")
-    for kdf_param_id, config in PARAM_CTX.avail_configs.items():
-        eta_sec        = round(PARAM_CTX.est_times_by_id[kdf_param_id], 1)
-        memory_cost    = config['memory_cost']
-        memory_cost_mb = int(memory_cost / 1024)
-        time_cost      = config['time_cost']
-        parts          = [
-            f"{kdf_param_id:<3}",
-            f"{memory_cost_mb:7}",
-            f"{time_cost:6}",
-            f"{eta_sec:11}",
-            f"  argon2id",
-        ]
+    echo("Estimated durations for KDF parameter choices")
+    echo()
 
-        if kdf_param_id == PARAM_ID_DEFAULT:
-            parts += ["<- default"]
+    high_m = kdf_params.m
+    high_t = kdf_params.t * 5
+    m      = high_m
 
-        is_visible = memory_cost > min_mem_kb and eta_sec > MIN_TIME_SEC
+    for _ in range(3):
+        t = high_t
+        for _ in range(9):
+            t = int(t / 1.5)
 
-        if is_visible or show_all or kdf_param_id == PARAM_CTX.param_id_default:
-            echo(" ".join(parts))
+            test_params = kdf_params._replace_any(m=int(m), t=int(t))
+
+            suffix = "<- default" if test_params == kdf_params else ""
+            prefix = f"-p={test_params.p:<3} -m={test_params.m:<5} -t={test_params.t:<4}"
+
+            eta = params.estimate_param_cost(sys_info, test_params)
+            echo(f"   {prefix} : {round(eta):>4} sec {suffix}")
+        m = int(m / 1.5)
+    return
+
+
+@cli.command()
+@_kdf_parallelism_option
+@_kdf_memory_cost_option
+@_kdf_time_cost_option
+def kdf_test(
+    parallelism: typ.Optional[params.NumThreads] = None,
+    memory_cost: typ.Optional[params.MebiBytes ] = None,
+    time_cost  : typ.Optional[params.Iterations] = None,
+) -> None:
+    sys_info   = params.load_sys_info()
+    kdf_params = params.get_default_params(sys_info)
+    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
+    params_str = f"-p={kdf_params.p:<3} -m={kdf_params.m:<5} -t={kdf_params.t:<4}"
+
+    echo()
+    echo(f"Parameters after rounding: {params_str}")
+    echo()
+
+    eta = params.estimate_param_cost(sys_info, kdf_params)
+    echo(f"Estimated duration: {round(eta):>4} sec")
+    MeasurementThread  = cli_util.EvalWithProgressbar[params.Measurement]
+    measurement_thread = MeasurementThread(target=params.measure, args=(kdf_params,))
+    measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
+    measurement = measurement_thread.retval
+    echo(f"Actual auration   : {round(measurement.duration):>4} sec")
 
 
 def _validate_salt_len(salt_len: int) -> None:
-    if salt_len < 1:
-        echo("Minimum value for -s/--salt-len is 1")
+    if salt_len < 4:
+        echo("Minimum value for -s/--salt-len is 4")
         raise click.Abort()
 
-    if salt_len > 16:
-        echo("Maximum value for -s/--salt-len is 16")
+    if salt_len > 60:
+        echo("Maximum value for -s/--salt-len is 60")
         raise click.Abort()
 
     if salt_len % 4 != 0:
@@ -748,12 +461,12 @@ def _validate_salt_len(salt_len: int) -> None:
 
 
 def _validate_brainkey_len(brainkey_len: int) -> None:
-    if brainkey_len < 4:
-        echo("Input Error: Minimum value for -b/--brainkey-len is 4")
+    if brainkey_len < 2:
+        echo("Input Error: Minimum value for -b/--brainkey-len is 2")
         raise click.Abort()
 
-    if brainkey_len > 32:
-        echo("Input Error: Maximum value for -b/--brainkey-len is 32")
+    if brainkey_len > 30:
+        echo("Input Error: Maximum value for -b/--brainkey-len is 30")
         raise click.Abort()
 
     if brainkey_len % 2 != 0:
@@ -761,148 +474,174 @@ def _validate_brainkey_len(brainkey_len: int) -> None:
         raise click.Abort()
 
 
-@cli.command()
-@_scheme_option
-@_salt_lvl_option
-@_brainkey_lvl_option
-@_kdf_param_id_option
-@_yes_all_option
-def create(
-    scheme      : str               = DEFAULT_SCHEME,
-    salt_len    : int               = DEFAULT_SALT_LEN,
-    brainkey_len: int               = DEFAULT_BRAINKEY_LEN,
-    kdf_param_id: params.KDFParamId = PARAM_ID_DEFAULT,
-    yes_all     : bool              = False,
-) -> None:
-    """Generate a new brainkey+salt and split them into shares."""
-    _validate_salt_len(salt_len)
-    _validate_brainkey_len(brainkey_len)
+def _validate_data(data_type: str, data: bytes, header_text: str) -> None:
+    full_header_text = RECOVERY_VALIDATION_TITLE + "\n\n\t" + header_text
+    while True:
+        recovered_data = cli_io.prompt(data_type, len(data), full_header_text)
+        if data == recovered_data:
+            return
+        else:
+            anykey_confirm("Invalid input. Data mismatch.")
 
-    threshold, num_shares = cli_util.parse_scheme(scheme)
 
-    if kdf_param_id not in params.PARAM_CONFIGS_BY_ID:
-        echo(f"Invalid --kdf-param-id={kdf_param_id}")
-        echo("To see available parameters use: sbk kdf-info ")
-        raise click.Abort()
+def _validate_copies(
+    param_cfg: params.ParamConfig, salt: Salt, brainkey: BrainKey, shares: typ.Sequence[Share]
+) -> bool:
+    param_cfg_data = params.param_cfg2bytes(param_cfg)
+    title_text     = 'Validate your copy of the "Parameters"'
+    _validate_data(cli_io.DATA_TYPE_PARAM_CFG, param_cfg_data, title_text)
 
-    key_len = salt_len + brainkey_len
-    key_len = (key_len + 3) // 4 * 4
+    title_text = 'Validate your copy of the "Salt"'
+    _validate_data(cli_io.DATA_TYPE_SALT, salt, title_text)
 
-    param_cfg  = params.init_params(threshold, num_shares, kdf_param_id, key_len)
-    param_data = enc_util.params2bytes(param_cfg)
+    title_text = 'Validate your memorized "Brainkey"'
+    _validate_data(cli_io.DATA_TYPE_BRAINKEY, brainkey, title_text)
 
-    yes_all or clear()
-    yes_all or echo(SECURITY_WARNING_TEXT)
-    yes_all or confirm(SECURITY_WARNING_PROMPT)
+    title_text = 'Validate your copy of the "Salt"'
+    _validate_data(cli_io.DATA_TYPE_SALT, salt, title_text)
 
-    # validate encoding round trip before we use the params
-    decoded_param_cfg    = enc_util.bytes2params(param_data)
+    for i, share_data in enumerate(shares):
+        share_no   = i + 1
+        title_text = f"Validate your copy of Share {share_no}/{len(shares)}"
+        _validate_data(cli_io.DATA_TYPE_SHARE, share_data, title_text)
+
+    return True
+
+
+def _validate_params(param_cfg: params.ParamConfig, param_cfg_data: bytes) -> None:
+    # validate encoding round trip before we use param_cfg
+    decoded_param_cfg    = params.bytes2param_cfg(param_cfg_data, param_cfg.sys_info)
     is_param_recoverable = (
-        param_cfg.threshold         == decoded_param_cfg.threshold
-        and param_cfg.kdf_param_id  == decoded_param_cfg.kdf_param_id
-        and param_cfg.key_len_bytes == decoded_param_cfg.key_len_bytes
+        param_cfg.threshold        == decoded_param_cfg.threshold
+        and param_cfg.version      == decoded_param_cfg.version
+        and param_cfg.kdf_params   == decoded_param_cfg.kdf_params
+        and param_cfg.brainkey_len == decoded_param_cfg.brainkey_len
+        and param_cfg.salt_len     == decoded_param_cfg.salt_len
     )
 
     if not is_param_recoverable:
         raise Exception("Integrity error. Aborting to prevent use of invald salt.")
 
-    hasher = hashlib.sha256()
-    hasher.update(urandom(salt_len * 2))
 
-    # The main reason to combine these is just so that the user
-    # has one less thing to know about. They always need both
-    # the seed and the original parameters, so we just combine
-    # them so they are always together.
-    param_and_salt_data = (param_data + hasher.digest())[:salt_len]
+def _show_created_data(
+    yes_all  : bool,
+    param_cfg: params.ParamConfig,
+    salt     : Salt,
+    brainkey : BrainKey,
+    shares   : typ.List[Share],
+) -> None:
+    param_cfg_data = params.param_cfg2bytes(param_cfg)
+    _validate_params(param_cfg, param_cfg_data)
 
-    # salt
+    yes_all or clear()
+    yes_all or echo(SECURITY_WARNING_TEXT)
+    yes_all or confirm(SECURITY_WARNING_PROMPT)
+
+    yes_all or clear()
+    echo(PARAMS_TITLE)
+    echo()
+    echo(PARAMS_INFO_TEXT)
+    echo()
+
+    _show_secret("Parameters", param_cfg_data, cli_io.DATA_TYPE_PARAM_CFG)
+
+    yes_all or anykey_confirm(PARAMS_PROMPT)
+
+    # Salt
     yes_all or clear()
 
-    echo(SALT_INFO_TITLE)
-    _show_secret("Salt", param_and_salt_data)
+    echo(SALT_TITLE)
+    echo()
+
     echo(SALT_INFO_TEXT)
-    yes_all or anykey_confirm(SALT_INFO_PROMPT)
 
-    hasher.update(urandom(brainkey_len))
-    brainkey_data = hasher.digest()[:brainkey_len]
+    _show_secret("Salt", salt, cli_io.DATA_TYPE_SALT)
 
+    yes_all or anykey_confirm(SALT_PROMPT)
+
+    # Brainkey
     yes_all or clear()
-    yes_all or echo(SBK_KEYGEN_TITLE.strip())
-    yes_all or echo(SBK_KEYGEN_TEXT)
-
-    secret_key = _derive_key(brainkey_data, param_and_salt_data, label="Deriving Secret Key")
-    assert len(secret_key) % 4 == 0, len(secret_key)
-
-    echo("\n")
-    yes_all or anykey_confirm(SBK_KEYGEN_PROMPT)
-
-    share_datas = list(_split_secret_key(secret_key, threshold=threshold, num_shares=num_shares))
-
-    for i, share_data in enumerate(share_datas):
-        share_no = i + 1
-        yes_all or clear()
-        info             = {'share_no': share_no, 'threshold': threshold, 'num_shares': num_shares}
-        sbk_share_title  = SBK_SHARE_TITLE.format(**info).strip()
-        sbk_share_prompt = SBK_SHARE_PROMPT.format(**info)
-
-        echo(sbk_share_title)
-        echo(SBK_SHARE_TEXT)
-
-        _show_secret(f"Secret Share {share_no}/{num_shares}", share_data)
-
-        yes_all or anykey_confirm(sbk_share_prompt)
-
-    # brainkey
-    yes_all or clear()
-    echo(BRAINKEY_INFO_TITLE.strip())
+    echo(BRAINKEY_TITLE.strip())
     echo(BRAINKEY_INFO_TEXT)
 
     yes_all or anykey_confirm("Press enter to show your brainkey")
 
     echo()
 
-    _show_secret("Brainkey", brainkey_data, codes=False)
+    _show_secret("Brainkey", brainkey, cli_io.DATA_TYPE_BRAINKEY)
 
     yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT)
-    yes_all or clear()
 
-    # wallet seed
+    # Shares
+    for i, share_data in enumerate(shares):
+        share_no = i + 1
+        yes_all or clear()
+        info = {
+            'share_no'  : share_no,
+            'threshold' : param_cfg.threshold,
+            'num_shares': param_cfg.num_shares,
+        }
+        share_title = SHARE_TITLE.format(**info).strip()
+        echo(share_title)
+        echo(SHARE_INFO_TEXT)
 
-    yes_all or clear()
+        label = f"Secret Share {share_no}/{param_cfg.num_shares}"
+        _show_secret(label, share_data, cli_io.DATA_TYPE_SALT)
 
-    if not yes_all:
-        _validate_copies(param_and_salt_data, share_datas)
-
-
-def _validate_data(data: bytes, header_text: str) -> None:
-    full_header_text = RECOVERY_VALIDATION_TITLE + "\n\n\t" + header_text
-    data_len         = len(data)
-    while True:
-        recovered_intcodes = _prompt_for_secret(full_header_text, data_len)
-        if recovered_intcodes is None:
-            return
-
-        recovered_data = cli_util.intcode_parts2bytes(recovered_intcodes)
-        if data == recovered_data:
-            return
-
-        anykey_confirm("Invalid input. Data mismatch.")
+        share_prompt = SHARE_PROMPT.format(**info)
+        yes_all or anykey_confirm(share_prompt)
 
 
-def _validate_copies(salt_data: bytes, share_datas: typ.Sequence[ShareData]) -> None:
-    _validate_data(salt_data, "Validate your copy of the Salt")
+@cli.command()
+@_scheme_option
+@_salt_len_option
+@_brainkey_len_option
+@_yes_all_option
+@_kdf_parallelism_option
+@_kdf_memory_cost_option
+@_kdf_time_cost_option
+def create(
+    scheme      : str  = DEFAULT_SCHEME,
+    salt_len    : int  = DEFAULT_SALT_LEN,
+    brainkey_len: int  = DEFAULT_BRAINKEY_LEN,
+    yes_all     : bool = False,
+    parallelism : typ.Optional[params.NumThreads] = None,
+    memory_cost : typ.Optional[params.MebiBytes ] = None,
+    time_cost   : typ.Optional[params.Iterations] = None,
+) -> None:
+    """Generate a new salt, brainkey and shares."""
+    _validate_salt_len(salt_len)
+    _validate_brainkey_len(brainkey_len)
 
-    num_shares = len(share_datas)
+    threshold, num_shares = cli_util.parse_scheme(scheme)
 
-    for i, share_data in enumerate(share_datas):
-        share_no   = i + 1
-        title_text = f"Validate your copy of Share {share_no}/{num_shares}"
-        _validate_data(share_data, title_text)
+    param_cfg = params.init_param_config(
+        salt_len, brainkey_len, threshold, num_shares, parallelism, memory_cost, time_cost,
+    )
+
+    assert param_cfg.threshold  == threshold
+    assert param_cfg.num_shares == num_shares
+
+    salt     = urandom(param_cfg.salt_len)
+    brainkey = urandom(param_cfg.brainkey_len)
+
+    shares = list(
+        _split_into_shares(param_cfg, salt, brainkey, threshold=threshold, num_shares=num_shares)
+    )
+
+    recoverd_salt, recovered_brainkey = _join_shares(param_cfg, shares)
+
+    assert recoverd_salt      == salt
+    assert recovered_brainkey == brainkey
+
+    _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
+
+    yes_all or _validate_copies(param_cfg, salt, brainkey, shares)
 
 
 @cli.command()
 def recover_params() -> None:
-    cli_io.prompt(cli_io.INPUT_TYPE_PARAMS, data_len=4)
+    cli_io.prompt(cli_io.DATA_TYPE_PARAM_CFG, data_len=4)
 
 
 @cli.command()
@@ -910,13 +649,13 @@ def recover_params() -> None:
 def recover_salt(salt_len: int = None) -> None:
     """Recover a partially readable Salt."""
     if salt_len is None:
-        params_data = cli_io.prompt(cli_io.INPUT_TYPE_PARAMS, data_len=4)
-        params      = enc_util.bytes2params(params_data)
-        salt_len    = params.salt_len
+        param_cfg_data = cli_io.prompt(cli_io.DATA_TYPE_PARAM_CFG, data_len=4)
+        param_cfg      = params.bytes2param_cfg(param_cfg_data)
+        salt_len       = param_cfg.salt_len
 
     key_len = salt_len
     if key_len >= 4 and key_len % 4 == 0:
-        cli_io.prompt(cli_io.INPUT_TYPE_SALT, data_len=key_len)
+        cli_io.prompt(cli_io.DATA_TYPE_SALT, data_len=key_len)
     else:
         click.echo(f"Invalid -s/--salt-len={key_len} must be divisible by 4.")
         raise click.Abort()
@@ -928,73 +667,86 @@ def recover_share(share_len: int = DEFAULT_SHARE_LEN) -> None:
     """Recover a partially readable share."""
     key_len = share_len
     if key_len >= 4 and key_len % 4 == 0:
-        cli_io.prompt(cli_io.INPUT_TYPE_SHARE, data_len=key_len)
+        cli_io.prompt(cli_io.DATA_TYPE_SHARE, data_len=key_len)
     else:
         click.echo(f"Invalid --share-len={key_len} must be divisible by 4.")
         raise click.Abort()
 
 
-def _join_shares(param_cfg: params.Params, share_datas: typ.List[ShareData]) -> SecretKey:
-    prime      = primes.POW2_PRIMES[param_cfg.pow2prime_idx]
-    gf         = polynom.GF(p=prime)
-    points     = [enc_util.bytes2gfpoint(p, gf) for p in share_datas]
-    secret_int = polynom.join(len(points), points)
-    secret_key = b"\x00" + enc_util.int2bytes(secret_int)
-    return secret_key
+def _join_shares(
+    param_cfg: params.ParamConfig, shares: typ.List[Share]
+) -> typ.Tuple[Salt, BrainKey]:
+    field  = gf.GFNum.field(order=param_cfg.prime)
+    points = [enc_util.bytes2gfpoint(p, field) for p in shares]
+
+    secret_int = gf_poly.join(param_cfg.threshold, points)
+    master_key = enc_util.int2bytes(secret_int)
+
+    assert len(master_key) == param_cfg.master_key_len
+
+    salt_end = param_cfg.salt_len
+    bk_start = param_cfg.salt_len
+
+    salt     = master_key[:salt_end]
+    brainkey = master_key[bk_start:]
+
+    assert len(salt    ) == param_cfg.salt_len
+    assert len(brainkey) == param_cfg.brainkey_len
+    return (salt, brainkey)
 
 
 @cli.command()
-@_salt_lvl_option
-@_brainkey_lvl_option
+@_yes_all_option
+def join_shares() -> None:
+    """Recover BrainKey and Salt by combining Shares."""
+    header_text    = "Enter Parameters"
+    param_cfg_data = cli_io.prompt(cli_io.DATA_TYPE_PARAM_CFG, 4, header_text)
+    param_cfg      = params.bytes2param_cfg(param_cfg_data)
+
+    shares: typ.List[Share] = []
+    while len(shares) < param_cfg.threshold:
+        share_num   = len(shares) + 1
+        header_text = f"Enter Share {share_num} of {param_cfg.threshold}."
+        share       = cli_io.prompt(cli_io.DATA_TYPE_SHARE, param_cfg.share_len, header_text)
+        shares.append(share)
+
+    salt, brainkey = _join_shares(param_cfg, shares)
+    salt_lines     = cli_io.format_secret_lines(cli_io.DATA_TYPE_SALT    , salt)
+    brainkey_lines = cli_io.format_secret_lines(cli_io.DATA_TYPE_BRAINKEY, brainkey)
+
+    clear()
+
+    echo("Salt")
+    echo("\n".join(salt_lines))
+
+    echo("Brainkey")
+    echo("\n".join(brainkey_lines))
+
+
+@cli.command()
 @_yes_all_option
 @_non_segwit_option
-def load_wallet(
-    salt_len    : int  = DEFAULT_SALT_LEN,
-    brainkey_len: int  = DEFAULT_BRAINKEY_LEN,
-    yes_all     : bool = False,
-    non_segwit  : bool = False,
-) -> None:
-    """Open wallet using Salt and Brainkey or Salt and SBK Pieces."""
-    salt_len = (salt_len + 3) // 4 * 4
-
+def load_wallet(yes_all: bool = False, non_segwit: bool = False) -> None:
+    """Open wallet using Salt+Brainkey or Shares."""
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or confirm(SECURITY_WARNING_PROMPT)
 
-    header_text   = """Enter your "Salt"."""
-    salt_intcodes = _prompt_for_secret(header_text, salt_len)
+    header_text    = "Enter Parameters"
+    param_cfg_data = cli_io.prompt(cli_io.DATA_TYPE_PARAM_CFG, 4, header_text)
+    param_cfg      = params.bytes2param_cfg(param_cfg_data)
 
-    if salt_intcodes is None:
-        click.echo("Salt is required")
-        raise click.Abort()
+    header_text = "Enter Salt"
+    salt        = cli_io.prompt(cli_io.DATA_TYPE_SALT, param_cfg.salt_len, header_text)
 
-    salt_data = cli_util.intcode_parts2bytes(salt_intcodes)
-    param_cfg = enc_util.bytes2params(salt_data)
+    header_text = "Enter Brainkey"
+    brainkey    = cli_io.prompt(cli_io.DATA_TYPE_BRAINKEY, param_cfg.brainkey_len, header_text)
 
-    if brainkey_len == 0:
-        brainkey_data = None
-    else:
-        brainkey_data = _brainkey_prompt(brainkey_len)
-
-    if brainkey_data is None:
-        share_datas: typ.List[ShareData] = []
-        while len(share_datas) < param_cfg.threshold:
-            piece_num = len(share_datas) + 1
-            header_text = f"""
-            Enter your SBK-Piece {piece_num} of {param_cfg.threshold}.
-            """.strip()
-            sbk_piece_intcodes = _prompt_for_secret(header_text, param_cfg.key_len_bytes)
-            if sbk_piece_intcodes:
-                sbk_piece = cli_util.intcode_parts2bytes(sbk_piece_intcodes)
-                share_datas.append(sbk_piece)
-
-        secret_key = _join_shares(param_cfg, share_datas)
-    else:
-        secret_key = _derive_key(brainkey_data, salt_data, label="Deriving Secret Key")
+    master_key = _derive_key(param_cfg, salt, brainkey, label="Deriving Master Key")
 
     seed_type = 'standard' if non_segwit else 'segwit'
 
-    int_seed    = enc_util.bytes2int(secret_key)
+    int_seed    = enc_util.bytes2int(master_key)
     wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
 
     wallet_path = "/tmp/sbk_electrum_wallet"

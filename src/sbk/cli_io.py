@@ -38,17 +38,17 @@ def _prompt(text: str) -> str:
 InputType = str
 
 
-INPUT_TYPE_PARAMS   = 'params'
-INPUT_TYPE_SALT     = 'salt'
-INPUT_TYPE_SHARE    = 'share'
-INPUT_TYPE_BRAINKEY = 'brainkey'
+DATA_TYPE_PARAM_CFG = 'params'
+DATA_TYPE_SALT      = 'salt'
+DATA_TYPE_SHARE     = 'share'
+DATA_TYPE_BRAINKEY  = 'brainkey'
 
 
 MESSAGES = {
-    INPUT_TYPE_PARAMS  : {'header': ""},
-    INPUT_TYPE_SALT    : {'header': "Enter your 'Salt'"},
-    INPUT_TYPE_SHARE   : {'header': ""},
-    INPUT_TYPE_BRAINKEY: {'header': """Step 2 of 2: Enter your "Brainkey".\n\tEnter BrainKey"""},
+    DATA_TYPE_PARAM_CFG: {'header': ""},
+    DATA_TYPE_SALT     : {'header': "Enter your 'Salt'"},
+    DATA_TYPE_SHARE    : {'header': ""},
+    DATA_TYPE_BRAINKEY : {'header': """Step 2 of 2: Enter your "Brainkey".\n\tEnter BrainKey"""},
 }
 
 
@@ -76,7 +76,7 @@ Accepted = typ.List[bool]
 
 class PromptState:
 
-    input_type: InputType
+    data_type: InputType
     # data_len does not include ecc data
     data_len  : int
     num_inputs: int
@@ -86,13 +86,13 @@ class PromptState:
 
     def __init__(
         self,
-        input_type: InputType,
-        data_len  : int,
-        cursor    : int = 0,
-        inputs    : typ.Optional[Inputs  ] = None,
-        accepted  : typ.Optional[Accepted] = None,
+        data_type: InputType,
+        data_len : int,
+        cursor   : int = 0,
+        inputs   : typ.Optional[Inputs  ] = None,
+        accepted : typ.Optional[Accepted] = None,
     ) -> None:
-        self.input_type: InputType = input_type
+        self.data_type: InputType = data_type
         self.data_len   = data_len
         self.num_inputs = data_len if self.has_intcode_inputs else data_len // 2
         self.cursor     = max(0, min(self.num_inputs - 1, cursor))
@@ -111,7 +111,7 @@ class PromptState:
 
     @property
     def has_intcode_inputs(self) -> bool:
-        return self.input_type != INPUT_TYPE_BRAINKEY
+        return self.data_type != DATA_TYPE_BRAINKEY
 
     @property
     def is_cursor_at_ecc(self) -> bool:
@@ -150,7 +150,7 @@ class PromptState:
             else:
                 return f"Enter command, data code or words at {cursor_marker}"
 
-        return MESSAGES[self.input_type][key]
+        return MESSAGES[self.data_type][key]
 
     def _formatted_lines(self) -> typ.List[str]:
         num_lines = self.num_inputs // 2 if self.has_intcode_inputs else self.num_inputs
@@ -190,35 +190,37 @@ class PromptState:
 
         return lines
 
-    def formatted_inputs(self) -> str:
+    def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
         lines = self._formatted_lines()
         out_lines: typ.List[str] = []
 
         for line_index, line in enumerate(lines):
-            if line_index == len(lines) // 2:
+            if len(lines) > 4 and line_index == len(lines) // 2:
                 out_lines.append("")
 
             prefix = "   "
             suffix = ""
-            if line_index == self.cursor:
-                prefix = "=> "
-            elif line_index == (self.cursor % len(lines)):
-                suffix = " <="
+
+            if show_cursor:
+                if line_index == self.cursor:
+                    prefix = "=> "
+                elif line_index == (self.cursor % len(lines)):
+                    suffix = " <="
 
             out_lines.append(prefix + line + suffix)
 
-        return "\n".join(out_lines)
+        return out_lines
 
     def _copy(self, **overrides) -> 'PromptState':
         return PromptState(
-            input_type=overrides.get('input_type', self.input_type),
+            data_type=overrides.get('data_type', self.data_type),
             data_len=overrides.get('data_len', self.data_len),
             cursor=overrides.get('cursor', self.cursor),
             inputs=overrides.get('inputs', self.inputs),
             accepted=overrides.get('accepted', self.accepted),
         )
 
-    def parse_input(self, in_val: str) -> 'PromptState':
+    def parse_input(self, in_val: str) -> typ.Optional['PromptState']:
         in_val, _ = re.subn(r"[^\w\s]", "", in_val.lower().strip())
 
         try:
@@ -248,6 +250,13 @@ class PromptState:
         except ValueError as err:
             _echo(f"{err}")
             return None
+
+        if len(in_data) < 2:
+            _echo("Invalid data length")
+            return None
+
+        if len(in_data) % 2 != 0:
+            in_data = in_data[:-1]
 
         new_inputs, new_accepted = self._updated_input_data(in_data)
         new_cursor = self.cursor + (len(in_data) // 2)
@@ -302,14 +311,29 @@ class PromptState:
         return (new_inputs, new_accepted)
 
 
-def prompt(input_type: str, data_len: int) -> bytes:
-    prompt_state = PromptState(input_type, data_len)
+def format_secret_lines(data_type: str, data: bytes) -> typ.Sequence[str]:
+    if data_type == DATA_TYPE_BRAINKEY:
+        intcodes = list(cli_util.bytes2intcode_parts(data))
+    else:
+        intcodes = list(cli_util.bytes2intcodes(data))
+    inputs       = typ.cast(Inputs, intcodes)
+    prompt_state = PromptState(data_type, len(data), inputs=inputs)
+    return prompt_state.formatted_input_lines(show_cursor=False)
+
+
+def prompt(data_type: str, data_len: int, header_text: typ.Optional[str] = None) -> bytes:
+    prompt_state = PromptState(data_type, data_len)
+
+    if header_text is None:
+        _header_text = prompt_state.message('header')
+    else:
+        _header_text = header_text
 
     while True:
         _clear()
-        _echo(prompt_state.message('header'))
+        _echo(_header_text)
         _echo()
-        _echo(prompt_state.formatted_inputs())
+        _echo("\n".join(prompt_state.formatted_input_lines()))
         _echo()
         _echo("Available commands:")
         _echo()
@@ -336,10 +360,10 @@ def prompt(input_type: str, data_len: int) -> bytes:
 
 
 def main() -> None:
-    data = prompt(INPUT_TYPE_BRAINKEY, 8)
+    data = prompt(DATA_TYPE_BRAINKEY, 8)
     print("<<<<", enc_util.bytes_repr(data))
     _prompt("...")
-    data = prompt(INPUT_TYPE_SALT, 12)
+    data = prompt(DATA_TYPE_SALT, 12)
     print("<<<<", enc_util.bytes_repr(data))
 
 

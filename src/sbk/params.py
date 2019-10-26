@@ -10,6 +10,7 @@ import enum
 import json
 import math
 import time
+import struct
 import typing as typ
 import logging
 
@@ -77,15 +78,29 @@ class KDFParams(typ.NamedTuple):
     h: HashAlgoVal
 
     @property
-    def field_values(self) -> typ.Tuple[int, int, int]:
+    def _field_values(self) -> typ.Tuple[int, int, int]:
         return (
             max(0, min(2 ** 4 - 1, int(math.log(self.p) / math.log(2)))),
             max(0, min(2 ** 6 - 1, int(math.log(self.m) / math.log(1.5)))),
             max(0, min(2 ** 6 - 1, int(math.log(self.t) / math.log(1.5)))),
         )
 
+    def _replace_any(
+        self, p: typ.Optional[int] = None, m: typ.Optional[int] = None, t: typ.Optional[int] = None
+    ) -> 'KDFParams':
+        updated = self
+
+        if p:
+            updated = updated._replace(p=p)
+        if m:
+            updated = updated._replace(m=m)
+        if t:
+            updated = updated._replace(t=t)
+
+        return init_kdf_params(p=updated.p, m=updated.m, t=updated.t)
+
     def __repr__(self) -> str:
-        return f"KDFParams(p={self.p} t={self.t} m={self.m:>3})"
+        return f"KDFParams(p={self.p} m={self.m:>3} t={self.t})"
 
 
 def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
@@ -95,7 +110,7 @@ def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
     h = HashAlgo.ARGON2_V19_ID.value
 
     _tmp_kdf_params = KDFParams(p, m, t, h)
-    f_p, f_m, f_t = _tmp_kdf_params.field_values
+    f_p, f_m, f_t = _tmp_kdf_params._field_values
     p = math.ceil(2 ** f_p)
     m = math.ceil(1.5 ** f_m)
     t = math.ceil(1.5 ** f_t)
@@ -220,13 +235,12 @@ def _init_sys_info() -> SystemInfo:
 
     while True:
         try:
-            measure(init_kdf_params(p=initial_p, m=initial_m, t=1))
-            break
+            measure(init_kdf_params(p=initial_p, m=int(initial_m), t=1))
+            break  # success
         except argon2.exceptions.HashingError as err:
             if "Memory allocation error" not in str(err):
                 raise
-
-            initial_m = math.ceil(initial_m / 1.5)
+            initial_m = int(initial_m / 1.5)
 
     # NOTE: choice of the baseline memory probably has the
     #   largest influence on the accuracy of cost estimation
@@ -251,14 +265,15 @@ def _init_sys_info() -> SystemInfo:
     return SystemInfo(num_cores, total_mb, initial_p, initial_m, measurements)
 
 
+_SYS_INFO: typ.Optional[SystemInfo] = None
+
+
 def init_sys_info() -> SystemInfo:
     InitSysInfoThread    = cli_util.EvalWithProgressbar[SystemInfo]
     init_sys_info_thread = InitSysInfoThread(target=_init_sys_info, args=())
     init_sys_info_thread.start_and_wait(eta_sec=20, label="Calibrating KDF parameters.")
     return init_sys_info_thread.retval
 
-
-_SYS_INFO: typ.Optional[SystemInfo] = None
 
 PARAM_SCALING = 5
 
@@ -336,7 +351,7 @@ def _load_cached_sys_info(cache_path: pl.Path) -> SystemInfo:
     return sys_info
 
 
-def _load_sys_info(app_dir: pl.Path = SBK_APP_DIR, use_cache: bool = True) -> SystemInfo:
+def load_sys_info(app_dir: pl.Path = SBK_APP_DIR, use_cache: bool = True) -> SystemInfo:
     global _SYS_INFO
     if _SYS_INFO:
         return _SYS_INFO
@@ -379,25 +394,27 @@ def _dump_sys_info(sys_info: SystemInfo, cache_path: pl.Path) -> None:
         return
 
 
-class Params(typ.NamedTuple):
+class ParamConfig(typ.NamedTuple):
 
     version     : int
-    brainkey_len: int
     salt_len    : int
+    brainkey_len: int
     threshold   : int
-    num_pieces  : int
+    num_shares  : int
     kdf_params  : KDFParams
     sys_info    : SystemInfo
 
     @property
     def master_key_len(self) -> int:
-        return self.salt_len + self.brainkey_len
+        # The master key is streched a bit and the remaining
+        # byte is used to encode the x coordinate of the shares.
+        return self.brainkey_len + self.salt_len
 
     @property
     def share_len(self) -> int:
-        # +1 byte for the x corrdinate
-        unpadded_len = self.master_key_len + 1
-        padded_len   = math.ceil(unpadded_len / 4) * 4
+        # +1 byte for the x-coordinate
+        unpadded_len = self.brainkey_len + self.salt_len
+        padded_len   = math.ceil((unpadded_len + 1) / 4) * 4
         return padded_len
 
     @property
@@ -406,53 +423,150 @@ class Params(typ.NamedTuple):
         return primes.get_pow2prime(master_key_bits)
 
 
-def init_params(
-    brainkey_len: int,
-    salt_len    : int,
-    threshold   : int,
-    num_pieces  : typ.Optional[int] = None,
-    kdf_params  : typ.Optional[KDFParams] = None,
-) -> Params:
-    _num_pieces = threshold if num_pieces is None else num_pieces
+def init_param_config(
+    salt_len       : int,
+    brainkey_len   : int,
+    threshold      : int,
+    num_shares     : typ.Optional[int] = None,
+    kdf_parallelism: typ.Optional[int] = None,
+    kdf_memory_cost: typ.Optional[int] = None,
+    kdf_time_cost  : typ.Optional[int] = None,
+) -> ParamConfig:
+    _num_shares = threshold if num_shares is None else num_shares
 
-    if threshold > _num_pieces:
-        err_msg = f"threshold must be <= num_pieces, got {threshold} > {_num_pieces}"
+    if threshold > _num_shares:
+        err_msg = f"threshold must be <= num_shares, got {threshold} > {_num_shares}"
         raise ValueError(err_msg)
 
-    sys_info = _load_sys_info()
+    sys_info = load_sys_info()
 
-    if kdf_params is None:
-        _kdf_params = get_default_params(sys_info)
-    else:
-        _kdf_params = kdf_params
-
-    assert brainkey_len % 2 == 0
+    kdf_params = get_default_params(sys_info)
+    kdf_params = kdf_params._replace_any(p=kdf_parallelism, m=kdf_memory_cost, t=kdf_time_cost)
     assert salt_len     % 4 == 0
+    assert brainkey_len % 2 == 0
 
-    master_key_len = brainkey_len + salt_len
+    master_key_len = salt_len + brainkey_len
     assert 0 < master_key_len <= 64
     assert master_key_len % 4 == 0, master_key_len
 
-    return Params(
+    return ParamConfig(
         version=0,
-        brainkey_len=brainkey_len,
         salt_len=salt_len,
+        brainkey_len=brainkey_len,
         threshold=threshold,
-        num_pieces=_num_pieces,
-        kdf_params=_kdf_params,
+        num_shares=_num_shares,
+        kdf_params=kdf_params,
         sys_info=sys_info,
     )
 
 
+def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> ParamConfig:
+    """Deserialize ParamConfig.
+
+    |        Field        |  Size  |                          Info                           |
+    | ------------------- | ------ | ------------------------------------------------------- |
+    | `f_version`         | 4 bit  | ...                                                     |
+    | `f_salt_len`        | 4 bit  | max length: 4 * 2**4 = 64 bytes                         |
+    | `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 32 bytes                         |
+    | `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
+    |                     |        | max length: 2**4 = 16 bytes                             |
+    | `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
+    | `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
+    | `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
+
+       0 1 2 3 4 5 6 7 8 9 A B C D E F
+     0 [ ver ] [salt ] [bkey ] [thres]
+    16 [kdf_p] [ kdf_mem ] [kdf_time ]
+    """
+    assert len(data) == 4
+
+    if sys_info is None:
+        _sys_info = load_sys_info()
+    else:
+        _sys_info = sys_info
+
+    field0123, field456 = struct.unpack("!HH", data)
+
+    version      = (field0123 >> 12) & 0xF
+    salt_len     = ((field0123 >> 8) & 0xF) * 4
+    brainkey_len = ((field0123 >> 4) & 0xF) * 2
+    threshold    = (field0123 >> 0) & 0xF
+
+    # The param_cfg encoding doesn't include num_shares as it's
+    # only required when originally generating the shares. The
+    # minimum value is threshold, so that is what we set it to.
+    num_shares = threshold
+
+    assert version == 0
+
+    master_key_len = salt_len + brainkey_len
+    assert 0 < master_key_len <= 64
+    assert master_key_len % 4 == 0, master_key_len
+
+    f_p = (field456 >> 12) & 0xF
+    f_m = (field456 >> 6) & 0x3F
+    f_t = (field456 >> 0) & 0x3F
+
+    p = math.ceil(2 ** f_p)
+    m = math.ceil(1.5 ** f_m)
+    t = math.ceil(1.5 ** f_t)
+
+    kdf_params = init_kdf_params(p=p, m=m, t=t)
+
+    return ParamConfig(
+        version=version,
+        salt_len=salt_len,
+        brainkey_len=brainkey_len,
+        threshold=threshold,
+        num_shares=num_shares,
+        kdf_params=kdf_params,
+        sys_info=_sys_info,
+    )
+
+
+def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
+    """Serialize ParamConfig.
+
+    Since these fields are part of the salt,
+    we try to keep the serialized param_cfg small
+    and leave more room for randomness.
+    """
+    assert param_cfg.salt_len     % 4 == 0
+    assert param_cfg.brainkey_len % 2 == 0
+
+    field0123 = 0
+    field0123 += param_cfg.version << 12
+    field0123 += (param_cfg.salt_len // 4) << 8
+    field0123 += (param_cfg.brainkey_len // 2) << 4
+    field0123 += param_cfg.threshold << 0
+
+    f_p, f_m, f_t = param_cfg.kdf_params._field_values
+
+    field456 = 0
+    field456 += f_p << 12
+    field456 += f_m << 6
+    field456 += f_t << 0
+
+    param_cfg_data = struct.pack("!HH", field0123, field456)
+    return param_cfg_data
+
+
 def main() -> None:
+    cach_path = SBK_APP_DIR / SYSINFO_CACHE_FNAME
+    if cach_path.exists():
+        cach_path.unlink()
     logging.basicConfig(level=logging.INFO)
 
-    params = init_params(brainkey_len=8, salt_len=16, threshold=3, num_pieces=5)
-    eta    = estimate_param_cost(params.sys_info, params.kdf_params)
+    param_cfg = init_param_config(brainkey_len=8, salt_len=16, threshold=3, num_shares=3)
+
+    param_cfg_data = param_cfg2bytes(param_cfg)
+    assert bytes2param_cfg(param_cfg_data) == param_cfg
+
+    eta = estimate_param_cost(param_cfg.sys_info, param_cfg.kdf_params)
     print("estimated cost", eta)
 
     MeasurementThread  = cli_util.EvalWithProgressbar[Measurement]
-    measurement_thread = MeasurementThread(target=measure, args=(params.kdf_params,))
+    measurement_thread = MeasurementThread(target=measure, args=(param_cfg.kdf_params,))
     measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
     measurement = measurement_thread.retval
     print("measured  cost", round(measurement.duration))

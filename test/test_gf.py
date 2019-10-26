@@ -3,7 +3,9 @@ import random
 import pytest
 
 import sbk.primes
-from sbk.polynom import *
+from sbk.gf import *
+from sbk.gf_p import *
+from sbk.gf_poly import *
 
 # Case 3: xgcd(240, 46)
 # | i |     qi−1     |         ri        |        si       |          ti         |
@@ -35,10 +37,10 @@ def alt_eval_at(coeffs, p):
     https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing
     """
 
-    def eval_fn(x):
+    def eval_fn(at_x):
         accu = 0
         for coeff in reversed(coeffs):
-            accu *= x
+            accu *= at_x
             accu += coeff
             accu %= p
         return accu
@@ -47,28 +49,28 @@ def alt_eval_at(coeffs, p):
 
 
 def test_ffpoly_eval():
-    gf7     = GF(7)
-    poly    = [2, 3, 4]
-    gf_poly = [gf7[2], gf7[3], gf7[4]]
+    gf7       = Field(7, GFNum)
+    coeffs    = [2, 3, 4]
+    gf_coeffs = [gf7[2], gf7[3], gf7[4]]
 
-    _eval_at1 = poly_eval_fn(gf_poly)
-    _eval_at2 = alt_eval_at(poly, p=7)
+    _eval_at1 = poly_eval_fn(gf7, gf_coeffs)
+    _eval_at2 = alt_eval_at(coeffs, p=7)
 
     # 2*0° + 3*0¹ + 4*0² == (2 + 3 + 4) % 7 == 9 % 7 == 2
-    assert _eval_at1(x=0) == (2 + 3 + 4) % 7
-    assert _eval_at1(x=0) == _eval_at2(x=0)
+    assert _eval_at1(at_x=0) == (2 + 3 + 4) % 7
+    assert _eval_at1(at_x=0) == _eval_at2(at_x=0)
 
     # 2*1° + 3*1¹ + 4*1² == (2 + 3 + 4) % 7 == 9 % 7 == 2
-    assert _eval_at1(x=1) == (2 + 3 + 4) % 7
-    assert _eval_at1(x=1) == _eval_at2(x=1)
+    assert _eval_at1(at_x=1) == (2 + 3 + 4) % 7
+    assert _eval_at1(at_x=1) == _eval_at2(at_x=1)
 
     # 2*2° + 3*2¹ + 4*2² == (2 + 6 + 16) % 7 == 24 % 7 == 3
-    assert _eval_at1(x=2) == (2 + 6 + 16) % 7
-    assert _eval_at1(x=2) == _eval_at2(x=2)
+    assert _eval_at1(at_x=2) == (2 + 6 + 16) % 7
+    assert _eval_at1(at_x=2) == _eval_at2(at_x=2)
 
     # 2*3° + 3*3¹ + 4*3² == (2 + 9 + 36) % 7 == 47 % 7 == 5
-    assert _eval_at1(x=3) == (2 + 9 + 36) % 7
-    assert _eval_at1(x=3) == _eval_at2(x=3)
+    assert _eval_at1(at_x=3) == (2 + 9 + 36) % 7
+    assert _eval_at1(at_x=3) == _eval_at2(at_x=3)
 
 
 @pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
@@ -89,14 +91,14 @@ def test_is_miller_rabin_prp():
 def test_ffpoly_eval_fuzz():
     primes = sorted(sbk.primes.PRIMES)
     for _ in range(100):
-        p  = random.choice(primes)
-        gf = GF(p)
+        p     = random.choice(primes)
+        field = GFNum.field(p)
 
-        poly    = [random.randint(0, p - 1) for _ in range(random.randint(1, 9))]
-        gf_poly = [gf[coeff] for coeff in poly]
+        coeffs    = [random.randint(0, p - 1) for _ in range(random.randint(1, 9))]
+        gf_coeffs = [field[coeff] for coeff in coeffs]
 
-        e1 = poly_eval_fn(gf_poly)
-        e2 = alt_eval_at(poly, p=p)
+        e1 = poly_eval_fn(field, gf_coeffs)
+        e2 = alt_eval_at(coeffs, p=p)
         for _ in range(10):
             x = random.randint(0, p - 1)
             assert e1(x) == e2(x)
@@ -109,11 +111,11 @@ def test_interpolate_deg1_float():
     points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0]]
 
     at_x, at_y = points[-1]
-    interp_y = interpolate(points[:-1], at_x)
+    interp_y = interpolate(points[:-1], at_x=at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], x=0.5) == 2.00
-    assert interpolate(points[1:], x=0.5) == 2.00
+    assert interpolate(points[:-1], at_x=0.5) == 2.00
+    assert interpolate(points[1:], at_x=0.5) == 2.00
 
 
 def test_interpolate_deg2_float():
@@ -123,15 +125,15 @@ def test_interpolate_deg2_float():
     points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0, 4.0]]
 
     at_x, at_y = points[-1]
-    interp_y = interpolate(points[:-1], at_x)
+    interp_y = interpolate(points[:-1], at_x=at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], x=0.5) == f(0.5)
-    assert interpolate(points[1:], x=0.5) == f(0.5)
+    assert interpolate(points[:-1], at_x=0.5) == f(0.5)
+    assert interpolate(points[1:], at_x=0.5) == f(0.5)
 
 
 def test_gf_arithmetic():
-    gf7 = GF(7)
+    gf7 = GFNum.field(7)
 
     zero = gf7[0]
     one  = gf7[1]
@@ -153,19 +155,25 @@ def test_gf_arithmetic():
 
 
 def test_interpolate_gf():
-    gf     = GF(7)
-    points = [Point(gf[1], gf[0]), Point(gf[2], gf[1]), Point(gf[3], gf[4]), Point(gf[4], gf[9])]
+    gf7 = GFNum.field(7)
+
+    points = [
+        Point(gf7[1], gf7[0]),
+        Point(gf7[2], gf7[1]),
+        Point(gf7[3], gf7[4]),
+        Point(gf7[4], gf7[9]),
+    ]
     at_x, at_y = points[-1]
-    interp_y = interpolate(points[:-1], at_x)
+    interp_y = interpolate(points[:-1], at_x=at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], x=gf[1] / gf[2]) == gf[1] / gf[4]
+    assert interpolate(points[:-1], at_x=gf7[1] / gf7[2]) == gf7[1] / gf7[4]
 
 
 def test_split_and_join_2of3():
     secret = random.randint(0, 10000000)
     prime  = min(p for p in sbk.primes.PRIMES if p > 10000000)
-    points = split(prime, threshold=2, num_pieces=3, secret=secret)
+    points = split(prime, threshold=2, num_shares=3, secret=secret)
     assert [p.x.val for p in points] == [1, 2, 3]
     assert not any(p.y.val == secret for p in points)
 
@@ -185,19 +193,19 @@ def test_split_and_join_fuzz():
     for _ in range(100):
         prime      = random.choice(primes)
         secret     = random.randint(0, prime - 1)
-        num_pieces = random.randint(2, 7)
-        threshold  = random.randint(2, num_pieces)
+        num_shares = random.randint(2, 7)
+        threshold  = random.randint(2, num_shares)
         debug_info = {
             'threshold' : threshold,
-            'num_pieces': num_pieces,
+            'num_shares': num_shares,
             'prime'     : prime,
             'secret'    : secret,
         }
-        points    = split(prime=prime, threshold=threshold, num_pieces=num_pieces, secret=secret)
+        points    = split(prime=prime, threshold=threshold, num_shares=num_shares, secret=secret)
         actual_xs = [p.x.val for p in points]
         actual_ys = [p.y.val for p in points]
 
-        expected_xs = list(range(1, num_pieces + 1))
+        expected_xs = list(range(1, num_shares + 1))
         assert actual_xs == expected_xs, debug_info
 
         # we accept collisions for primes below 100k, everything else
@@ -205,10 +213,10 @@ def test_split_and_join_fuzz():
         lt_100k = prime < 100_000
         assert lt_100k or secret not in actual_ys, debug_info
 
-        recovered_secret = join(threshold=num_pieces, points=points)
+        recovered_secret = join(threshold=num_shares, points=points)
         assert recovered_secret == secret, debug_info
 
-        for i in range(num_pieces - threshold):
+        for i in range(num_shares - threshold):
             debug_info['sample_size'] = threshold + i
             sample           = random.sample(points, threshold + i)
             recovered_secret = join(threshold=threshold, points=sample)

@@ -4,8 +4,9 @@ import pylev
 import pytest
 
 import sbk.ecc
+import sbk.gf_p
 import sbk.primes
-import sbk.polynom
+import sbk.gf_poly
 from sbk.enc_util import *
 
 
@@ -67,9 +68,12 @@ def test_bytes2int_fuzz():
 def test_bytes2gfpoint():
     data_len = 32
     prime    = sbk.primes.get_pow2prime(data_len * 8 - 8)
-    gf       = sbk.polynom.GF(p=prime)
 
-    in_point   = sbk.polynom.Point(gf[7], gf[1234567890])
+    field = sbk.gf_p.GFNum.field(prime)
+    x     = field[         7]
+    y     = field[1234567890]
+
+    in_point   = sbk.gf_poly.Point(x, y)
     point_data = gfpoint2bytes(in_point)
     assert len(point_data) == data_len
-    assert bytes2gfpoint(point_data, gf) == in_point
+    assert bytes2gfpoint(point_data, field) == in_point

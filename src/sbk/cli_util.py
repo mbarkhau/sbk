@@ -90,7 +90,7 @@ def bytes2intcodes(data: bytes) -> IntCodes:
 
 
 def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
-    """Decode and and validate intcodes to parts."""
+    """Decode and and validate intcodes to MaybeBytes."""
     expected_chk_idx = idx_offset % 13
     chk_idx_offset   = idx_offset - expected_chk_idx
 
@@ -178,7 +178,7 @@ def is_completed_intcodes(intcodes: MaybeIntCodes) -> bool:
         return False
 
 
-def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: MaybeIntCodes) -> Lines:
+def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: IntCodes) -> Lines:
     ecc_offset      = len(intcodes    ) // 2
     spacer_offset   = len(phrase_lines) // 2
     phrases_padding = max(map(len, phrase_lines))
@@ -187,31 +187,28 @@ def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: MaybeIntCod
     yield ""
 
     for i, line in enumerate(phrase_lines):
-        if i == spacer_offset:
+        if len(phrase_lines) > 4 and i == spacer_offset:
             yield ""
 
         ecc_idx      = ecc_offset + i
         data_intcode = intcodes[i]
         ecc_intcode  = intcodes[ecc_idx]
 
-        data = "_________" if data_intcode is None else data_intcode
-        ecc  = "_________" if ecc_intcode  is None else ecc_intcode
-
         marker_id = i % spacer_offset
         prefix_id = f"A{marker_id}" if i < spacer_offset else f"B{marker_id}"
         suffix_id = f"C{marker_id}" if i < spacer_offset else f"D{marker_id}"
 
-        prefix = f"{prefix_id}: {data} "
-        suffix = f"{suffix_id}: {ecc} "
+        prefix = f"{prefix_id}: {data_intcode} "
+        suffix = f"{suffix_id}: {ecc_intcode} "
 
-        phrase_line = EMPTY_PHRASE_LINE if line is None else line
-        out_line    = f"{prefix}  {phrase_line:<{phrases_padding}}  {suffix}"
+        words_line = EMPTY_PHRASE_LINE if line is None else line
+        out_line   = f"{prefix}  {words_line:<{phrases_padding}}  {suffix}"
         yield out_line
 
 
 def format_secret_lines(data: bytes) -> Lines:
     """Format a completed secret."""
-    phrase = mnemonic.bytes2phrase(data).upper()
+    phrase = mnemonic.bytes2phrase(data)
     assert mnemonic.phrase2bytes(phrase) == data
 
     intcodes = bytes2intcodes(data)
@@ -223,26 +220,6 @@ def format_secret_lines(data: bytes) -> Lines:
 
 def format_secret(data: bytes) -> str:
     return "\n".join(format_secret_lines(data))
-
-
-# TODO: cleanup
-# def format_secret_lines(data: bytes, add_ecc=True) -> Lines:
-#     phrase = mnemonic.bytes2phrase(data).upper()
-#     assert mnemonic.phrase2bytes(phrase) == data
-#
-#     intcodes: IntCodes
-#
-#     if add_ecc:
-#         intcodes = bytes2intcodes(data)
-#         assert intcodes2bytes(intcodes) == data
-#     else:
-#         # This allows the function to be used when
-#         # only part of the secret has been entered.
-#         intcodes = list(bytes2intcode_parts(data))
-#         intcodes.extend([None] * len(data))
-#
-#     phrase_lines = phrase.splitlines()
-#     return format_partial_secret_lines(phrase_lines, intcodes)
 
 
 class ParsedSecret(typ.NamedTuple):
@@ -328,7 +305,7 @@ class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
         assert rv is not None
         return rv
 
-    def start_and_wait(self, eta_sec: int, label: str) -> None:
+    def start_and_wait(self, eta_sec: float, label: str) -> None:
         # daemon means the thread is killed if user hits Ctrl-C
         self.daemon = True
         self.start()

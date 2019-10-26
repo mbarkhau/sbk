@@ -22,11 +22,10 @@ import typing as typ
 import itertools
 
 from . import gf
-from . import primes
 
 _rand = random.SystemRandom()
 
-Coefficients = typ.List[gf.Num]
+Coefficients = typ.List[gf.GFNum]
 
 
 class Point(typ.Generic[gf.Num]):
@@ -110,19 +109,13 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
     return accu
 
 
-def poly_eval_fn(field: gf.Field, coeffs: Coefficients) -> typ.Callable[[int], int]:
+def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[[int], int]:
     """Return function to evaluate polynomial at x."""
-    reveal_type(coeffs)
 
     def eval_at(at_x: int) -> int:
         """Evaluate polynomial at x."""
-        reveal_type(coeffs)
         y = field[0]
         for exp, coeff in enumerate(coeffs):
-            reveal_type(coeff)
-            reveal_type(field[at_x])
-            reveal_type(field[exp ])
-            reveal_type(coeff * field[at_x] ** field[exp])
             y += coeff * field[at_x] ** field[exp]
 
         return y.val
@@ -149,11 +142,11 @@ def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -
     assert len(points) == num_shares
 
     # make sure we only return pieces that we can join again
-    recoverd_secret = join(threshold, points)
+    recoverd_secret = join(field, threshold, points)
     assert recoverd_secret == secret
 
     for points_subset in itertools.combinations(points, threshold):
-        recoverd_secret = join(threshold, points_subset)
+        recoverd_secret = join(field, threshold, points_subset)
         assert recoverd_secret == secret
 
     return points
@@ -181,8 +174,8 @@ def split(prime: int, threshold: int, num_shares: int, secret: int) -> Points:
     return _split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
 
 
-def join(threshold: int, points: Points) -> int:
+def join(field: gf.Field[gf.Num], threshold: int, points: Points) -> int:
     if len(points) < threshold:
         raise ValueError("Not enough pieces to recover secret")
 
-    return interpolate(points, at_x=0).val
+    return interpolate(points, at_x=field[0]).val

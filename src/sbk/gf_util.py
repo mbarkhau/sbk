@@ -4,7 +4,7 @@
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
-""" Galois Field arithmetic functions."""
+"""Galois Field arithmetic functions."""
 
 import typing as typ
 
@@ -97,7 +97,8 @@ def mul(a: int, b: int) -> int:
     return div_by_rrp(res)
 
 
-def pow(a: int, b: int) -> int:
+def pow_slow(a: int, b: int) -> int:
+    # there has to be a better way!
     res = 1
     n   = b
     while n > 0:
@@ -122,7 +123,7 @@ def inverse(val: int) -> int:
         return 0
 
     exp = 2 ** 8 - 2
-    inv = pow(val, exp)
+    inv = pow_slow(val, exp)
     assert mul(val, inv) == 1
     return inv
 

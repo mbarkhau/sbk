@@ -220,6 +220,25 @@ class PromptState:
             accepted=overrides.get('accepted', self.accepted),
         )
 
+    def _eval_cmd(self, cmd: str) -> 'PromptState':
+        if cmd == 'accept':
+            return self._copy(accepted=[True] * self.num_inputs)
+        if cmd == 'delete':
+            new_inputs   = list(self.inputs)
+            new_accepted = list(self.accepted)
+            new_inputs[self.cursor] = None
+            new_accepted[self.cursor] = False
+            return self._copy(cursor=self.cursor + 1, inputs=new_inputs, accepted=new_accepted)
+
+        if cmd == 'next':
+            return self._copy(cursor=self.cursor + 1)
+        if cmd == 'prev':
+            return self._copy(cursor=self.cursor - 1)
+        if cmd == 'cancel':
+            raise click.Abort()
+
+        raise Exception(f"Invalid command {cmd}")
+
     def parse_input(self, in_val: str) -> typ.Optional['PromptState']:
         in_val, _ = re.subn(r"[^\w\s]", "", in_val.lower().strip())
 
@@ -228,25 +247,10 @@ class PromptState:
                 in_data = b"".join(cli_util.intcodes2parts(in_val.split(), idx_offset=self.cursor))
             else:
                 cmd = _parse_command(in_val)
-                if cmd == 'accept':
-                    return self._copy(accepted=[True] * self.num_inputs)
-                if cmd == 'delete':
-                    new_inputs   = list(self.inputs)
-                    new_accepted = list(self.accepted)
-                    new_inputs[self.cursor] = None
-                    new_accepted[self.cursor] = False
-                    return self._copy(
-                        cursor=self.cursor + 1, inputs=new_inputs, accepted=new_accepted
-                    )
-
-                if cmd == 'next':
-                    return self._copy(cursor=self.cursor + 1)
-                if cmd == 'prev':
-                    return self._copy(cursor=self.cursor - 1)
-                if cmd == 'cancel':
-                    raise click.Abort()
-
-                in_data = mnemonic.phrase2bytes(in_val)
+                if cmd is None:
+                    in_data = mnemonic.phrase2bytes(in_val)
+                else:
+                    return self._eval_cmd(cmd)
         except ValueError as err:
             _echo(f"{err}")
             return None

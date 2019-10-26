@@ -21,7 +21,6 @@ from . import gf
 from . import kdf
 from . import cli_io
 from . import params
-from . import primes
 from . import gf_poly
 from . import cli_util
 from . import enc_util
@@ -679,7 +678,7 @@ def _join_shares(
     field  = gf.GFNum.field(order=param_cfg.prime)
     points = [enc_util.bytes2gfpoint(p, field) for p in shares]
 
-    secret_int = gf_poly.join(param_cfg.threshold, points)
+    secret_int = gf_poly.join(field, param_cfg.threshold, points)
     master_key = enc_util.int2bytes(secret_int)
 
     assert len(master_key) == param_cfg.master_key_len

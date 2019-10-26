@@ -159,7 +159,7 @@ class GF256(GFNum):
         return GF256(gf_util.mul(self.val, other.val))
 
     def __pow__(self, other: Num) -> 'GF256':
-        return GF256(gf_util.pow(self.val, other.val))
+        return GF256(gf_util.pow_slow(self.val, other.val))
 
     def _mul_inverse(self) -> 'GF256':
         v = self.val

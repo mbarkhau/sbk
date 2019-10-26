@@ -3,6 +3,13 @@
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
+
+"""Reed Solomon style Forward Error Correction code.
+
+This may actually be a legitimate Reed Solomon encoding, it's certainly
+based on the same ideas, I'm just not sure if it qualifies
+"""
+
 import os
 import random
 
@@ -22,7 +29,7 @@ def interpolate(points: gf_poly.Points, at_x: gf.Num) -> gf.Num:
 
 
 def old_main() -> None:
-    field    = gf.GFNum.field(257)
+    field = gf.GFNum.field(257)
 
     for _ in range(100):
         data_in = [255] + list(os.urandom(10)) + [255]

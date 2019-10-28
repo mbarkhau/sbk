@@ -5,6 +5,7 @@ import pytest
 import sbk.primes
 from sbk.gf import *
 from sbk.gf_poly import *
+from sbk.gf_util import *
 
 # Case 3: xgcd(240, 46)
 # | i |     qi−1     |         ri        |        si       |          ti         |
@@ -170,21 +171,23 @@ def test_interpolate_gf():
 
 
 def test_split_and_join_2of3():
-    secret = random.randint(0, 10000000)
-    prime  = min(p for p in sbk.primes.PRIMES if p > 10000000)
-    points = split(prime, threshold=2, num_shares=3, secret=secret)
+    prime = min(p for p in sbk.primes.PRIMES if p > 10000000)
+    field = GFNum.field(prime)
+
+    secret = random.randrange(10000000)
+    points = split(field, threshold=2, num_shares=3, secret=secret)
     assert [p.x.val for p in points] == [1, 2, 3]
     assert not any(p.y.val == secret for p in points)
 
-    assert join(threshold=2, points=points) == secret
+    assert join(field, threshold=2, points=points) == secret
 
     sample1 = [points[0], points[1]]
     sample2 = [points[0], points[2]]
     sample3 = [points[1], points[2]]
 
-    assert join(threshold=2, points=sample1) == secret
-    assert join(threshold=2, points=sample2) == secret
-    assert join(threshold=2, points=sample3) == secret
+    assert join(field, threshold=2, points=sample1) == secret
+    assert join(field, threshold=2, points=sample2) == secret
+    assert join(field, threshold=2, points=sample3) == secret
 
 
 def test_split_and_join_fuzz():
@@ -200,7 +203,8 @@ def test_split_and_join_fuzz():
             'prime'     : prime,
             'secret'    : secret,
         }
-        points    = split(prime=prime, threshold=threshold, num_shares=num_shares, secret=secret)
+        field     = GFNum.field(prime)
+        points    = split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
         actual_xs = [p.x.val for p in points]
         actual_ys = [p.y.val for p in points]
 
@@ -212,11 +216,11 @@ def test_split_and_join_fuzz():
         lt_100k = prime < 100_000
         assert lt_100k or secret not in actual_ys, debug_info
 
-        recovered_secret = join(threshold=num_shares, points=points)
+        recovered_secret = join(field=field, threshold=num_shares, points=points)
         assert recovered_secret == secret, debug_info
 
         for i in range(num_shares - threshold):
             debug_info['sample_size'] = threshold + i
             sample           = random.sample(points, threshold + i)
-            recovered_secret = join(threshold=threshold, points=sample)
+            recovered_secret = join(field=field, threshold=threshold, points=sample)
             assert recovered_secret == secret, debug_info

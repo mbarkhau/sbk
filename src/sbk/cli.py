@@ -360,8 +360,9 @@ def _split_into_shares(
     master_key = salt + brainkey
     secret_int = enc_util.bytes2int(master_key)
 
+    field    = gf.GFNum.field(param_cfg.prime)
     gfpoints = gf_poly.split(
-        prime=param_cfg.prime, threshold=threshold, num_shares=num_shares, secret=secret_int
+        field=field, threshold=threshold, num_shares=num_shares, secret=secret_int
     )
     for gfpoint in gfpoints:
         share_data = enc_util.gfpoint2bytes(gfpoint)

@@ -163,13 +163,13 @@ def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -
     return points
 
 
-def split(prime: int, threshold: int, num_shares: int, secret: int) -> Points:
+def split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret: int) -> Points:
     """Generate points of a split secret."""
 
     if num_shares <= 1:
         raise ValueError("number of pieces too low, secret would be exposed")
 
-    if num_shares >= prime:
+    if num_shares >= field.order:
         raise ValueError("number of pieces too high, cannot generate distinct points")
 
     if threshold > num_shares:
@@ -178,10 +178,13 @@ def split(prime: int, threshold: int, num_shares: int, secret: int) -> Points:
     if secret < 0:
         raise ValueError("Invalid secret, must be a positive integer")
 
-    if prime <= secret:
+    # TODO: if field.order != 256
+    # - 256 splits the secret up into bytes and encodes each separately.
+    # - we could do this generally for any order, and chunk up the secret
+    # - secret should perhaps be bytes instead of int
+    if field.order <= secret:
         raise ValueError("Invalid prime for secret, must be greater than secret.")
 
-    field = gf.GFNum.field(prime)
     return _split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
 
 

@@ -47,8 +47,8 @@ def alt_eval_at(coeffs, p):
     return eval_fn
 
 
-def test_ffpoly_eval():
-    gf7       = Field(7, GFNum)
+def test_gfpoly_eval():
+    gf7       = GFNum.field(7)
     coeffs    = [2, 3, 4]
     gf_coeffs = [gf7[2], gf7[3], gf7[4]]
 
@@ -72,6 +72,22 @@ def test_ffpoly_eval():
     assert _eval_at1(at_x=3) == _eval_at2(at_x=3)
 
 
+def test_gfpoly_eval_fuzz():
+    primes = sorted(sbk.primes.PRIMES)
+    for _ in range(100):
+        p     = random.choice(primes)
+        field = GFNum.field(p)
+
+        coeffs    = [random.randrange(p) for _ in range(random.randint(1, min(9, p)))]
+        gf_coeffs = [field[coeff] for coeff in coeffs]
+
+        _eval_at1 = poly_eval_fn(field, gf_coeffs)
+        _eval_at2 = alt_eval_at(coeffs, p=p)
+        for _ in range(10):
+            x = random.randrange(p)
+            assert _eval_at1(x) == _eval_at2(x)
+
+
 @pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
 def test_prime(prime_idx):
     param = sbk.primes.POW2_PRIME_PARAMS[prime_idx]
@@ -85,22 +101,6 @@ def test_is_miller_rabin_prp():
     assert not sbk.primes.is_miller_rabin_prp(60)
     assert not sbk.primes.is_miller_rabin_prp( 7 * 73 * 103)
     assert not sbk.primes.is_miller_rabin_prp(89 * 683)
-
-
-def test_ffpoly_eval_fuzz():
-    primes = sorted(sbk.primes.PRIMES)
-    for _ in range(100):
-        p     = random.choice(primes)
-        field = GFNum.field(p)
-
-        coeffs    = [random.randint(0, p - 1) for _ in range(random.randint(1, 9))]
-        gf_coeffs = [field[coeff] for coeff in coeffs]
-
-        e1 = poly_eval_fn(field, gf_coeffs)
-        e2 = alt_eval_at(coeffs, p=p)
-        for _ in range(10):
-            x = random.randint(0, p - 1)
-            assert e1(x) == e2(x)
 
 
 def test_interpolate_deg1_float():

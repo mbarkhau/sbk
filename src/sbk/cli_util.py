@@ -13,7 +13,7 @@ import threading
 
 import click
 
-from . import ecc
+from . import ecc_lt
 from . import enc_util
 from . import mnemonic
 
@@ -85,7 +85,7 @@ def bytes2intcodes(data: bytes) -> IntCodes:
     The main purpose of the intcode format is to be
     compact, redundant and resilient to input errors.
     """
-    data_with_ecc = ecc.encode(data)
+    data_with_ecc = ecc_lt.encode(data)
     return list(bytes2intcode_parts(data_with_ecc))
 
 
@@ -126,7 +126,7 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
     return part_vals
 
 
-def parts2packets(parts: PartVals, packet_len: int) -> ecc.MaybePackets:
+def parts2packets(parts: PartVals, packet_len: int) -> ecc_lt.MaybePackets:
     num_packets = len(parts) // packet_len
     assert num_packets == 8
 
@@ -159,7 +159,7 @@ def maybe_intcodes2bytes(intcodes: MaybeIntCodes) -> bytes:
 
     packet_len    = block_len // 8  # aka. parts per packet
     maybe_packets = parts2packets(data_with_ecc, packet_len)
-    return ecc.decode_packets(maybe_packets)
+    return ecc_lt.decode_packets(maybe_packets)
 
 
 def intcodes2bytes(intcodes: IntCodes) -> bytes:

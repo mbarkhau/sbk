@@ -3,8 +3,7 @@ import os
 import pylev
 import pytest
 
-import sbk.ecc
-import sbk.gf_p
+import sbk.gf
 import sbk.primes
 import sbk.gf_poly
 from sbk.enc_util import *
@@ -69,7 +68,7 @@ def test_bytes2gfpoint():
     data_len = 32
     prime    = sbk.primes.get_pow2prime(data_len * 8 - 8)
 
-    field = sbk.gf_p.GFNum.field(prime)
+    field = sbk.gf.GFNum.field(prime)
     x     = field[         7]
     y     = field[1234567890]
 

@@ -1,4 +1,12 @@
-"""Error correction coding.
+# This file is part of the sbk project
+# https://gitlab.com/mbarkhau/sbk
+#
+# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# SPDX-License-Identifier: MIT
+
+"""Error correction coding using Luby Transform Codes.
+
+This module is no longer used and has been replaced by ecc_rs.py
 
 The encoding scheme here is quite simple and is based on LT-Codes. I'm
 not smart enough/don't have the time for a more general implementation

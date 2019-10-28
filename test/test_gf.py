@@ -4,7 +4,6 @@ import pytest
 
 import sbk.primes
 from sbk.gf import *
-from sbk.gf_p import *
 from sbk.gf_poly import *
 
 # Case 3: xgcd(240, 46)

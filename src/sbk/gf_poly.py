@@ -109,6 +109,17 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
     return accu
 
 
+def _val_of(n: typ.Union[int, float, gf.GFNum, gf.GF256]) -> int:
+    # Helper function to allow n to be a plain integer or float in tests.
+    if isinstance(n, int):
+        return n
+    if isinstance(n, float):
+        return int(n)
+
+    assert isinstance(n, (gf.GFNum, gf.GF256))
+    return n.val
+
+
 def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[[int], int]:
     """Return function to evaluate polynomial at x."""
 
@@ -118,7 +129,7 @@ def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[
         for exp, coeff in enumerate(coeffs):
             y += coeff * field[at_x] ** field[exp]
 
-        return y.val
+        return _val_of(y)
 
     return eval_at
 
@@ -178,4 +189,4 @@ def join(field: gf.Field[gf.Num], threshold: int, points: Points) -> int:
     if len(points) < threshold:
         raise ValueError("Not enough pieces to recover secret")
 
-    return interpolate(points, at_x=field[0]).val
+    return _val_of(interpolate(points, at_x=field[0]))

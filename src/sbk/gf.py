@@ -37,7 +37,7 @@ class GFNum:
     val: int
 
     @classmethod
-    def field(cls: NumType, order: int) -> Field:
+    def field(cls: NumType, order: int) -> Field['GFNum']:
         return Field(order, cls)
 
     def __init__(self, val: int, p: int) -> None:
@@ -141,7 +141,7 @@ class GF256(GFNum):
     val: int
 
     @classmethod
-    def field(cls: NumType, order: int = 256) -> Field:
+    def field(cls: NumType, order: int = 256) -> Field[GFNum]:
         assert order == 256
         return Field(order, cls)
 

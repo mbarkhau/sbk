@@ -7,8 +7,8 @@ import contextlib
 import click
 import pytest
 
-import sbk.ecc
 import sbk.cli_io
+import sbk.ecc_lt
 from sbk.cli_util import *
 from sbk.mnemonic import *
 
@@ -69,7 +69,7 @@ def test_intcode_order_fail(data_len):
             try:
                 decoded = intcodes2bytes(intcodes_kaputt)
                 assert decoded == data
-            except sbk.ecc.DecodeError:
+            except sbk.ecc_lt.DecodeError:
                 pass
         else:
             try:

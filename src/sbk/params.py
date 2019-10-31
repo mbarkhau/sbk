@@ -41,7 +41,8 @@ log = logging.getLogger(__name__)
 #
 # memory_cost: The main constraint here is that later reconstruction
 # of the secret will require a machine with at least as much memory as
-# the one used during the initial derivation.
+# the one used during the initial derivation. Otherwise it should be
+# chosen as large as possible.
 
 
 DEFAULT_KDF_THREADS_RATIO = 2
@@ -94,9 +95,9 @@ class KDFParams(typ.NamedTuple):
         m = math.ceil(1.5 ** f_m)
         t = math.ceil(1.5 ** f_t)
 
-        assert p == self.p_raw
-        assert m == self.m_raw
-        assert t == self.t_raw
+        assert p == self.p_raw, (p, "vs", self.p_raw)
+        assert m == self.m_raw, (m, "vs", self.m_raw)
+        assert t == self.t_raw, (t, "vs", self.t_raw)
         return (p, m, t)
 
     def _replace_any(
@@ -114,7 +115,7 @@ class KDFParams(typ.NamedTuple):
         return init_kdf_params(p=updated.p_raw, m=updated.m_raw, t=updated.t_raw)
 
     def __repr__(self) -> str:
-        return f"KDFParams(p={self.p} m={self.m:>3} t={self.t})"
+        return f"KDFParams(p={self.p_raw} m={self.m_raw:>3} t={self.t_raw})"
 
     @property
     def p(self) -> NumThreads:
@@ -129,7 +130,9 @@ class KDFParams(typ.NamedTuple):
         return self._verified_values[2]
 
 
-def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
+def init_kdf_params(
+    p: NumThreads, m: MebiBytes, t: Iterations, no_verify: bool = False
+) -> KDFParams:
     # NOTE mb: It's important to ALWAYS and ONLY use kdf parameters that have gone through
     #   this function so we always do the kdf parameter normalization.
     # Only certain parameter values can be serialized.
@@ -138,6 +141,12 @@ def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
     h = HashAlgo.ARGON2_V19_ID.value
 
     _tmp_kdf_params = KDFParams(p, m, t, h)
+    if no_verify:
+        # The exception to the verification is when we use kdf parameters
+        # for measurements, in which case we don't want the rounding to
+        # mess with accuracy.
+        return _tmp_kdf_params
+
     f_p, f_m, f_t = _tmp_kdf_params._field_values
     p = math.ceil(2 ** f_p)
     m = math.ceil(1.5 ** f_m)
@@ -165,13 +174,16 @@ class SystemInfo(typ.NamedTuple):
 
 
 def mem_total() -> MebiBytes:
-    """Get total memory (linux only)."""
+    """Get total memory."""
 
-    with open("/proc/meminfo", mode="rb") as fobj:
-        for line in fobj:
-            key, num, unit = line.decode("ascii").split()
-            if key == "MemTotal:":
-                return int(num) // 1024
+    # Linux
+    meminfo_path = pl.Path("/proc/meminfo")
+    if meminfo_path.exists():
+        with meminfo_path.open(mode="rb") as fobj:
+            for line in fobj:
+                key, num, unit = line.decode("ascii").split()
+                if key == "MemTotal:":
+                    return int(num) // 1024
 
     return 128
 
@@ -247,7 +259,7 @@ def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
             m = measurement.m
             t = measurement.t
 
-        kdf_params  = init_kdf_params(baseline.p, m, t)
+        kdf_params  = init_kdf_params(baseline.p, m, t, no_verify=True)
         measurement = measure(kdf_params)
         measurements.append(measurement)
 
@@ -259,11 +271,12 @@ def _init_sys_info() -> SystemInfo:
     total_mb  = mem_total()
 
     initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb * DEFAULT_KDF_MEM_RATIO)
+    initial_m = int(total_mb * DEFAULT_KDF_MEM_RATIO) // initial_p
 
     while True:
         try:
-            measure(init_kdf_params(p=initial_p, m=int(initial_m), t=1))
+            kdf_params = init_kdf_params(p=initial_p, m=int(initial_m), t=1, no_verify=True)
+            measure(kdf_params)
             break  # success
         except argon2.exceptions.HashingError as err:
             if "Memory allocation error" not in str(err):
@@ -280,14 +293,14 @@ def _init_sys_info() -> SystemInfo:
     m = 1
 
     while True:
-        kdf_params = init_kdf_params(initial_p, m, t=1)
+        kdf_params = init_kdf_params(p=initial_p, m=m, t=1, no_verify=True)
         sample     = measure(kdf_params)
         if sample.duration > 0.2:
             break
         else:
             m = math.ceil(m * 1.5)
 
-    kdf_params   = init_kdf_params(initial_p, m, t=2)
+    kdf_params   = init_kdf_params(p=initial_p, m=m, t=2, no_verify=True)
     baseline     = measure(kdf_params)
     measurements = _measure_scaled_params(baseline)
     return SystemInfo(num_cores, total_mb, initial_p, initial_m, measurements)

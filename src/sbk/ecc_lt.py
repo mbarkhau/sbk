@@ -181,9 +181,8 @@ class Residual:
         return len(self.indexes)
 
     def __repr__(self) -> str:
-        indexes  = sorted(self.indexes)
-        data_str = str(self.data)
-        return f"Residual({data_str}, {indexes}, {self.sources})"
+        indexes = sorted(self.indexes)
+        return f"Residual({repr(self.data)}, {indexes}, {self.sources})"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Residual):

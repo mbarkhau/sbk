@@ -279,23 +279,34 @@ T = typ.TypeVar('T')
 
 class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
 
-    _return: typ.Optional[T]
+    _exception: typ.Optional[Exception]
+    _return   : typ.Optional[T]
 
     def __init__(self, target=None, args=(), kwargs=None) -> None:
         threading.Thread.__init__(self, target=target, args=args, kwargs=kwargs)
-        self._target = target
-        self._args   = args
-        self._kwargs = kwargs
-        self._return = None
+        self._target    = target
+        self._args      = args
+        self._kwargs    = kwargs
+        self._exception = None
+        self._return    = None
 
     def run(self) -> None:
         tgt = self._target
         assert tgt is not None
-        kwargs       = self._kwargs or {}
-        self._return = tgt(*self._args, **kwargs)
+        kwargs = self._kwargs or {}
+        try:
+            self._return = tgt(*self._args, **kwargs)
+        except Exception as ex:
+            self._exception = ex
+            raise
 
     def join(self, *args) -> None:
         threading.Thread.join(self, *args)
+
+        if self._exception:
+            errmsg = f"Thread failed with {type(self._exception)}: {self._exception}"
+            raise Exception(errmsg) from self._exception
+
         if self._return is None:
             raise Exception("Missing return value after Thread.join")
 

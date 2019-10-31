@@ -478,6 +478,7 @@ devtest:
 ifdef FILTER
 	ENABLE_BACKTRACE=0 \
 		ENV=$${ENV-dev} \
+		PYTEST_SKIP=slow \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
@@ -491,6 +492,7 @@ ifdef FILTER
 else
 	ENABLE_BACKTRACE=0 \
 		ENV=$${ENV-dev} \
+		PYTEST_SKIP=slow \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \

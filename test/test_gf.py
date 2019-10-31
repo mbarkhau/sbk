@@ -1,3 +1,4 @@
+import os
 import random
 
 import pytest
@@ -89,6 +90,7 @@ def test_gfpoly_eval_fuzz():
             assert _eval_at1(x) == _eval_at2(x)
 
 
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Primes don't change")
 @pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
 def test_prime(prime_idx):
     param = sbk.primes.POW2_PRIME_PARAMS[prime_idx]

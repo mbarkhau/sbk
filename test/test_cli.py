@@ -13,6 +13,7 @@ from sbk.cli_util import *
 from sbk.mnemonic import *
 
 
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="ECC recovery can be intense")
 def test_intcode_fuzz():
     bytes2intcodes(os.urandom(8))
 
@@ -35,6 +36,7 @@ def test_intcode_fuzz():
 TEST_DATA = (string.ascii_letters + "0123456789").encode('ascii')
 
 
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="ECC recovery can be intense")
 @pytest.mark.parametrize("data_len", range(16, 33, 4))
 def test_intcode_fuzz_loss(data_len):
     for _ in range(5):
@@ -50,6 +52,7 @@ def test_intcode_fuzz_loss(data_len):
         assert decoded == data
 
 
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="ECC recovery can be intense")
 @pytest.mark.parametrize("data_len", range(4, 33, 4))
 def test_intcode_order_fail(data_len):
     data     = os.urandom(data_len)

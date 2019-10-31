@@ -72,18 +72,32 @@ Iterations = int
 
 class KDFParams(typ.NamedTuple):
 
-    p: NumThreads
-    m: MebiBytes
-    t: Iterations
-    h: HashAlgoVal
+    p_raw: NumThreads
+    m_raw: MebiBytes
+    t_raw: Iterations
+    h    : HashAlgoVal
 
     @property
     def _field_values(self) -> typ.Tuple[int, int, int]:
         return (
-            max(0, min(2 ** 4 - 1, int(math.log(self.p) / math.log(2)))),
-            max(0, min(2 ** 6 - 1, int(math.log(self.m) / math.log(1.5)))),
-            max(0, min(2 ** 6 - 1, int(math.log(self.t) / math.log(1.5)))),
+            max(0, min(2 ** 4 - 1, round(math.log(self.p_raw) / math.log(2)))),
+            max(0, min(2 ** 6 - 1, round(math.log(self.m_raw) / math.log(1.5)))),
+            max(0, min(2 ** 6 - 1, round(math.log(self.t_raw) / math.log(1.5)))),
         )
+
+    @property
+    def _verified_values(self) -> typ.Tuple[NumThreads, MebiBytes, Iterations]:
+        # Fail safe accessor to make sure we always initialized
+        #   KDFParams with values that can be serialized correctly.
+        f_p, f_m, f_t = self._field_values
+        p = math.ceil(2 ** f_p)
+        m = math.ceil(1.5 ** f_m)
+        t = math.ceil(1.5 ** f_t)
+
+        assert p == self.p_raw
+        assert m == self.m_raw
+        assert t == self.t_raw
+        return (p, m, t)
 
     def _replace_any(
         self, p: typ.Optional[int] = None, m: typ.Optional[int] = None, t: typ.Optional[int] = None
@@ -91,19 +105,33 @@ class KDFParams(typ.NamedTuple):
         updated = self
 
         if p:
-            updated = updated._replace(p=p)
+            updated = updated._replace(p_raw=p)
         if m:
-            updated = updated._replace(m=m)
+            updated = updated._replace(m_raw=m)
         if t:
-            updated = updated._replace(t=t)
+            updated = updated._replace(t_raw=t)
 
-        return init_kdf_params(p=updated.p, m=updated.m, t=updated.t)
+        return init_kdf_params(p=updated.p_raw, m=updated.m_raw, t=updated.t_raw)
 
     def __repr__(self) -> str:
         return f"KDFParams(p={self.p} m={self.m:>3} t={self.t})"
 
+    @property
+    def p(self) -> NumThreads:
+        return self._verified_values[0]
+
+    @property
+    def m(self) -> NumThreads:
+        return self._verified_values[1]
+
+    @property
+    def t(self) -> NumThreads:
+        return self._verified_values[2]
+
 
 def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
+    # NOTE mb: It's important to ALWAYS and ONLY use kdf parameters that have gone through
+    #   this function so we always do the kdf parameter normalization.
     # Only certain parameter values can be serialized.
     # Everything goes through this constructor to make sure
     # we only use valid values.
@@ -444,9 +472,11 @@ def init_param_config(
     kdf_params = kdf_params._replace_any(p=kdf_parallelism, m=kdf_memory_cost, t=kdf_time_cost)
     assert salt_len     % 4 == 0
     assert brainkey_len % 2 == 0
+    assert 4 <= salt_len <= 64, salt_len
+    assert 2 <= brainkey_len <= 32, brainkey_len
+    assert 1 <= threshold <= 16, threshold
 
     master_key_len = salt_len + brainkey_len
-    assert 0 < master_key_len <= 64
     assert master_key_len % 4 == 0, master_key_len
 
     return ParamConfig(
@@ -469,7 +499,7 @@ def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> P
     | `f_salt_len`        | 4 bit  | max length: 4 * 2**4 = 64 bytes                         |
     | `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 32 bytes                         |
     | `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
-    |                     |        | max length: 2**4 = 16 bytes                             |
+    |                     |        | max: 1..2**4 = 1..16                                    |
     | `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
     | `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
     | `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
@@ -485,27 +515,23 @@ def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> P
     else:
         _sys_info = sys_info
 
-    field0123, field456 = struct.unpack("!HH", data)
+    fields_0123, fields_456 = struct.unpack("!HH", data)
 
-    version      = (field0123 >> 12) & 0xF
-    salt_len     = ((field0123 >> 8) & 0xF) * 4
-    brainkey_len = ((field0123 >> 4) & 0xF) * 2
-    threshold    = (field0123 >> 0) & 0xF
+    version      = (fields_0123 >> 12) & 0xF
+    salt_len     = (((fields_0123 >> 8) & 0xF) + 1) * 4
+    brainkey_len = (((fields_0123 >> 4) & 0xF) + 1) * 2
+    threshold    = ((fields_0123 >> 0) & 0xF) + 1
 
     # The param_cfg encoding doesn't include num_shares as it's
     # only required when originally generating the shares. The
     # minimum value is threshold, so that is what we set it to.
     num_shares = threshold
 
-    assert version == 0
+    assert version == 0, version
 
-    master_key_len = salt_len + brainkey_len
-    assert 0 < master_key_len <= 64
-    assert master_key_len % 4 == 0, master_key_len
-
-    f_p = (field456 >> 12) & 0xF
-    f_m = (field456 >> 6) & 0x3F
-    f_t = (field456 >> 0) & 0x3F
+    f_p = (fields_456 >> 12) & 0xF
+    f_m = (fields_456 >> 6) & 0x3F
+    f_t = (fields_456 >> 0) & 0x3F
 
     p = math.ceil(2 ** f_p)
     m = math.ceil(1.5 ** f_m)
@@ -534,20 +560,20 @@ def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
     assert param_cfg.salt_len     % 4 == 0
     assert param_cfg.brainkey_len % 2 == 0
 
-    field0123 = 0
-    field0123 += param_cfg.version << 12
-    field0123 += (param_cfg.salt_len // 4) << 8
-    field0123 += (param_cfg.brainkey_len // 2) << 4
-    field0123 += param_cfg.threshold << 0
+    fields_0123 = 0
+    fields_0123 += param_cfg.version << 12
+    fields_0123 += ((param_cfg.salt_len // 4) - 1) << 8
+    fields_0123 += ((param_cfg.brainkey_len // 2) - 1) << 4
+    fields_0123 += param_cfg.threshold - 1
 
     f_p, f_m, f_t = param_cfg.kdf_params._field_values
 
-    field456 = 0
-    field456 += f_p << 12
-    field456 += f_m << 6
-    field456 += f_t << 0
+    fields_456 = 0
+    fields_456 += f_p << 12
+    fields_456 += f_m << 6
+    fields_456 += f_t << 0
 
-    param_cfg_data = struct.pack("!HH", field0123, field456)
+    param_cfg_data = struct.pack("!HH", fields_0123, fields_456)
     return param_cfg_data
 
 
@@ -563,13 +589,13 @@ def main() -> None:
     assert bytes2param_cfg(param_cfg_data) == param_cfg
 
     eta = estimate_param_cost(param_cfg.sys_info, param_cfg.kdf_params)
-    print("estimated cost", eta)
+    log.info(f"estimated cost {eta}")
 
     MeasurementThread  = cli_util.EvalWithProgressbar[Measurement]
     measurement_thread = MeasurementThread(target=measure, args=(param_cfg.kdf_params,))
     measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
     measurement = measurement_thread.retval
-    print("measured  cost", round(measurement.duration))
+    log.info(f"measured  cost {round(measurement.duration)}")
 
 
 if __name__ == '__main__':

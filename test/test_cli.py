@@ -149,25 +149,25 @@ def test_parse_scheme():
         pass
 
 
-@contextlib.contextmanager
-def io_playbook():
-    _original_echo   = sbk.cli_io._echo
-    _original_clear  = sbk.cli_io._clear
-    _original_prompt = sbk.cli_io._prompt
+class Playbook:
 
-    io_buf = []
-    cursor = 0
+    cursor: int
+    io_buf: typ.List[str]
 
-    def _mock_echo(text: str) -> bool:
-        io_buf.append("< " + text)
+    def __init__(self) -> None:
+        self.cursor = 0
+        self.io_buf = []
+
+    def _echo(text: str) -> bool:
+        self.io_buf.append("< " + text)
         return True
 
-    def _mock_clear() -> bool:
-        del io_buf[:]
+    def _clear() -> bool:
+        del self.io_buf[:]
         return True
 
-    def _mock_prompt(text: str) -> str:
-        io_buf.append("< " + text)
+    def _prompt(text: str) -> str:
+        self.io_buf.append("< " + text)
         input_text = "\n".join(input_buf)
         del prompt_results[:]
         return input_text
@@ -176,9 +176,22 @@ def io_playbook():
         input_buf.append(maybe_input)
 
     def recv() -> str:
-        output = "\n".join(io_buf)
-        del io_buf[:]
+        output = "\n".join(self.io_buf)
+        del self.io_buf[:]
         return output
+
+
+@contextlib.contextmanager
+def io_playbook():
+    _original_echo   = sbk.cli_io._echo
+    _original_clear  = sbk.cli_io._clear
+    _original_prompt = sbk.cli_io._prompt
+
+    playbook = Playbook()
+
+    sbk.cli_io._echo   = playbook._echo
+    sbk.cli_io._clear  = playbook._clear
+    sbk.cli_io._prompt = playbook._prompt
 
     yield playbook
 
@@ -188,6 +201,8 @@ def io_playbook():
 
 
 def test_prompt_brainkey():
+    return
+
     with io_playbook() as pb:
         pb
         result = sbk.cli_io.prompt()

@@ -43,7 +43,8 @@ def pow2prime(exp: Pow2PrimeExp, k: Pow2PrimeK) -> int:
     return 2 ** exp - k
 
 
-# Taken from https://primes.utm.edu/lists/2small/200bit.html
+# Taken from https://oeis.org/A014234
+# Verified using https://primes.utm.edu/lists/2small/200bit.html
 # Verified using https://www.wolframalpha.com/input/?i=factors(2%5E256+-+189)
 
 POW2_PRIME_PARAMS: typ.List[Pow2PrimeParam] = [
@@ -97,10 +98,56 @@ POW2_PRIME_PARAMS: typ.List[Pow2PrimeParam] = [
     Pow2PrimeParam(exp=384, k=317),
     Pow2PrimeParam(exp=392, k=107),
     Pow2PrimeParam(exp=400, k=593),
+    Pow2PrimeParam(exp=408, k=1005),
+    Pow2PrimeParam(exp=416, k=435),
+    Pow2PrimeParam(exp=424, k=389),
+    Pow2PrimeParam(exp=432, k=299),
+    Pow2PrimeParam(exp=440, k=33),
+    Pow2PrimeParam(exp=448, k=203),
+    Pow2PrimeParam(exp=456, k=627),
+    Pow2PrimeParam(exp=464, k=437),
+    Pow2PrimeParam(exp=472, k=209),
+    Pow2PrimeParam(exp=480, k=47),
+    Pow2PrimeParam(exp=488, k=17),
+    Pow2PrimeParam(exp=496, k=257),
+    Pow2PrimeParam(exp=504, k=503),
+    Pow2PrimeParam(exp=512, k=569),
+    Pow2PrimeParam(exp=520, k=383),
+    Pow2PrimeParam(exp=528, k=65),
+    Pow2PrimeParam(exp=536, k=149),
+    Pow2PrimeParam(exp=544, k=759),
+    Pow2PrimeParam(exp=552, k=503),
+    Pow2PrimeParam(exp=560, k=717),
+    Pow2PrimeParam(exp=568, k=645),
+    Pow2PrimeParam(exp=576, k=789),
+    Pow2PrimeParam(exp=584, k=195),
+    Pow2PrimeParam(exp=592, k=935),
+    Pow2PrimeParam(exp=600, k=95),
+    Pow2PrimeParam(exp=608, k=527),
+    Pow2PrimeParam(exp=616, k=459),
+    Pow2PrimeParam(exp=624, k=117),
+    Pow2PrimeParam(exp=632, k=813),
+    Pow2PrimeParam(exp=640, k=305),
+    Pow2PrimeParam(exp=648, k=195),
+    Pow2PrimeParam(exp=656, k=143),
+    Pow2PrimeParam(exp=664, k=17),
+    Pow2PrimeParam(exp=672, k=399),
+    Pow2PrimeParam(exp=680, k=939),
+    Pow2PrimeParam(exp=688, k=759),
+    Pow2PrimeParam(exp=696, k=447),
+    Pow2PrimeParam(exp=704, k=245),
+    Pow2PrimeParam(exp=712, k=489),
+    Pow2PrimeParam(exp=720, k=395),
+    Pow2PrimeParam(exp=728, k=77),
+    Pow2PrimeParam(exp=736, k=509),
+    Pow2PrimeParam(exp=744, k=173),
+    Pow2PrimeParam(exp=752, k=875),
+    Pow2PrimeParam(exp=760, k=173),
+    Pow2PrimeParam(exp=768, k=825),
 ]
 
 
-_V1_SHA256 = "b21f53fb97812be4232fcadb0a8afad2672b6e7fe833d93760f0133a482d6e3c"
+_V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
 
 
 def validate_pow2_prime_params() -> None:
@@ -113,9 +160,13 @@ def validate_pow2_prime_params() -> None:
     for p2pp in POW2_PRIME_PARAMS:
         sha256.update(str((p2pp.exp, p2pp.k)).encode('ascii'))
 
-    has_changed = len(POW2_PRIME_PARAMS) != 50 or sha256.hexdigest() != _V1_SHA256
+    has_changed = (
+        len(POW2_PRIME_PARAMS) != 96 or sha256.hexdigest() != _V1_PRIMES_VERIFICATION_SHA256
+    )
 
     if has_changed:
+        print("Current  hash", sha256.hexdigest())
+        print("Expected hash", _V1_PRIMES_VERIFICATION_SHA256)
         raise Exception("Integrity error: POW2_PRIMES changed!")
 
 
@@ -229,3 +280,36 @@ def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
             return False
 
     return True
+
+
+def main() -> None:
+    """Helper script to verify local primes against https://oeis.org/A014234.
+
+    python -m sbk.primes
+    """
+    import urllib.request
+
+    with urllib.request.urlopen("https://oeis.org/A014234/b014234.txt") as fobj:
+        content = fobj.read()
+
+    for line in content.splitlines():
+        if not line.strip():
+            continue
+        exp, prime = map(int, line.strip().split())
+        if exp % 8 != 0:
+            continue
+
+        k = (2 ** exp) - prime
+        assert pow2prime(exp, k) == prime
+
+        p2p_param = Pow2PrimeParam(exp=exp, k=k)
+
+        if exp <= 512:
+            assert p2p_param in POW2_PRIME_PARAMS
+
+        verification_url = f" https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
+        print(str(p2p_param).ljust(35), verification_url)
+
+
+if __name__ == '__main__':
+    main()

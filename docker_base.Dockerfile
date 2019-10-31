@@ -36,6 +36,7 @@ ADD makefile.extra.make makefile.extra.make
 ADD makefile.config.make makefile.config.make
 ADD makefile makefile
 
+RUN apt-get install -y gcc
 RUN make install
 
 RUN rm -f /root/.ssh/id_rsa

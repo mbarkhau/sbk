@@ -10,7 +10,7 @@ def test_mem_total():
     assert mem_total() > 0
 
 
-@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Primes don't change")
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Calibration is expensive")
 def test_estimate_param_cost():
     sys_info = load_sys_info()
 

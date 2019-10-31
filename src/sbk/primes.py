@@ -9,6 +9,10 @@
 import random
 import typing as typ
 import hashlib
+import logging
+
+log = logging.getLogger(__name__)
+
 
 # https://oeis.org/A000040/list
 SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59]
@@ -37,10 +41,10 @@ class Pow2PrimeParam(typ.NamedTuple):
 
 
 def pow2prime(exp: Pow2PrimeExp, k: Pow2PrimeK) -> int:
-    if exp % 8 != 0:
+    if exp % 8 == 0:
+        return 2 ** exp - k
+    else:
         raise ValueError(f"Invalid exp={exp}, must be divisible by 8")
-
-    return 2 ** exp - k
 
 
 # Taken from https://oeis.org/A014234
@@ -160,13 +164,12 @@ def validate_pow2_prime_params() -> None:
     for p2pp in POW2_PRIME_PARAMS:
         sha256.update(str((p2pp.exp, p2pp.k)).encode('ascii'))
 
-    has_changed = (
-        len(POW2_PRIME_PARAMS) != 96 or sha256.hexdigest() != _V1_PRIMES_VERIFICATION_SHA256
-    )
+    digest      = sha256.hexdigest()
+    has_changed = len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
 
     if has_changed:
-        print("Current  hash", sha256.hexdigest())
-        print("Expected hash", _V1_PRIMES_VERIFICATION_SHA256)
+        log.error(f"Current  hash: {digest}")
+        log.error(f"Expected hash: {_V1_PRIMES_VERIFICATION_SHA256}")
         raise Exception("Integrity error: POW2_PRIMES changed!")
 
 
@@ -282,19 +285,11 @@ def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
     return True
 
 
-def main() -> None:
-    """Helper script to verify local primes against https://oeis.org/A014234.
-
-    python -m sbk.primes
-    """
-    import urllib.request
-
-    with urllib.request.urlopen("https://oeis.org/A014234/b014234.txt") as fobj:
-        content = fobj.read()
-
-    for line in content.splitlines():
+def a014234_verify(a014234_content: str) -> typ.Iterable[Pow2PrimeParam]:
+    for line in a014234_content.splitlines():
         if not line.strip():
             continue
+
         exp, prime = map(int, line.strip().split())
         if exp % 8 != 0:
             continue
@@ -304,10 +299,27 @@ def main() -> None:
 
         p2p_param = Pow2PrimeParam(exp=exp, k=k)
 
-        if exp <= 512:
+        if exp <= 768:
             assert p2p_param in POW2_PRIME_PARAMS
 
-        verification_url = f" https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
+        yield p2p_param
+
+
+def main() -> None:
+    """Helper script to verify local primes against https://oeis.org/A014234.
+
+    $ source activate
+    $ python -m sbk.primes
+    """
+    import urllib.request
+
+    with urllib.request.urlopen("https://oeis.org/A014234/b014234.txt") as fobj:
+        content = fobj.read()
+
+    for p2p_param in a014234_verify(content):
+        exp              = p2p_param.exp
+        k                = p2p_param.k
+        verification_url = f"https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
         print(str(p2p_param).ljust(35), verification_url)
 
 

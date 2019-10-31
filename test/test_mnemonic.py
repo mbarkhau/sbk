@@ -48,6 +48,31 @@ def test_wordlists():
     assert len(wl1 & wl2) == 0
 
 
+def test_bytes2phrase_fail():
+    try:
+        bytes2phrase(b"\x00")
+        assert False, "Expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_phrase2bytes_fail():
+    assert phrase2bytes("abacus adelaide") == b"\x00\x00"
+    assert phrase2bytes("abakus adilaide") == b"\x00\x00"
+
+    try:
+        phrase2bytes("abbakuss adilaid")
+        assert False, "Expected ValueError"
+    except ValueError as ex:
+        assert "Unknown word" in str(ex)
+
+    try:
+        phrase2bytes("adelaide abacus")
+        assert False, "Expected ValueError"
+    except ValueError as ex:
+        assert "Invalid word order" in str(ex)
+
+
 def test_fuzz_bytes2phrase():
     for i in range(2, 100, 2):
         data   = os.urandom(i % 20)

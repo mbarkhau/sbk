@@ -60,6 +60,7 @@ def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
     This is sometimes also denoted by Π (upper case PI).
     """
     if len(vals) == 0:
+        # If we new the field, we could return gf[1]
         raise ValueError("prod requires at least one value")
 
     accu = vals[0]
@@ -94,12 +95,8 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
 
     # validate x coordinates
     for i, p in enumerate(points):
-        if p.x == 0 or p.x == 255:
-            errmsg = f"Illegal Share {i + 1} with x={p.x}. Possible attack."
-            raise Exception(errmsg)
-
         if not 0 < p.x < 255:
-            errmsg = f"Invalid Share {i + 1} with x={p.x}. Possible attack."
+            errmsg = f"Invalid share {i + 1} with x={p.x}. Possible attack."
             raise Exception(errmsg)
 
     terms = iter(_interpolation_terms(points, at_x=at_x))
@@ -109,7 +106,7 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
     return accu
 
 
-def _val_of(n: typ.Union[int, float, gf.GFNum, gf.GF256]) -> int:
+def val_of(n: typ.Union[int, float, gf.GFNum, gf.GF256]) -> int:
     # Helper function to allow n to be a plain integer or float in tests.
     if isinstance(n, int):
         return n
@@ -129,7 +126,7 @@ def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[
         for exp, coeff in enumerate(coeffs):
             y += coeff * field[at_x] ** field[exp]
 
-        return _val_of(y)
+        return val_of(y)
 
     return eval_at
 
@@ -192,4 +189,4 @@ def join(field: gf.Field[gf.Num], threshold: int, points: Points) -> int:
     if len(points) < threshold:
         raise ValueError("Not enough pieces to recover secret")
 
-    return _val_of(interpolate(points, at_x=field[0]))
+    return val_of(interpolate(points, at_x=field[0]))

@@ -100,18 +100,16 @@ def bytes2gfpoint(data: bytes, field: gf.Field) -> gf_poly.Point:
     y = bytes2int(y_data)
 
     if y >= field.order:
-        raise Exception(f"Invalid prime for point with y >= {field.order}")
+        raise ValueError(f"Invalid data for field with order={field.order}. Too large y={y}")
 
     return gf_poly.Point(field[x], field[y])
 
 
 def gfpoint2bytes(point: gf_poly.Point) -> bytes:
+    # NOTE: for x=0 or x=255 the y value may be the secret, which should not be serialized.
     x = point.x.val
-    if x == 0:
-        # NOTE: for x=0 the y value is the secret
-        raise Exception(f"Invalid point with x={x} == 0")
-    if x >= 255:
-        raise Exception(f"Invalid point with x={x} >= 255")
+    if not (0 < x < 255):
+        raise ValueError(f"Invalid point with x={x}. Was not 0 < x < 255")
 
     num_bits    = math.ceil(math.log2(point.y.p))
     num_bytes   = num_bits // 8

@@ -23,13 +23,31 @@ from sbk.gf_util import *
 def test_xgcd():
     assert xgcd(252, 105) == XGCDResult(g=21, s=-2, t=5)
     assert xgcd(105, 252) == XGCDResult(g=21, s=5, t=-2)
-    assert xgcd(240,  46) == XGCDResult(g=2 , s=-9, t=47)
+    assert xgcd(240, 46) == XGCDResult(g=2, s=-9, t=47)
 
 
 def test_prod():
-    assert prod([1  ]) == 1
+    assert prod([1]) == 1
     assert prod([2.0]) == 2.0
     assert prod([2, 3, 4]) == 24
+
+    try:
+        prod([])
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "at least one value" in str(ex)
+
+
+def test_point():
+    p = Point(1, 2)
+    assert repr(p)
+    assert list(p) == [1, 2]
+    assert p == Point(1, 2)
+
+    try:
+        Point(1, 2) == (1, 2)
+    except NotImplementedError:
+        pass
 
 
 def alt_eval_at(coeffs, p):
@@ -121,6 +139,10 @@ def test_interpolate_deg2_float():
 def test_gf_arithmetic():
     gf7 = GFNum.field(7)
 
+    assert val_of(3  ) == 3
+    assert val_of(3.0) == 3.0
+    assert val_of(gf7[3]) == 3
+
     zero = gf7[0]
     one  = gf7[1]
     two  = gf7[2]
@@ -154,6 +176,56 @@ def test_interpolate_gf():
     assert interp_y == at_y
 
     assert interpolate(points[:-1], at_x=gf7[1] / gf7[2]) == gf7[1] / gf7[4]
+
+
+def test_interpolate_fail():
+    gf7    = GFNum.field(7)
+    points = [
+        Point(gf7[1], gf7[0]),
+        Point(gf7[1], gf7[1]),
+    ]
+
+    try:
+        interpolate([], at_x=gf7[1])
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "fewer than two points" in str(ex)
+
+    try:
+        interpolate(points[:1], at_x=gf7[1])
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "fewer than two points" in str(ex)
+
+    try:
+        interpolate(points, at_x=gf7[1])
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "Points must be distinct" in str(ex)
+
+
+def test_interpolate_attack():
+    gf = GFNum.field(1021)
+
+    points = [
+        Point(gf[1], gf[0]),
+        Point(gf[2], gf[1]),
+        Point(gf[3], gf[4]),
+    ]
+
+    try:
+        interpolate([Point(gf[0], gf[0])] + points, at_x=gf[0])
+        assert False, "expected Exception"
+    except Exception as ex:
+        assert "Invalid share" in str(ex)
+        assert "Possible attack" in str(ex)
+
+    try:
+        interpolate([Point(gf[255], gf[0])] + points, at_x=gf[0])
+        assert False, "expected Exception"
+    except Exception as ex:
+        assert "Invalid share" in str(ex)
+        assert "Possible attack" in str(ex)
 
 
 def test_split_and_join_2of3():

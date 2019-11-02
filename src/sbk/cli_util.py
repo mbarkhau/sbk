@@ -13,7 +13,7 @@ import threading
 
 import click
 
-from . import ecc_lt
+from . import ecc_rs
 from . import enc_util
 from . import mnemonic
 
@@ -85,12 +85,12 @@ def bytes2intcodes(data: bytes) -> IntCodes:
     The main purpose of the intcode format is to be
     compact, redundant and resilient to input errors.
     """
-    data_with_ecc = ecc_lt.encode(data)
+    data_with_ecc = ecc_rs.encode(data, ecc_len=len(data))
     return list(bytes2intcode_parts(data_with_ecc))
 
 
 def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
-    """Decode and and validate intcodes to MaybeBytes."""
+    """Decode and and validate intcodes to PartVals."""
     expected_chk_idx = idx_offset % 13
     chk_idx_offset   = idx_offset - expected_chk_idx
 
@@ -126,40 +126,13 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
     return part_vals
 
 
-def parts2packets(parts: PartVals, packet_len: int) -> ecc_lt.MaybePackets:
-    num_packets = len(parts) // packet_len
-    assert num_packets == 8
-
-    packets = [b""] * num_packets
-    for idx, part_val in enumerate(parts):
-        if part_val != b"":
-            packets[idx // packet_len] += part_val
-
-    # NOTE: It is unfortunate that only a full packet is
-    #   considered valid. A better ECC algo would make
-    #   use of all available data.
-
-    return [(pkt if len(pkt) == packet_len else None) for pkt in packets]
-
-
-# 060-691 096-369 172-944 227-441 292-977 358-513
-# abacus adelaide avocado aspen beggar bahrain boat bohemia flute brussels peanut carolina
-
-# 030-833 096-369 161-905 227-441 292-977 358-513
-# 422-264 487-800 553-336 618-872 684-408 749-944
-# kiwi iraq kiwi iraq kiwi iraq kiwi iraq kiwi iraq kiwi iraq
-
-
 def maybe_intcodes2bytes(intcodes: MaybeIntCodes) -> bytes:
     data_with_ecc = intcodes2parts(intcodes)
-    block_len     = len(data_with_ecc)
-    if block_len % 8 != 0:
-        errmsg = f"Invalid len(data_with_ecc)={block_len}, must be divisible by 8"
-        raise ValueError(errmsg)
+    msg_len       = len(data_with_ecc) // 2
 
-    packet_len    = block_len // 8  # aka. parts per packet
-    maybe_packets = parts2packets(data_with_ecc, packet_len)
-    return ecc_lt.decode_packets(maybe_packets)
+    assert all(len(part) <= 1 for part in data_with_ecc)
+    maybe_packets = [part[0] if part else None for part in data_with_ecc]
+    return ecc_rs.decode_packets(maybe_packets, msg_len)
 
 
 def intcodes2bytes(intcodes: IntCodes) -> bytes:
@@ -207,7 +180,7 @@ def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: IntCodes) -
 
 
 def format_secret_lines(data: bytes) -> Lines:
-    """Format a completed secret."""
+    """Format a fully known secret."""
     phrase = mnemonic.bytes2phrase(data)
     assert mnemonic.phrase2bytes(phrase) == data
 

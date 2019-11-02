@@ -16,20 +16,6 @@ Num     = typ.TypeVar('Num', 'GFNum', 'GF256')
 NumType = typ.Type[Num]
 
 
-class Field(typ.Generic[Num]):
-
-    order  : int
-    num_typ: NumType
-
-    def __init__(self, order: int, num_typ: NumType) -> None:
-        # order, aka. characteristic, aka. prime
-        self.order   = order
-        self.num_typ = num_typ
-
-    def __getitem__(self, val: int) -> Num:
-        return self.num_typ(val, self.order)
-
-
 @functools.total_ordering
 class GFNum:
 
@@ -37,7 +23,7 @@ class GFNum:
     val: int
 
     @classmethod
-    def field(cls: NumType, order: int) -> Field['GFNum']:
+    def field(cls: NumType, order: int) -> "Field[GFNum]":
         return Field(order, cls)
 
     def __init__(self, val: int, p: int) -> None:
@@ -80,8 +66,8 @@ class GFNum:
 
     def _mul_inverse(self) -> 'GFNum':
         assert self.val >= 0
-        t       = gf_util.xgcd(self.p, self.val).t
-        inv_val = self.p + t
+        res     = gf_util.xgcd(self.p, self.val)
+        inv_val = self.p + res.t
         return self._new_gf(inv_val)
 
     def __truediv__(self, other: 'GFNum') -> 'GFNum':
@@ -98,7 +84,7 @@ class GFNum:
             return
 
         if not isinstance(other, GFNum):
-            errmsg = f"Cannot compare GFNum with {type(other)}"
+            errmsg = f"Cannot compare {repr(self)} with {repr(other)}"
             raise NotImplementedError(errmsg)
 
         if hasattr(self, 'p') and self.p != other.p:
@@ -106,22 +92,20 @@ class GFNum:
             raise ValueError(errmsg)
 
     def __eq__(self, other: object) -> bool:
+        if self is other:
+            return True
+
+        if isinstance(other, GFNum) and self.p == other.p:
+            return self.val == other.val
+
         self._check_comparable(other)
-        if isinstance(other, int):
-            return self.val == other
-
-        assert isinstance(other, GFNum)
-        return self.val == other.val
-
-    def __ne__(self, other: object) -> bool:
-        self._check_comparable(other)
-        if isinstance(other, int):
-            return self.val != other
-
-        assert isinstance(other, GFNum)
-        return self.val != other.val
+        assert isinstance(other, int)
+        return self.val == other
 
     def __lt__(self, other: object) -> bool:
+        if self is other:
+            return False
+
         self._check_comparable(other)
         if isinstance(other, int):
             return self.val < other
@@ -133,15 +117,12 @@ class GFNum:
         return f"GFNum({self.val:>3}, p={self.p})"
 
 
-_MUL_INV_LUT = [0] * 256
-
-
 class GF256(GFNum):
 
     val: int
 
     @classmethod
-    def field(cls: NumType, order: int = 256) -> Field[GFNum]:
+    def field(cls: NumType, order: int = 256) -> "Field[GFNum]":
         assert order == 256
         return Field(order, cls)
 
@@ -150,23 +131,63 @@ class GF256(GFNum):
         self.val = val
 
     def __add__(self, other: Num) -> 'GF256':
-        return GF256(self.val ^ other.val)
+        val = self.val ^ other.val
+        assert 0 <= val <= 255
+        return ALL_GF256[val]
 
     def __sub__(self, other: Num) -> 'GF256':
-        return GF256(self.val ^ other.val)
+        val = self.val ^ other.val
+        assert 0 <= val <= 255
+        return ALL_GF256[val]
 
     def __mul__(self, other: Num) -> 'GF256':
-        return GF256(gf_util.mul(self.val, other.val))
+        a = self.val
+        b = other.val
+        assert 0 <= a <= 255, a
+        assert 0 <= b <= 255, b
+        val = gf_util.MUL_LUT[a * 256 + b]
+        assert 0 <= val <= 255
+        return ALL_GF256[val]
 
     def __pow__(self, other: Num) -> 'GF256':
-        return GF256(gf_util.pow_slow(self.val, other.val))
+        val = gf_util.pow_slow(self.val, other.val)
+        assert 0 <= val <= 255
+        return ALL_GF256[val]
 
-    def _mul_inverse(self) -> 'GF256':
-        v = self.val
-        if v > 0 and _MUL_INV_LUT[v] == 0:
-            _MUL_INV_LUT[v] = gf_util.inverse(v)
+    def __truediv__(self, other: Num) -> 'GF256':
+        inv = gf_util.MUL_INVERSE_LUT[other.val]
+        return self * ALL_GF256[inv]
 
-        return GF256(_MUL_INV_LUT[v])
+    def __eq__(self, other: object) -> bool:
+        if self is other:
+            return True
+
+        if isinstance(other, GFNum):
+            return self.val == other.val
+        else:
+            errmsg = f"Cannot compare {repr(self)} with {repr(other)}"
+            raise NotImplementedError(errmsg)
 
     def __repr__(self) -> str:
         return f"GF256({self.val:>3})"
+
+
+ALL_GF256 = [GF256(n) for n in range(256)]
+
+
+class Field(typ.Generic[Num]):
+
+    order  : int
+    num_typ: NumType
+
+    def __init__(self, order: int, num_typ: NumType) -> None:
+        # order, aka. characteristic, aka. prime
+        self.order   = order
+        self.num_typ = num_typ
+
+    def __getitem__(self, val: int) -> Num:
+        if self.order == 256:
+            assert 0 <= val <= 255
+            return ALL_GF256[val]
+        else:
+            return self.num_typ(val, self.order)

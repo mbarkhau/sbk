@@ -338,6 +338,7 @@ lint:
 .PHONY: mypy
 mypy:
 	@rm -rf ".mypy_cache";
+	@rm -rf "mypycov/";
 
 	@printf "mypy ....\n"
 	@MYPYPATH=stubs/:vendor/ $(DEV_ENV_PY) -m mypy \
@@ -370,6 +371,7 @@ test:
 	@rm -rf ".pytest_cache";
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";
+	@rm -rf "htmlcov/";
 
 	# First we test the local source tree using the dev environment
 	ENV=$${ENV-dev} PYTHONPATH=src/:vendor/:$$PYTHONPATH \
@@ -382,11 +384,14 @@ test:
 		test/ src/;
 
 	# Next we install the package and run the test suite against it.
+	@rm -rf test_dists/;
+	$(DEV_ENV_PY) setup.py bdist_wheel --python-tag=$(BDIST_WHEEL_PYTHON_TAG) \
+		--dist-dir test_dists/;
 
 	IFS=' ' read -r -a env_py_paths <<< "$(CONDA_ENV_BIN_PYTHON_PATHS)"; \
 	for i in $${!env_py_paths[@]}; do \
 		env_py=$${env_py_paths[i]}; \
-		$${env_py} setup.py install; \
+		$${env_py} -m pip install --upgrade test_dists/*.whl; \
 		PYTHONPATH="" ENV=$${ENV-dev} $${env_py} -m pytest test/; \
 	done;
 

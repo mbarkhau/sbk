@@ -3881,7 +3881,7 @@ def gen_int_seed(num_bits: int, random_fn: RandumFn = os.urandom):
     if num_bits % 8 != 0:
         raise ValueError("Argument 'num_bits' must be divisible by 8.")
     if num_bits < 1:
-        raise ValueError("Argument 'num_bits' must be >0.")
+        raise ValueError("Argument 'num_bits' must be > 0.")
 
     num_bytes = num_bits // 8
 

@@ -1,4 +1,5 @@
 import math
+import random
 
 from sbk.electrum_mnemonic import *
 
@@ -37,6 +38,29 @@ def test_mnemonic():
 
     expected = TEST_SEED
     assert mnemonic_encode(TEST_SEED_RAW) == expected
+
+
+def test_electrum_mnemonic():
+    seed = gen_int_seed(num_bits=128)
+    assert 0 <= seed < 2 ** 128
+
+    try:
+        gen_int_seed(num_bits=127)
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "divisible by 8" in str(ex)
+
+    try:
+        gen_int_seed(num_bits=0)
+        assert False, "expected ValueError"
+    except ValueError as ex:
+        assert "must be > 0" in str(ex)
+
+
+def test_seed_raw2phrase():
+    seed   = gen_int_seed(128)
+    phrase = seed_raw2phrase(seed)
+    assert len(phrase.split(" ")) == 12
 
 
 def main():

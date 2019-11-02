@@ -44,8 +44,16 @@ class ECCDecodeError(ValueError):
     pass
 
 
-def _interpolate(points: gf_poly.Points, at_x: gf.Num) -> gf.Num:
-    terms = iter(gf_poly._interpolation_terms(points, at_x=at_x))
+def _interpolate(
+    points: gf_poly.Points[gf.GF256], at_x: gf.GF256, verify: bool = False
+) -> gf.GF256:
+    terms_fast = list(gf_poly._interpolation_terms_256(points, at_x=at_x))
+
+    if verify:
+        terms_slow = list(gf_poly._interpolation_terms(points, at_x=at_x))
+        assert terms_fast == terms_slow
+
+    terms = iter(terms_fast)
     accu  = next(terms)
     for term in terms:
         accu += term
@@ -59,17 +67,19 @@ def _encode(msg: Message, ecc_len: int) -> Block:
         # We need at least two points (and hence bytes) to do interpolation
         msg = msg + msg
 
-    field = gf.GF256.field()
+    field = gf.Field[gf.GF256](256, gf.GF256)
 
-    data_points = [gf_poly.Point(field[x], field[y]) for x, y in enumerate(msg)]
-    ecc_x_vals  = [field[x] for x in range(len(msg), len(msg) + ecc_len)]
-    ecc_points  = [gf_poly.Point(x=x, y=_interpolate(data_points, at_x=x)) for x in ecc_x_vals]
-    y_vals      = [p.y.val for p in data_points + ecc_points]
+    data_points  = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(msg))
+    ecc_x_coords = tuple(field[x] for x in range(len(msg), len(msg) + ecc_len))
+    ecc_points   = tuple(
+        gf_poly.Point(x=x, y=_interpolate(data_points, at_x=x)) for x in ecc_x_coords
+    )
+    y_vals = tuple(p.y.val for p in data_points + ecc_points)
     assert all(0 <= y <= 255 for y in y_vals)
     return bytes(y_vals)
 
 
-def encode(msg: Message, ecc_len: int) -> Block:
+def encode(msg: Message, ecc_len: int, verify: bool = True) -> Block:
     """Encode message to a Block with RS Code as ECC data."""
     assert ecc_len >= 0
     if ecc_len == 0:
@@ -77,7 +87,8 @@ def encode(msg: Message, ecc_len: int) -> Block:
 
     block = _encode(msg, ecc_len=ecc_len)
     assert block.startswith(msg)
-    assert decode(block, len(msg)) == msg
+    if verify:
+        assert decode(block, len(msg)) == msg
     return block
 
 
@@ -101,7 +112,7 @@ def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
             yield tuple(combo)
     else:
         sample_combos: typ.Set[Indexes] = set()
-        while len(sample_combos) < num_combos / 3:
+        while len(sample_combos) < num_combos // 3:
             sample_combo = tuple(random.sample(all_indexes, msg_len))
             if sample_combo not in sample_combos:
                 sample_combos.add(sample_combo)
@@ -109,21 +120,22 @@ def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
 
 
 def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
-    field  = gf.GF256.field()
-    points = [gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None]
+    field  = gf.Field[gf.GF256](256, gf.GF256)
+    points = tuple(
+        gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None
+    )
 
     if len(points) < msg_len:
         raise ECCDecodeError("Not enough data to recover message.")
 
-    msg_x_coords = [field[x] for x in range(msg_len)]
+    msg_x_coords = tuple(field[x] for x in range(msg_len))
     candidates: typ.Counter[bytes] = collections.Counter()
     for sample_num, point_indexes in enumerate(_iter_indexes(msg_len, len(points))):
-        sample_points = [points[idx] for idx in point_indexes]
-        msg_bytes     = [_interpolate(sample_points, at_x=x).val for x in msg_x_coords]
-        msg_candidate = bytes(msg_bytes)
+        sample_points = tuple(points[idx] for idx in point_indexes)
+        msg_candidate = bytes(_interpolate(sample_points, at_x=x).val for x in msg_x_coords)
         candidates[msg_candidate] += 1
 
-        if (sample_num + 1) % 20 == 0:
+        if (sample_num + 1) % 10 == 0:
             if len(candidates) == 1:
                 ((top, top_n),) = candidates.most_common(1)
                 return top
@@ -182,6 +194,10 @@ CLI_HELP = """CLI to demo recovery using ecc.
 
 Example usage:
 
+    $ python -m sbk.ecc_rs --test
+    ...
+    $ python -m sbk.ecc_rs --profile
+    ...
     $ echo "Hello, 世界!" | python -m sbk.ecc_rs --encode
     48656c6c6f2c20e4b896e7958c210a51ee32d3ac1bee26daac14d3b95428
     $ echo "48656c6c6f2c20e4b896e7958c210a51ee32d3ac1bee26daac14d3b95428" | python -m sbk.ecc_rs --decode
@@ -200,6 +216,33 @@ def main(args: typ.List[str] = sys.argv[1:]) -> int:
         print(main.__doc__)
         return 0
 
+    if "--test" in args:
+        input_data = "Hello, 世界!!!!iasdf1234567890!!!!"
+        block      = _cli_encode(input_data)
+        msg        = _cli_decode(block)
+        assert msg == input_data
+        print("ok")
+        return 0
+
+    if "--profile" in args:
+        import io
+        import pstats
+        import cProfile
+
+        # init lookup tables
+        input_data = "Hello, 世界!!!!iasdf1234567890!!!!"
+        _cli_encode(input_data)
+
+        pr = cProfile.Profile()
+        pr.enable()
+        _cli_encode(input_data)
+        pr.disable()
+        s  = io.StringIO()
+        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+        ps.print_stats()
+        print(s.getvalue())
+        return 0
+
     input_data = sys.stdin.read()
 
     if "-e" in args or "--encode" in args:
@@ -214,8 +257,6 @@ def main(args: typ.List[str] = sys.argv[1:]) -> int:
         sys.stderr.write("Invalid arguments\n")
         sys.stderr.write(CLI_HELP)
         return 1
-
-    return
 
 
 main.__doc__ = CLI_HELP

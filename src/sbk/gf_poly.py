@@ -22,6 +22,7 @@ import typing as typ
 import itertools
 
 from . import gf
+from . import gf_util
 
 _rand = random.SystemRandom()
 
@@ -51,7 +52,7 @@ class Point(typ.Generic[gf.Num]):
         yield self.y
 
 
-Points = typ.Sequence[Point[gf.Num]]
+Points = typ.Tuple[Point[gf.Num], ...]
 
 
 def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
@@ -69,12 +70,48 @@ def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
     return accu
 
 
-def _interpolation_terms(points: Points, at_x: gf.Num) -> typ.Iterable[gf.Num]:
-    for p in points:
-        others = [o for o in points if o != p]
+def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
+    # specialization to speed up ecc_rs.decode_packets
+    assert isinstance(at_x, gf.GF256)
+    assert all(isinstance(p.x, gf.GF256) for p in points)
+    assert all(isinstance(p.y, gf.GF256) for p in points)
 
-        numer = prod([at_x - o.x for o in others])
-        denum = prod([p.x  - o.x for o in others])
+    mul_lut = gf_util.MUL_LUT
+    inv_lut = gf_util.MUL_INVERSE_LUT
+
+    _points = tuple((p.x.val, p.y.val) for p in points)
+    _xs     = tuple(px for px, py in _points)
+    _at_x   = at_x.val
+
+    for i, (px, py) in enumerate(_points):
+        _other_xs = _xs[:i] + _xs[i + 1 :]
+        assert len(_other_xs) == len(_points) - 1
+
+        numer = 1
+        for ox in _other_xs:
+            numer = mul_lut[numer * 256 + (_at_x ^ ox)]
+
+        denum = 1
+        for ox in _other_xs:
+            denum = mul_lut[denum * 256 + (px ^ ox)]
+
+        assert 0 <= py    < 256, py
+        assert 0 <= numer < 256, numer
+        assert 0 <= denum < 256, denum
+
+        numer2 = mul_lut[py * 256 + numer]
+        d_inv  = inv_lut[denum]
+        result = mul_lut[numer2 * 256 + d_inv]
+        yield gf.ALL_GF256[result]
+
+
+def _interpolation_terms(points: Points, at_x: gf.Num) -> typ.Iterable[gf.Num]:
+    for i, p in enumerate(points):
+        others = points[:i] + points[i + 1 :]
+        assert len(others) == len(points) - 1
+
+        numer = prod(tuple(at_x - o.x for o in others))
+        denum = prod(tuple(p.x  - o.x for o in others))
 
         yield (p.y * numer) / denum
 
@@ -89,7 +126,7 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
     if len(points) < 2:
         raise ValueError("Cannot interpolate with fewer than two points")
 
-    x_vals = [p.x for p in points]
+    x_vals = tuple(p.x for p in points)
     if len(x_vals) != len(set(x_vals)):
         raise ValueError("Points must be distinct {points}")
 
@@ -146,7 +183,7 @@ def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -
 
     eval_at = poly_eval_fn(field, coeffs)
 
-    points = [Point(field[x], field[eval_at(x)]) for x in range(1, num_shares + 1)]
+    points = tuple(Point(field[x], field[eval_at(x)]) for x in range(1, num_shares + 1))
     assert len(points) == num_shares
 
     # make sure we only return pieces that we can join again

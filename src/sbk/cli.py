@@ -107,24 +107,20 @@ def _derive_key(
     KDFThread  = cli_util.EvalWithProgressbar[bytes]
     kdf_thread = KDFThread(target=kdf.derive_key, kwargs=kdf_kwargs)
     kdf_thread.start_and_wait(eta_sec, label)
-    hash_data = kdf_thread.retval
-
-    # NOTE: We encode the x value of a point in the first byte.
-    key_data = b"\x00" + hash_data
-    assert len(key_data) % 4 == 0
-    return key_data
+    master_key = kdf_thread.retval
+    return master_key
 
 
 SECURITY_WARNING_TEXT = """
-The security of your system is important. Please ensure the following:
+Security Warning
+
+Please ensure the following:
 
  - Only you can currently view your screen.
-
  - Your computer is not connected to any network.
-
  - Your computer is booted using a trusted installation of Linux.
 
-For more information on setting up a secure air gapped system
+For more information on setting up a secure air-gapped system
 see: http://tiny.cc/sbk-airgap
 
                                   █████████████████████████████████
@@ -148,7 +144,7 @@ see: http://tiny.cc/sbk-airgap
 
 
 SECURITY_WARNING_PROMPT = """
-Do you believe this system is secure?
+Press enter to continue
 """
 
 
@@ -218,16 +214,14 @@ Please make a physical copy of Share {share_no}/{num_shares}.
 """
 
 BRAINKEY_INFO_TEXT = r"""
-Your "Brainkey" and "Salt" are combined to produce your "Master Key".
-As long as you can remember your "Brainkey", and as
-long as you have access to your "Salt", you will be able to recover your
-wallet.
+Your "Salt" and "Brainkey" are combined to produce your wallet seed.
+As long as you have access to your "Salt" and as long as you can
+remember your "Brainkey", you will be able to recover your wallet.
 
-If you forget your brainkey, it will be lost forever. So, you should
-
+It is important that you
  - memorize your brainkey very well,
  - regularly remember it so you don't forget it,
- - never tell it to anybody ever!
+ - never tell it to anybody, ever!
 """
 
 # Salt + Brainkey + Wallet Name -> Wallet
@@ -235,11 +229,11 @@ If you forget your brainkey, it will be lost forever. So, you should
 BRAINKEY_LAST_CHANCE_WARNING_TEXT = """
 This is the last time your brainkey will be shown.
 
-If you do not yet feel confident in your memory:
+If you don't yet feel confident in your memory:
 
  1. Write down the brainkey only as a temporary memory aid.
- 2. Do not use the generated wallet until you feel comfortable that
-    you have have memorized your brainkey.
+ 2. Do not use the generated wallet until you feel
+    comfortable that you have have memorized your brainkey.
  3. Destroy the memory aid before you use the wallet.
 
 Press enter to hide your brainkey and to continue
@@ -534,8 +528,8 @@ def _show_created_data(
     _validate_params(param_cfg, param_cfg_data)
 
     yes_all or clear()
-    yes_all or echo(SECURITY_WARNING_TEXT)
-    yes_all or confirm(SECURITY_WARNING_PROMPT)
+    yes_all or echo(SECURITY_WARNING_TEXT.strip())
+    yes_all or anykey_confirm(SECURITY_WARNING_PROMPT)
 
     yes_all or clear()
     echo(PARAMS_TITLE)
@@ -634,6 +628,9 @@ def create(
     assert recoverd_salt      == salt
     assert recovered_brainkey == brainkey
 
+    # verify that derivation works before we show anything
+    _derive_key(param_cfg, salt, brainkey, label="Deriving Master Key")
+
     _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
 
     yes_all or _validate_copies(param_cfg, salt, brainkey, shares)
@@ -677,7 +674,7 @@ def _join_shares(
     param_cfg: params.ParamConfig, shares: typ.List[Share]
 ) -> typ.Tuple[Salt, BrainKey]:
     field  = gf.GFNum.field(order=param_cfg.prime)
-    points = [enc_util.bytes2gfpoint(p, field) for p in shares]
+    points = tuple(enc_util.bytes2gfpoint(p, field) for p in shares)
 
     secret_int = gf_poly.join(field, param_cfg.threshold, points)
     master_key = enc_util.int2bytes(secret_int)
@@ -730,7 +727,7 @@ def load_wallet(yes_all: bool = False, non_segwit: bool = False) -> None:
     """Open wallet using Salt+Brainkey or Shares."""
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
-    yes_all or confirm(SECURITY_WARNING_PROMPT)
+    yes_all or anykey_confirm(SECURITY_WARNING_PROMPT)
 
     header_text    = "Enter Parameters"
     param_cfg_data = cli_io.prompt(cli_io.DATA_TYPE_PARAM_CFG, 4, header_text)

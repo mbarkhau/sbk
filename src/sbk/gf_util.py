@@ -8,6 +8,8 @@
 
 import typing as typ
 
+from . import gf_256_mul_lut
+
 # https://en.wikipedia.org/wiki/Finite_field_arithmetic#Rijndael's_finite_field
 #
 # x**8 + x**4 + x**3 + x + 1  (0b100011011 = 0x11B)
@@ -58,7 +60,7 @@ import typing as typ
 RIJNDAEL_REDUCING_POLYNOMIAL = 0x11B
 
 
-def div(a: int, b: int) -> int:
+def div_slow(a: int, b: int) -> int:
     # long division
     val     = a
     divisor = b
@@ -82,11 +84,25 @@ def div(a: int, b: int) -> int:
     return val
 
 
+DIV_LUT: typ.Dict[int, int] = {}
+
+
+def div(a: int, b: int) -> int:
+    assert 0 <= a < 65536, a
+    assert 0 < b, b
+
+    key = a * 65536 + b
+    if key not in DIV_LUT:
+        DIV_LUT[key] = div_slow(a, b)
+
+    return DIV_LUT[key]
+
+
 def div_by_rrp(val: int) -> int:
     return div(val, RIJNDAEL_REDUCING_POLYNOMIAL)
 
 
-def mul(a: int, b: int) -> int:
+def mul_slow(a: int, b: int) -> int:
     res = 0
     while a > 0:
         if a & 1 != 0:
@@ -97,8 +113,16 @@ def mul(a: int, b: int) -> int:
     return div_by_rrp(res)
 
 
+MUL_LUT = gf_256_mul_lut.LOOKUP_TABLE
+
+
+def mul(a: int, b: int) -> int:
+    assert 0 <= a < 256, a
+    assert 0 <= b < 256, b
+    return MUL_LUT[a * 256 + b]
+
+
 def pow_slow(a: int, b: int) -> int:
-    # there has to be a better way!
     res = 1
     n   = b
     while n > 0:
@@ -126,6 +150,13 @@ def inverse(val: int) -> int:
     inv = pow_slow(val, exp)
     assert mul(val, inv) == 1
     return inv
+
+
+def _init_mul_inv_lut() -> typ.List[int]:
+    return [inverse(val) for val in range(256)]
+
+
+MUL_INVERSE_LUT = _init_mul_inv_lut()
 
 
 # The Euclidean GCD algorithm is based on the principle that the
@@ -169,3 +200,18 @@ def xgcd(a: int, b: int) -> XGCDResult:
     res = XGCDResult(g=g, s=t - q * s, t=s)
     assert res.s * a + res.t * b == res.g
     return res
+
+
+def main() -> None:
+    """Generate lookup table for GF(2**8)."""
+    for a in range(256):
+        for b in range(256):
+            m    = mul_slow(a, b)
+            mstr = hex(m)[2:]
+            print(f"{mstr:>02}", end=" ")
+            if (b + 1) % 32 == 0:
+                print()
+
+
+if __name__ == '__main__':
+    main()

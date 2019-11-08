@@ -17,6 +17,7 @@ and Reed-Solomon
 https://research.swtch.com/field
 """
 
+import os
 import random
 import typing as typ
 import itertools
@@ -24,7 +25,16 @@ import itertools
 from . import gf
 from . import gf_util
 
-_rand = random.SystemRandom()
+_rand       = random.SystemRandom()
+_debug_rand = random.Random(0)
+
+
+def randrange(*args, **kwargs) -> int:
+    if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
+        return _debug_rand.randrange(*args, **kwargs)
+    else:
+        return _rand.randrange(*args, **kwargs)
+
 
 Coefficients = typ.List[gf.GFNum]
 
@@ -179,7 +189,7 @@ def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -
     coeffs: Coefficients = [field[secret]]
 
     while len(coeffs) < threshold:
-        coeffs.append(field[_rand.randrange(field.order)])
+        coeffs.append(field[randrange(field.order)])
 
     eval_at = poly_eval_fn(field, coeffs)
 

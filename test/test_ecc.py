@@ -1,5 +1,9 @@
+import io
 import os
+import sys
 import random
+
+import pytest
 
 import sbk.ecc_lt
 import sbk.ecc_rs
@@ -67,34 +71,57 @@ def _add_bad_symbols(block, errors=0, erasures=0):
     return bad_block, err_indexes, del_indexes
 
 
-def test_rs():
-    return
-    import sys
-    import random
+MSG_LENS = [2, 3, 4, 8, 12, 14, 24]
 
-    for msg_len in range(4, 40, 4):
-        msg_in  = os.urandom(msg_len)
-        ecc_len = max(msg_len, 2)
-        block   = encode(msg_in, ecc_len=ecc_len)
-        msg_out = decode(block , msg_len)
-        assert msg_out == msg_in
-        print(str(msg_len).rjust(2), end="  ")
 
-        for max_erasures in range(1, ecc_len * 2):
+@pytest.mark.parametrize("msg_len", MSG_LENS)
+def test_rs(msg_len):
+    msg_in  = os.urandom(msg_len)
+    block   = sbk.ecc_rs.encode(msg_in)
+    ecc_len = len(block) - msg_len
+    assert ecc_len >= msg_len
+    assert len(block) % 4 == 0
+    msg_out = sbk.ecc_rs.decode(block, msg_len)
+    assert msg_out == msg_in
+
+
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Erasure recovery is expensive")
+@pytest.mark.parametrize("msg_len", MSG_LENS)
+def test_rs_erasure(msg_len):
+    msg_in = os.urandom(msg_len)
+    block  = sbk.ecc_rs.encode(msg_in)
+    try:
+        os.environ['SBK_VERIFY_ECC_RS_INTERPOLATION_TERMS'] = "1"
+        for max_erasures in range(1, msg_len):
             packets = list(block)
 
             # erase some packets
             for _ in range(max_erasures):
                 packets[random.randrange(0, len(block))] = None
 
-            sys.stdout.write(f"{max_erasures:>3}|{msg_len:>2}|{ecc_len:<2}")
-            try:
-                assert decode_packets(packets, msg_len) == msg_in
-                sys.stdout.write(".")
-            except ValueError:
-                sys.stdout.write(f"x")
-            sys.stdout.flush()
-        print("ok")
+            msg_out = sbk.ecc_rs.decode_packets(packets, msg_len)
+            assert msg_out == msg_in
+    finally:
+        del os.environ['SBK_VERIFY_ECC_RS_INTERPOLATION_TERMS']
+
+
+@pytest.mark.skipif(
+    "slow" in os.getenv('PYTEST_SKIP', ""), reason="Corruption recovery is expensive"
+)
+@pytest.mark.parametrize("msg_len", MSG_LENS)
+def test_rs_corruption(msg_len):
+    msg_in = os.urandom(msg_len)
+    block  = sbk.ecc_rs.encode(msg_in)
+
+    for max_corruption in range(1, max(1, min(6, 2 * msg_len // 3))):
+        packets = list(block)
+
+        # corrupt some packets
+        for _ in range(max_corruption):
+            packets[random.randrange(0, len(block))] = 0xFF
+
+        msg_out = sbk.ecc_rs.decode_packets(packets, msg_len)
+        assert msg_out == msg_in
 
 
 def test_xor_bytes():
@@ -175,8 +202,6 @@ def test_residual_xor():
 
 
 def test_candidate_counts():
-    # TODO
-    return
     message          = b'01234567'
     block            = sbk.ecc_lt.encode(message)
     packets          = sbk.ecc_lt.block2packets(block)
@@ -294,10 +319,13 @@ def test_lt_decode_error_detect():
                 if decoded == data:
                     success += 1
                 else:
-                    print(">>", sbk.enc_util.bytes_repr(data ))
-                    print("!!", sbk.enc_util.bytes_repr(block))
-                    print("!!", sbk.enc_util.bytes_repr(bad_block), bad_indexes)
-                    print("<<", sbk.enc_util.bytes_repr(decoded))
+                    print(">> data ", sbk.enc_util.bytes_repr(data     ))
+                    print(">> block", sbk.enc_util.bytes_repr(block    ))
+                    print("<< data ", sbk.enc_util.bytes_repr(decoded  ))
+                    print("<< block", sbk.enc_util.bytes_repr(bad_block))
+
+                    print("!! error indexes  ", err_indexes)
+                    print("!! deleted indexes", del_indexes)
                     invalid += 1
             except sbk.ecc_lt.DecodeError:
                 errors += 1
@@ -307,3 +335,35 @@ def test_lt_decode_error_detect():
 
         assert errors + success > 0
         assert invalid == 0
+
+
+def test_main_test(capsys):
+    # No validation, just excercising the code
+    sbk.ecc_rs.main(args=['--test'])
+    assert capsys.readouterr().out == "ok\n"
+
+
+def test_main_profile(capsys):
+    # No validation, just excercising the code
+    sbk.ecc_rs.main(args=['--profile'])
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) > 20
+
+
+def test_main_encode(capsys):
+    buf = io.StringIO()
+    buf.write("Hello, 世界!\n")
+    buf.seek(0)
+    sbk.ecc_rs.main(args=['--encode'], stdin=buf)
+    assert (
+        capsys.readouterr().out.strip()
+        == "48656c6c6f2c20e4b896e7958c210a51ee32d3ac1bee26daac14d3b95428"
+    )
+
+
+def test_main_decode(capsys):
+    buf = io.StringIO()
+    buf.write("48656c6c6f2c20e4b896e7958c210a51ee32d3ac1bee26daac14d3b95428\n")
+    buf.seek(0)
+    sbk.ecc_rs.main(args=['--decode'], stdin=buf)
+    assert capsys.readouterr().out.strip() == "Hello, 世界!"

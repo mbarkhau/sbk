@@ -12,6 +12,7 @@ can contribute to making this conform to an appropriate standard, please
 open an issue or merge request on gitlab.
 """
 
+import os
 import sys
 import math
 import base64
@@ -44,12 +45,10 @@ class ECCDecodeError(ValueError):
     pass
 
 
-def _interpolate(
-    points: gf_poly.Points[gf.GF256], at_x: gf.GF256, verify: bool = False
-) -> gf.GF256:
+def _interpolate(points: gf_poly.Points[gf.GF256], at_x: gf.GF256) -> gf.GF256:
     terms_fast = list(gf_poly._interpolation_terms_256(points, at_x=at_x))
 
-    if verify:
+    if os.getenv('SBK_VERIFY_ECC_RS_INTERPOLATION_TERMS', "0") == '1':
         terms_slow = list(gf_poly._interpolation_terms(points, at_x=at_x))
         assert terms_fast == terms_slow
 
@@ -79,13 +78,19 @@ def _encode(msg: Message, ecc_len: int) -> Block:
     return bytes(y_vals)
 
 
-def encode(msg: Message, ecc_len: int, verify: bool = True) -> Block:
+def encode(msg: Message, ecc_len: typ.Optional[int] = None, verify: bool = True) -> Block:
     """Encode message to a Block with RS Code as ECC data."""
-    assert ecc_len >= 0
-    if ecc_len == 0:
+    if ecc_len is None:
+        total_len = math.ceil(len(msg) / 2) * 4
+        _ecc_len  = total_len - len(msg)
+    else:
+        _ecc_len = ecc_len
+
+    assert _ecc_len >= 0
+    if _ecc_len == 0:
         return msg
 
-    block = _encode(msg, ecc_len=ecc_len)
+    block = _encode(msg, ecc_len=_ecc_len)
     assert block.startswith(msg)
     if verify:
         assert decode(block, len(msg)) == msg
@@ -211,7 +216,7 @@ Example usage:
 """
 
 
-def main(args: typ.List[str] = sys.argv[1:]) -> int:
+def main(args: typ.List[str] = sys.argv[1:], stdin: typ.TextIO = sys.stdin) -> int:
     if "-h" in args or "--help" in args or not args:
         print(main.__doc__)
         return 0
@@ -243,7 +248,7 @@ def main(args: typ.List[str] = sys.argv[1:]) -> int:
         print(s.getvalue())
         return 0
 
-    input_data = sys.stdin.read()
+    input_data = stdin.read()
 
     if "-e" in args or "--encode" in args:
         block_b16 = _cli_encode(input_data)

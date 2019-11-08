@@ -8,6 +8,14 @@ from sbk.gf import *
 from sbk.gf_poly import *
 from sbk.gf_util import *
 
+
+def test_mul_lut():
+    for _ in range(10):
+        a = random.randrange(256)
+        b = random.randrange(256)
+        assert mul_slow(a, b) == mul(a, b)
+
+
 # Case 3: xgcd(240, 46)
 # | i |     qi−1     |         ri        |        si       |          ti         |
 # |---|--------------|-------------------|-----------------|---------------------|

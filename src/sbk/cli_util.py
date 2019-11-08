@@ -6,6 +6,7 @@
 
 """CLI parsing, encoding and formatting functions."""
 
+import os
 import re
 import time
 import typing as typ
@@ -15,19 +16,15 @@ import click
 
 from . import ecc_rs
 from . import enc_util
-from . import mnemonic
-
-EMPTY_PHRASE_LINE = "_________  _________"
-
 
 # https://regex101.com/r/iQKt5L/5
 FORMATTED_LINE_PATTERN = r"""
-[AB]\d:[ ]
+[AB0-9]\d:[ ]
     (\d{3}-\d{3})
     \s+
     ([A-Za-z]+)\s+([A-Za-z]+)
     \s+
-[CD]\d:[ ]
+[CD0-9]\d:[ ]
     (\d{3}-\d{3})
 """
 
@@ -42,6 +39,8 @@ PhraseLines = typ.Sequence[str]
 PartIndex = int
 PartVal   = bytes
 PartVals  = typ.Sequence[PartVal]
+# A PartVal can be an empty string to mark its value
+# is not known yet.
 
 
 BYTES_PER_INTCODE = 2
@@ -73,6 +72,7 @@ def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> typ.Iterable[IntCod
 
 
 def bytes2incode_part(data: bytes, idx_offset: int = 0) -> IntCode:
+    """Parse a single intcode from two bytes."""
     assert len(data) == 2
     intcodes = list(bytes2intcode_parts(data, idx_offset))
     assert len(intcodes) == 1
@@ -85,7 +85,9 @@ def bytes2intcodes(data: bytes) -> IntCodes:
     The main purpose of the intcode format is to be
     compact, redundant and resilient to input errors.
     """
-    data_with_ecc = ecc_rs.encode(data, ecc_len=len(data))
+    total_len     = ((len(data) + 1) // 2) * 4
+    ecc_len       = total_len - len(data)
+    data_with_ecc = ecc_rs.encode(data, ecc_len=ecc_len)
     return list(bytes2intcode_parts(data_with_ecc))
 
 
@@ -126,97 +128,47 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
     return part_vals
 
 
-def maybe_intcodes2bytes(intcodes: MaybeIntCodes) -> bytes:
+def maybe_intcodes2bytes(intcodes: MaybeIntCodes, msg_len: typ.Optional[int] = None) -> bytes:
     data_with_ecc = intcodes2parts(intcodes)
-    msg_len       = len(data_with_ecc) // 2
+    if msg_len is None:
+        _msg_len = len(data_with_ecc) // 2
+    else:
+        _msg_len = msg_len
 
     assert all(len(part) <= 1 for part in data_with_ecc)
     maybe_packets = [part[0] if part else None for part in data_with_ecc]
-    return ecc_rs.decode_packets(maybe_packets, msg_len)
+    return ecc_rs.decode_packets(maybe_packets, _msg_len)
 
 
 def intcodes2bytes(intcodes: IntCodes) -> bytes:
     return maybe_intcodes2bytes(intcodes)
 
 
-def is_completed_intcodes(intcodes: MaybeIntCodes) -> bool:
-    complete_intcodes = [intcode for intcode in intcodes if intcode]
-    if len(complete_intcodes) < len(intcodes):
-        return False
-
-    try:
-        maybe_intcodes2bytes(complete_intcodes)
-        return True
-    except ValueError:
-        return False
-
-
-def format_partial_secret_lines(phrase_lines: PhraseLines, intcodes: IntCodes) -> Lines:
-    ecc_offset      = len(intcodes    ) // 2
-    spacer_offset   = len(phrase_lines) // 2
-    phrases_padding = max(map(len, phrase_lines))
-
-    yield f"       Data  {'Phrases':^{phrases_padding}}    ECC"
-    yield ""
-
-    for i, line in enumerate(phrase_lines):
-        if len(phrase_lines) > 4 and i == spacer_offset:
-            yield ""
-
-        ecc_idx      = ecc_offset + i
-        data_intcode = intcodes[i]
-        ecc_intcode  = intcodes[ecc_idx]
-
-        marker_id = i % spacer_offset
-        prefix_id = f"A{marker_id}" if i < spacer_offset else f"B{marker_id}"
-        suffix_id = f"C{marker_id}" if i < spacer_offset else f"D{marker_id}"
-
-        prefix = f"{prefix_id}: {data_intcode} "
-        suffix = f"{suffix_id}: {ecc_intcode} "
-
-        words_line = EMPTY_PHRASE_LINE if line is None else line
-        out_line   = f"{prefix}  {words_line:<{phrases_padding}}  {suffix}"
-        yield out_line
-
-
-def format_secret_lines(data: bytes) -> Lines:
-    """Format a fully known secret."""
-    phrase = mnemonic.bytes2phrase(data)
-    assert mnemonic.phrase2bytes(phrase) == data
-
-    intcodes = bytes2intcodes(data)
-    assert intcodes2bytes(intcodes) == data
-
-    phrase_lines = phrase.splitlines()
-    return format_partial_secret_lines(phrase_lines, intcodes)
-
-
-def format_secret(data: bytes) -> str:
-    return "\n".join(format_secret_lines(data))
-
-
 class ParsedSecret(typ.NamedTuple):
-    words     : typ.List[str]
-    data_codes: typ.List[IntCode]
-    ecc_codes : typ.List[IntCode]
+    words     : typ.Tuple[str    , ...]
+    data_codes: typ.Tuple[IntCode, ...]
+    ecc_codes : typ.Tuple[IntCode, ...]
 
 
-def parse_formatted_secret(text: str) -> ParsedSecret:
+def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
     words     : typ.List[str    ] = []
     data_codes: typ.List[IntCode] = []
     ecc_codes : typ.List[IntCode] = []
 
     for i, line in enumerate(text.splitlines()):
-        line = line.strip().upper()
-        if not line or line.startswith("DATA"):
+        line = line.strip().lower()
+        if not line:
             continue
 
         line_no = i + 1
 
         match = FORMATTED_LINE_RE.match(line)
         if match is None:
-            err_msg = f"Invalid input at line {line_no}: {line}"
-            raise Exception(err_msg)
+            if strict:
+                err_msg = f"Invalid input at line {line_no}: {line}"
+                raise ValueError(err_msg)
+            else:
+                continue
 
         (data, w1, w2, ecc) = match.groups()
 
@@ -224,7 +176,7 @@ def parse_formatted_secret(text: str) -> ParsedSecret:
         words.extend([w1, w2])
         ecc_codes.append(ecc)
 
-    return ParsedSecret(words, data_codes, ecc_codes)
+    return ParsedSecret(tuple(words), tuple(data_codes), tuple(ecc_codes))
 
 
 class Scheme(typ.NamedTuple):
@@ -294,33 +246,29 @@ class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
         self.daemon = True
         self.start()
 
-        progress_bar = None
+        if os.getenv('SBK_PROGRESS_BAR', "1") == '0':
+            return self.join()
 
-        tzero = time.time()
-        total = int(eta_sec * 1000)
+        total_ms = int(eta_sec * 1000)
+        step_ms  = 200
 
-        step = 0.1
+        with click.progressbar(label=label, length=total_ms, show_eta=True) as bar:
+            tzero = time.time()
+            while self.is_alive():
+                time.sleep(step_ms / 1000)
 
-        while self.is_alive():
-            time.sleep(step)
-            tnow          = time.time()
-            elapsed       = tnow    - tzero
-            remaining     = eta_sec - elapsed
-            remaining_pct = 100 * remaining / eta_sec
+                done_ms  = (time.time() - tzero) * 1000
+                rest_ms  = max(0, total_ms - done_ms)
+                rest_pct = 100 * rest_ms / total_ms
 
-            if progress_bar is None and elapsed > 0.2:
-                progress_bar = click.progressbar(label=label, length=total, show_eta=True)
-                progress_bar.update(int(elapsed * 1000))
-            elif progress_bar:
-                if remaining_pct < 1:
-                    progress_bar.update(int(step * 100))
-                elif remaining_pct < 5:
-                    progress_bar.update(int(step * 500))
+                # Lies, damn lies, and progress bars
+                if rest_pct > 10:
+                    bar.update(step_ms)  # default
+                elif rest_pct > 3:
+                    bar.update(step_ms // 2)  # slow down
                 else:
-                    progress_bar.update(int(step * 1000))
+                    bar.update(step_ms // 10)  # just nudge
 
-        if progress_bar:
-            progress_bar.update(total)
+            bar.update(total_ms)
 
         self.join()
-        print()

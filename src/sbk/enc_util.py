@@ -111,11 +111,10 @@ def gfpoint2bytes(point: gf_poly.Point) -> bytes:
     if not (0 < x < 255):
         raise ValueError(f"Invalid point with x={x}. Was not 0 < x < 255")
 
-    num_bits    = math.ceil(math.log2(point.y.p))
-    num_bytes   = num_bits // 8
-    zfill_bytes = math.ceil((num_bytes + 1) / 4) * 4 - 1
-    x_data      = int2bytes(x)
-    y_data      = int2bytes(point.y.val, zfill_bytes)
+    num_bits  = math.ceil(math.log2(point.y.p))
+    num_bytes = num_bits // 8
+    x_data    = int2bytes(x)
+    y_data    = int2bytes(point.y.val, num_bytes)
     assert len(x_data) == 1
-    assert len(x_data + y_data) % 4 == 0
+    assert len(y_data) == num_bytes
     return x_data + y_data

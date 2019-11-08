@@ -121,11 +121,11 @@ def test_gfpoint2bytes():
 
     point_data = gfpoint2bytes(sbk.gf_poly.Point(field[1], field[127]))
     assert point_data[:1] == b"\x01"
-    assert point_data[1:] == b"\x00\x00\x7f"
+    assert point_data[1:] == b"\x7f"
 
     point_data = gfpoint2bytes(sbk.gf_poly.Point(field[254], field[127]))
     assert point_data[:1] == b"\xfe"
-    assert point_data[1:] == b"\x00\x00\x7f"
+    assert point_data[1:] == b"\x7f"
 
 
 def test_gfpoint2bytes_fail():

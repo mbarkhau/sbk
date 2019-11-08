@@ -6,7 +6,6 @@
 """Logic related to KDF parameters."""
 
 import os
-import enum
 import json
 import math
 import time
@@ -17,6 +16,7 @@ import logging
 import argon2
 import pathlib2 as pl
 
+from . import kdf
 from . import primes
 from . import cli_util
 
@@ -44,122 +44,42 @@ log = logging.getLogger(__name__)
 # the one used during the initial derivation. Otherwise it should be
 # chosen as large as possible.
 
+Seconds = float
+
+Flags = int
+
+FLAG_IS_SEGWIT = 0b0001
+
+RAW_SALT_LEN         = 12
+PARAM_CFG_LEN        = 4
+SALT_LEN             = PARAM_CFG_LEN + RAW_SALT_LEN
+DEFAULT_BRAINKEY_LEN = 8
+SHARE_X_COORD_LEN    = 1
+DEFAULT_SHARE_LEN    = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + DEFAULT_BRAINKEY_LEN
+
+PARAM_SCALING = 5
 
 DEFAULT_KDF_THREADS_RATIO = 2
 DEFAULT_KDF_MEM_RATIO     = 0.9
 DEFAULT_KDF_TIME_SEC      = 120
 
+# Fallback value for systems on which total memory cannot be detected
+FALLBACK_MEM_TOTAL_MB = int(os.getenv("SBK_FALLBACK_MEM_TOTAL_MB", "1024"))
 
-class HashAlgo(enum.Enum):
+DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
+XDG_CONFIG_HOME         = pl.Path(os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME))
 
-    ARGON2_V19_D  = 0
-    ARGON2_V19_I  = 1
-    ARGON2_V19_ID = 2
-
-
-HashAlgoVal = int
-
-HASH_ALGO_NAMES = {
-    HashAlgo.ARGON2_V19_I : 'argon2_v19_i',
-    HashAlgo.ARGON2_V19_D : 'argon2_v19_d',
-    HashAlgo.ARGON2_V19_ID: 'argon2_v19_id',
-}
-
-Seconds    = float
-NumThreads = int
-MebiBytes  = int
-Iterations = int
-
-
-class KDFParams(typ.NamedTuple):
-
-    p_raw: NumThreads
-    m_raw: MebiBytes
-    t_raw: Iterations
-    h    : HashAlgoVal
-
-    @property
-    def _field_values(self) -> typ.Tuple[int, int, int]:
-        return (
-            max(0, min(2 ** 4 - 1, round(math.log(self.p_raw) / math.log(2)))),
-            max(0, min(2 ** 6 - 1, round(math.log(self.m_raw) / math.log(1.5)))),
-            max(0, min(2 ** 6 - 1, round(math.log(self.t_raw) / math.log(1.5)))),
-        )
-
-    @property
-    def _verified_values(self) -> typ.Tuple[NumThreads, MebiBytes, Iterations]:
-        # Fail safe accessor to make sure we always initialized
-        #   KDFParams with values that can be serialized correctly.
-        f_p, f_m, f_t = self._field_values
-        p = math.ceil(2 ** f_p)
-        m = math.ceil(1.5 ** f_m)
-        t = math.ceil(1.5 ** f_t)
-
-        assert p == self.p_raw, (p, "vs", self.p_raw)
-        assert m == self.m_raw, (m, "vs", self.m_raw)
-        assert t == self.t_raw, (t, "vs", self.t_raw)
-        return (p, m, t)
-
-    def _replace_any(
-        self, p: typ.Optional[int] = None, m: typ.Optional[int] = None, t: typ.Optional[int] = None
-    ) -> 'KDFParams':
-        updated = self
-
-        if p:
-            updated = updated._replace(p_raw=p)
-        if m:
-            updated = updated._replace(m_raw=m)
-        if t:
-            updated = updated._replace(t_raw=t)
-
-        return init_kdf_params(p=updated.p_raw, m=updated.m_raw, t=updated.t_raw)
-
-    def __repr__(self) -> str:
-        return f"KDFParams(p={self.p_raw} m={self.m_raw:>3} t={self.t_raw})"
-
-    @property
-    def p(self) -> NumThreads:
-        return self._verified_values[0]
-
-    @property
-    def m(self) -> NumThreads:
-        return self._verified_values[1]
-
-    @property
-    def t(self) -> NumThreads:
-        return self._verified_values[2]
-
-
-def init_kdf_params(
-    p: NumThreads, m: MebiBytes, t: Iterations, no_verify: bool = False
-) -> KDFParams:
-    # NOTE mb: It's important to ALWAYS and ONLY use kdf parameters that have gone through
-    #   this function so we always do the kdf parameter normalization.
-    # Only certain parameter values can be serialized.
-    # Everything goes through this constructor to make sure
-    # we only use valid values.
-    h = HashAlgo.ARGON2_V19_ID.value
-
-    _tmp_kdf_params = KDFParams(p, m, t, h)
-    if no_verify:
-        # The exception to the verification is when we use kdf parameters
-        # for measurements, in which case we don't want the rounding to
-        # mess with accuracy.
-        return _tmp_kdf_params
-
-    f_p, f_m, f_t = _tmp_kdf_params._field_values
-    p = math.ceil(2 ** f_p)
-    m = math.ceil(1.5 ** f_m)
-    t = math.ceil(1.5 ** f_t)
-    return KDFParams(p, m, t, h)
+SBK_APP_DIR         = XDG_CONFIG_HOME / "sbk"
+SYSINFO_CACHE_FNAME = "sys_info_measurements.json"
+SYSINFO_CACHE_FPATH = SBK_APP_DIR / SYSINFO_CACHE_FNAME
 
 
 class Measurement(typ.NamedTuple):
 
-    p: NumThreads
-    m: MebiBytes
-    t: Iterations
-    h: HashAlgoVal
+    p: kdf.NumThreads
+    m: kdf.MebiBytes
+    t: kdf.Iterations
+    h: kdf.HashAlgoVal
 
     duration: Seconds
 
@@ -167,71 +87,39 @@ class Measurement(typ.NamedTuple):
 class SystemInfo(typ.NamedTuple):
 
     num_cores   : int
-    total_mb    : MebiBytes
-    initial_p   : NumThreads
-    initial_m   : MebiBytes
+    total_mb    : kdf.MebiBytes
+    initial_p   : kdf.NumThreads
+    initial_m   : kdf.MebiBytes
     measurements: typ.List[Measurement]
 
 
-def mem_total() -> MebiBytes:
+def mem_total() -> kdf.MebiBytes:
     """Get total memory."""
 
     # Linux
     meminfo_path = pl.Path("/proc/meminfo")
     if meminfo_path.exists():
-        with meminfo_path.open(mode="rb") as fobj:
-            for line in fobj:
-                key, num, unit = line.decode("ascii").split()
+        try:
+            with meminfo_path.open(mode="rb") as fobj:
+                data = fobj.read()
+            for line in data.splitlines():
+                key, num, unit = line.decode("ascii").strip().split()
                 if key == "MemTotal:":
                     return int(num) // 1024
+        except Exception:
+            log.error("Error while evaluating system memory", exc_info=True)
 
-    return 128
-
-
-def parse_argon2_type(h: HashAlgoVal) -> int:
-    if h == HashAlgo.ARGON2_V19_D.value:
-        return argon2.low_level.Type.D
-    if h == HashAlgo.ARGON2_V19_I.value:
-        return argon2.low_level.Type.I
-    if h == HashAlgo.ARGON2_V19_ID.value:
-        return argon2.low_level.Type.ID
-
-    err_msg = f"Unknown hash_algo={h}"
-    raise ValueError(err_msg)
+    return FALLBACK_MEM_TOTAL_MB
 
 
-def parse_argon2_version(h: HashAlgoVal) -> int:
-    return 19
-
-
-# The first of the parameters with the most memory that has an
-# estimated duration above this threshold, is the one that is
-# chosen as the default.
-
-
-DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
-XDG_CONFIG_HOME         = pl.Path(os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME))
-
-SBK_APP_DIR         = XDG_CONFIG_HOME / "sbk"
-SYSINFO_CACHE_FNAME = "sys_info_measurements.json"
-
-
-def measure(kdf_params: KDFParams) -> Measurement:
-    p, m, t, h = kdf_params
-
+def measure(kdf_params: kdf.KDFParams) -> Measurement:
     tzero = time.time()
-    argon2.low_level.hash_secret_raw(
-        secret=b"dummy secret",
-        salt=b"saltsaltsaltsalt",
-        memory_cost=m * 1024,
-        time_cost=t,
-        parallelism=p,
-        hash_len=16,
-        type=argon2.low_level.Type.ID,
-    )
+    kdf.derive_key(b"dummy secret", b"saltsaltsaltsalt", kdf_params, hash_len=16)
     duration = round(time.time() - tzero, 5)
 
     log.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
+
+    p, m, t, h = kdf_params
     return Measurement(p=p, m=m, t=t, h=h, duration=duration)
 
 
@@ -259,7 +147,7 @@ def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
             m = measurement.m
             t = measurement.t
 
-        kdf_params  = init_kdf_params(baseline.p, m, t, no_verify=True)
+        kdf_params  = kdf.init_kdf_params(baseline.p, m, t)
         measurement = measure(kdf_params)
         measurements.append(measurement)
 
@@ -271,17 +159,21 @@ def _init_sys_info() -> SystemInfo:
     total_mb  = mem_total()
 
     initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb * DEFAULT_KDF_MEM_RATIO) // initial_p
+    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
 
     while True:
         try:
-            kdf_params = init_kdf_params(p=initial_p, m=int(initial_m), t=1, no_verify=True)
+            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
+            initial_p  = kdf_params.p
+            initial_m  = kdf_params.m
+            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
             measure(kdf_params)
+            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
             break  # success
         except argon2.exceptions.HashingError as err:
             if "Memory allocation error" not in str(err):
                 raise
-            initial_m = int(initial_m / 1.5)
+            initial_m = (2 * initial_m) // 3
 
     # NOTE: choice of the baseline memory probably has the
     #   largest influence on the accuracy of cost estimation
@@ -290,17 +182,22 @@ def _init_sys_info() -> SystemInfo:
     #   to see if curve of the durations is past some inflection
     #   point that is presumably related to a bottleneck.
 
+    # import pudb; pudb.set_trace()
+
+    p = initial_p
     m = 1
 
     while True:
-        kdf_params = init_kdf_params(p=initial_p, m=m, t=1, no_verify=True)
+        kdf_params = kdf.init_kdf_params(p=p, m=m, t=1)
+        p          = kdf_params.p
+        m          = kdf_params.m
         sample     = measure(kdf_params)
         if sample.duration > 0.2:
             break
         else:
             m = math.ceil(m * 1.5)
 
-    kdf_params   = init_kdf_params(p=initial_p, m=m, t=2, no_verify=True)
+    kdf_params   = kdf.init_kdf_params(p=p, m=m, t=2)
     baseline     = measure(kdf_params)
     measurements = _measure_scaled_params(baseline)
     return SystemInfo(num_cores, total_mb, initial_p, initial_m, measurements)
@@ -312,14 +209,11 @@ _SYS_INFO: typ.Optional[SystemInfo] = None
 def init_sys_info() -> SystemInfo:
     InitSysInfoThread    = cli_util.EvalWithProgressbar[SystemInfo]
     init_sys_info_thread = InitSysInfoThread(target=_init_sys_info, args=())
-    init_sys_info_thread.start_and_wait(eta_sec=20, label="Calibrating KDF parameters.")
+    init_sys_info_thread.start_and_wait(eta_sec=25, label="Calibrating KDF parameters.")
     return init_sys_info_thread.retval
 
 
-PARAM_SCALING = 5
-
-
-def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: KDFParams) -> Seconds:
+def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: kdf.KDFParams) -> Seconds:
     """Estimate the runtime for parameters in seconds.
 
     This extrapolates based on a few short measurements and
@@ -329,11 +223,12 @@ def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: KDFParams) -> Seco
 
     measurements = sys_info.measurements
     assert len(measurements) >= 8
-    assert all(p == tgt_p for p, m, t, h, d in measurements)
+    if any(p != tgt_p for p, m, t, h, d in measurements):
+        log.warning(f"Estimated kdf may be inacurate for --parallelism={tgt_p}")
 
-    min_measurements: typ.Dict[KDFParams, float] = {}
+    min_measurements: typ.Dict[kdf.KDFParams, float] = {}
     for measurement in measurements:
-        key = KDFParams(measurement.p, measurement.m, measurement.t, measurement.h)
+        key = kdf.init_kdf_params(measurement.p, measurement.m, measurement.t)
         if key in min_measurements:
             val = min_measurements[key]
             min_measurements[key] = min(measurement.duration, val)
@@ -347,35 +242,36 @@ def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: KDFParams) -> Seco
     # https://stackoverflow.com/a/8662355/62997
     # https://en.wikipedia.org/wiki/Bilinear_interpolation#Algorithm
 
-    m0 , _, _, m1 = [m for p, m, t, h, d in measurements]
-    t0 , _, _, t1 = [t for p, m, t, h, d in measurements]
+    m0 , _  , _  , m1  = [m for p, m, t, h, d in measurements]
+    t0 , _  , _  , t1  = [t for p, m, t, h, d in measurements]
     d00, d01, d10, d11 = [d for p, m, t, h, d in measurements]
 
     s = [
-        d00 * (m1 - tgt_m) * (t1 - tgt_t),
-        d10 * (tgt_m - m0) * (t1 - tgt_t),
-        d01 * (m1 - tgt_m) * (tgt_t - t0),
-        d11 * (tgt_m - m0) * (tgt_t - t0),
+        d00 * (m1    - tgt_m) * (t1    - tgt_t),
+        d10 * (tgt_m - m0   ) * (t1    - tgt_t),
+        d01 * (m1    - tgt_m) * (tgt_t - t0),
+        d11 * (tgt_m - m0   ) * (tgt_t - t0),
     ]
 
     return sum(s) / ((m1 - m0) * (t1 - t0))
 
 
-def get_default_params(sys_info: SystemInfo) -> KDFParams:
+def get_default_params(sys_info: SystemInfo) -> kdf.KDFParams:
     p = sys_info.initial_p
     m = sys_info.initial_m
 
     t = 1
     while True:
-        test_kdf_params = init_kdf_params(p=p, m=m, t=t)
-        est_cost        = estimate_param_cost(sys_info, test_kdf_params)
+        test_kdf_params = kdf.init_kdf_params(p=p, m=m, t=t)
+
+        est_cost = estimate_param_cost(sys_info, test_kdf_params)
         if est_cost > DEFAULT_KDF_TIME_SEC:
             return test_kdf_params
         else:
             t = math.ceil(t * 1.5)
 
 
-def _load_cached_sys_info(cache_path: pl.Path) -> SystemInfo:
+def _load_cached_sys_info(cache_path: pl.Path = SYSINFO_CACHE_FPATH) -> SystemInfo:
     try:
         with cache_path.open(mode="rb") as fobj:
             sys_info_data = json.load(fobj)
@@ -435,40 +331,70 @@ def _dump_sys_info(sys_info: SystemInfo, cache_path: pl.Path) -> None:
         return
 
 
+class InitialParamConfig(typ.NamedTuple):
+
+    version     : int
+    flags       : Flags
+    brainkey_len: int
+    threshold   : int
+    kdf_params  : kdf.KDFParams
+
+
+def parse_initial_param_cfg(data: bytes) -> InitialParamConfig:
+    fields_01, fields_23, fields_456 = struct.unpack("!BBH", data)
+
+    version        = (fields_01 >> 4) & 0xF
+    flags          = (fields_01 >> 0) & 0xF
+    f_brainkey_len = (fields_23 >> 4) & 0xF
+    f_threshold    = (fields_23 >> 0) & 0xF
+    assert version == 0, version
+
+    brainkey_len = (f_brainkey_len + 1) * 2
+    threshold    = f_threshold + 1
+
+    kdf_params = kdf.KDFParams.decode(fields_456)
+    return InitialParamConfig(version, flags, brainkey_len, threshold, kdf_params)
+
+
 class ParamConfig(typ.NamedTuple):
 
     version     : int
-    salt_len    : int
+    flags       : Flags
     brainkey_len: int
     threshold   : int
     num_shares  : int
-    kdf_params  : KDFParams
+    kdf_params  : kdf.KDFParams
     sys_info    : SystemInfo
+
+    @property
+    def raw_salt_len(self) -> int:
+        return RAW_SALT_LEN
 
     @property
     def master_key_len(self) -> int:
         # The master key is streched a bit and the remaining
         # byte is used to encode the x coordinate of the shares.
-        return self.brainkey_len + self.salt_len
+        return self.raw_salt_len + self.brainkey_len
 
     @property
     def share_len(self) -> int:
-        # +1 byte for the x-coordinate
-        unpadded_len = self.brainkey_len + self.salt_len
-        padded_len   = math.ceil((unpadded_len + 1) / 4) * 4
-        return padded_len
+        return PARAM_CFG_LEN + SHARE_X_COORD_LEN + self.master_key_len
 
     @property
     def prime(self) -> int:
         master_key_bits = self.master_key_len * 8
         return primes.get_pow2prime(master_key_bits)
 
+    @property
+    def is_segwit(self) -> bool:
+        return self.flags & FLAG_IS_SEGWIT == 1
+
 
 def init_param_config(
-    salt_len       : int,
     brainkey_len   : int,
     threshold      : int,
     num_shares     : typ.Optional[int] = None,
+    is_segwit      : bool = True,
     kdf_parallelism: typ.Optional[int] = None,
     kdf_memory_cost: typ.Optional[int] = None,
     kdf_time_cost  : typ.Optional[int] = None,
@@ -483,24 +409,35 @@ def init_param_config(
 
     kdf_params = get_default_params(sys_info)
     kdf_params = kdf_params._replace_any(p=kdf_parallelism, m=kdf_memory_cost, t=kdf_time_cost)
-    assert salt_len     % 4 == 0
+
+    raw_salt_len = RAW_SALT_LEN
+    assert raw_salt_len % 4 == 0
+    assert 4 <= raw_salt_len <= 64, raw_salt_len
+
     assert brainkey_len % 2 == 0
-    assert 4 <= salt_len <= 64, salt_len
     assert 2 <= brainkey_len <= 32, brainkey_len
-    assert 1 <= threshold <= 16, threshold
+    assert 1 <= threshold    <= 16, threshold
 
-    master_key_len = salt_len + brainkey_len
-    assert master_key_len % 4 == 0, master_key_len
+    version = 0
+    flags   = 0b0000
+    if is_segwit:
+        flags |= FLAG_IS_SEGWIT
+    else:
+        assert flags & FLAG_IS_SEGWIT == 0
 
-    return ParamConfig(
-        version=0,
-        salt_len=salt_len,
+    assert 0b0000 <= flags <= 0b1111
+
+    param_cfg = ParamConfig(
+        version=version,
+        flags=flags,
         brainkey_len=brainkey_len,
         threshold=threshold,
         num_shares=_num_shares,
         kdf_params=kdf_params,
         sys_info=sys_info,
     )
+
+    return param_cfg
 
 
 def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> ParamConfig:
@@ -509,10 +446,10 @@ def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> P
     |        Field        |  Size  |                          Info                           |
     | ------------------- | ------ | ------------------------------------------------------- |
     | `f_version`         | 4 bit  | ...                                                     |
-    | `f_salt_len`        | 4 bit  | max length: 4 * 2**4 = 64 bytes                         |
     | `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 32 bytes                         |
     | `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
     |                     |        | max: 1..2**4 = 1..16                                    |
+    | `f_flags`           | 4 bit  | (reserved, reserved, reserved, is_segwit)               |
     | `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
     | `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
     | `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
@@ -528,37 +465,20 @@ def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> P
     else:
         _sys_info = sys_info
 
-    fields_0123, fields_456 = struct.unpack("!HH", data)
-
-    version      = (fields_0123 >> 12) & 0xF
-    salt_len     = (((fields_0123 >> 8) & 0xF) + 1) * 4
-    brainkey_len = (((fields_0123 >> 4) & 0xF) + 1) * 2
-    threshold    = ((fields_0123 >> 0) & 0xF) + 1
+    p = parse_initial_param_cfg(data)
 
     # The param_cfg encoding doesn't include num_shares as it's
     # only required when originally generating the shares. The
     # minimum value is threshold, so that is what we set it to.
-    num_shares = threshold
-
-    assert version == 0, version
-
-    f_p = (fields_456 >> 12) & 0xF
-    f_m = (fields_456 >> 6) & 0x3F
-    f_t = (fields_456 >> 0) & 0x3F
-
-    p = math.ceil(2 ** f_p)
-    m = math.ceil(1.5 ** f_m)
-    t = math.ceil(1.5 ** f_t)
-
-    kdf_params = init_kdf_params(p=p, m=m, t=t)
+    num_shares = p.threshold
 
     return ParamConfig(
-        version=version,
-        salt_len=salt_len,
-        brainkey_len=brainkey_len,
-        threshold=threshold,
+        version=p.version,
+        flags=p.flags,
+        brainkey_len=p.brainkey_len,
+        threshold=p.threshold,
         num_shares=num_shares,
-        kdf_params=kdf_params,
+        kdf_params=p.kdf_params,
         sys_info=_sys_info,
     )
 
@@ -566,48 +486,56 @@ def bytes2param_cfg(data: bytes, sys_info: typ.Optional[SystemInfo] = None) -> P
 def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
     """Serialize ParamConfig.
 
-    Since these fields are part of the salt,
-    we try to keep the serialized param_cfg small
-    and leave more room for randomness.
+    Since these fields are part of the salt, we try
+    to keep the serialized param_cfg small and leave
+    more room for randomness, hence the bit twiddling.
     """
-    assert param_cfg.salt_len     % 4 == 0
+    assert param_cfg.raw_salt_len % 4 == 0
     assert param_cfg.brainkey_len % 2 == 0
 
-    fields_0123 = 0
-    fields_0123 += param_cfg.version << 12
-    fields_0123 += ((param_cfg.salt_len // 4) - 1) << 8
-    fields_0123 += ((param_cfg.brainkey_len // 2) - 1) << 4
-    fields_0123 += param_cfg.threshold - 1
+    f_brainkey_len = (param_cfg.brainkey_len // 2) - 1
+    f_threshold    = param_cfg.threshold - 1
 
-    f_p, f_m, f_t = param_cfg.kdf_params._field_values
+    fields_01 = 0
+    fields_01 |= param_cfg.version << 4
+    fields_01 |= param_cfg.flags
 
-    fields_456 = 0
-    fields_456 += f_p << 12
-    fields_456 += f_m << 6
-    fields_456 += f_t << 0
+    fields_23 = 0
+    fields_23 |= f_brainkey_len << 4
+    fields_23 |= f_threshold
 
-    param_cfg_data = struct.pack("!HH", fields_0123, fields_456)
+    fields_456     = param_cfg.kdf_params.encode()
+    param_cfg_data = struct.pack("!BBH", fields_01, fields_23, fields_456)
     return param_cfg_data
 
 
+def fresh_sys_info() -> SystemInfo:
+    global _SYS_INFO
+    _SYS_INFO  = None
+    cache_path = SYSINFO_CACHE_FPATH
+    if cache_path.exists():
+        cache_path.unlink()
+
+    return load_sys_info()
+
+
+def measure_in_thread(sys_info: SystemInfo, kdf_params: kdf.KDFParams) -> Measurement:
+    eta                = estimate_param_cost(sys_info, kdf_params)
+    MeasurementThread  = cli_util.EvalWithProgressbar[Measurement]
+    measurement_thread = MeasurementThread(target=measure, args=(kdf_params,))
+    measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
+    return measurement_thread.retval
+
+
 def main() -> None:
-    cach_path = SBK_APP_DIR / SYSINFO_CACHE_FNAME
-    if cach_path.exists():
-        cach_path.unlink()
     logging.basicConfig(level=logging.INFO)
 
-    param_cfg = init_param_config(brainkey_len=8, salt_len=16, threshold=3, num_shares=3)
+    sys_info   = fresh_sys_info()
+    kdf_params = get_default_params(sys_info)
+    eta        = estimate_param_cost(sys_info, kdf_params)
 
-    param_cfg_data = param_cfg2bytes(param_cfg)
-    assert bytes2param_cfg(param_cfg_data) == param_cfg
-
-    eta = estimate_param_cost(param_cfg.sys_info, param_cfg.kdf_params)
     log.info(f"estimated cost {eta}")
-
-    MeasurementThread  = cli_util.EvalWithProgressbar[Measurement]
-    measurement_thread = MeasurementThread(target=measure, args=(param_cfg.kdf_params,))
-    measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
-    measurement = measurement_thread.retval
+    measurement = measure_in_thread(sys_info, kdf_params)
     log.info(f"measured  cost {round(measurement.duration)}")
 
 

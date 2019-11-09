@@ -71,10 +71,15 @@ def _add_bad_symbols(block, errors=0, erasures=0):
     return bad_block, err_indexes, del_indexes
 
 
-MSG_LENS = [2, 3, 4, 8, 12, 14, 24]
+ALL_MSG_LENS = [2, 3, 4, 8, 12, 14, 24]
+
+if "slow" in os.getenv('PYTEST_SKIP', ""):
+    SLOW_MSG_LENS = [2, 3, 8, 14]
+else:
+    SLOW_MSG_LENS = ALL_MSG_LENS
 
 
-@pytest.mark.parametrize("msg_len", MSG_LENS)
+@pytest.mark.parametrize("msg_len", ALL_MSG_LENS)
 def test_rs(msg_len):
     msg_in  = os.urandom(msg_len)
     block   = sbk.ecc_rs.encode(msg_in)
@@ -85,8 +90,7 @@ def test_rs(msg_len):
     assert msg_out == msg_in
 
 
-@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Erasure recovery is expensive")
-@pytest.mark.parametrize("msg_len", MSG_LENS)
+@pytest.mark.parametrize("msg_len", SLOW_MSG_LENS)
 def test_rs_erasure(msg_len):
     msg_in = os.urandom(msg_len)
     block  = sbk.ecc_rs.encode(msg_in)
@@ -105,10 +109,7 @@ def test_rs_erasure(msg_len):
         del os.environ['SBK_VERIFY_ECC_RS_INTERPOLATION_TERMS']
 
 
-@pytest.mark.skipif(
-    "slow" in os.getenv('PYTEST_SKIP', ""), reason="Corruption recovery is expensive"
-)
-@pytest.mark.parametrize("msg_len", MSG_LENS)
+@pytest.mark.parametrize("msg_len", SLOW_MSG_LENS)
 def test_rs_corruption(msg_len):
     msg_in = os.urandom(msg_len)
     block  = sbk.ecc_rs.encode(msg_in)

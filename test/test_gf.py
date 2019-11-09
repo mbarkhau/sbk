@@ -256,37 +256,39 @@ def test_split_and_join_2of3():
     assert join(field, threshold=2, points=sample3) == secret
 
 
-def test_split_and_join_fuzz():
-    primes = sorted([p for p in sbk.primes.PRIMES if p > 10])
-    for _ in range(100):
-        prime      = random.choice(primes)
-        secret     = random.randint(0, prime - 1)
-        num_shares = random.randint(2, 7)
-        threshold  = random.randint(2, num_shares)
-        debug_info = {
-            'threshold' : threshold,
-            'num_shares': num_shares,
-            'prime'     : prime,
-            'secret'    : secret,
-        }
-        field     = GFNum.field(prime)
-        points    = split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
-        actual_xs = [p.x.val for p in points]
-        actual_ys = [p.y.val for p in points]
+TEST_PRIME_INDEXES = random.sample([i for i, p in enumerate(sbk.primes.PRIMES) if p > 10], 10)
 
-        expected_xs = list(range(1, num_shares + 1))
-        assert actual_xs == expected_xs, debug_info
 
-        # we accept collisions for primes below 100k, everything else
-        # is probably not a coincidence/is probably a bug.
-        lt_100k = prime < 100_000
-        assert lt_100k or secret not in actual_ys, debug_info
+@pytest.mark.parametrize("prime_index", TEST_PRIME_INDEXES)
+def test_split_and_join_fuzz(prime_index):
+    prime      = sbk.primes.PRIMES[prime_index]
+    secret     = random.randint(0, prime - 1)
+    num_shares = random.randint(2, 7)
+    threshold  = random.randint(2, num_shares)
+    debug_info = {
+        'threshold' : threshold,
+        'num_shares': num_shares,
+        'prime'     : prime,
+        'secret'    : secret,
+    }
+    field     = GFNum.field(prime)
+    points    = split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
+    actual_xs = [p.x.val for p in points]
+    actual_ys = [p.y.val for p in points]
 
-        recovered_secret = join(field=field, threshold=num_shares, points=points)
+    expected_xs = list(range(1, num_shares + 1))
+    assert actual_xs == expected_xs, debug_info
+
+    # we accept collisions for primes below 100k, everything else
+    # is probably not a coincidence/is probably a bug.
+    lt_100k = prime < 100_000
+    assert lt_100k or secret not in actual_ys, debug_info
+
+    recovered_secret = join(field=field, threshold=num_shares, points=points)
+    assert recovered_secret == secret, debug_info
+
+    for i in range(num_shares - threshold):
+        debug_info['sample_size'] = threshold + i
+        sample           = random.sample(points, threshold + i)
+        recovered_secret = join(field=field, threshold=threshold, points=sample)
         assert recovered_secret == secret, debug_info
-
-        for i in range(num_shares - threshold):
-            debug_info['sample_size'] = threshold + i
-            sample           = random.sample(points, threshold + i)
-            recovered_secret = join(field=field, threshold=threshold, points=sample)
-            assert recovered_secret == secret, debug_info

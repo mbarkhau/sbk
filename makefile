@@ -488,6 +488,7 @@ ifdef FILTER
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--no-cov \
+		--durations 15 \
 		--verbose \
 		--capture=no \
 		--exitfirst \
@@ -502,6 +503,7 @@ else
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--no-cov \
+		--durations 15 \
 		--verbose \
 		--capture=no \
 		--exitfirst \

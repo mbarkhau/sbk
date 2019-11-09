@@ -5,9 +5,11 @@ import random
 
 import pytest
 
-import sbk.ecc_lt
 import sbk.ecc_rs
 import sbk.enc_util
+
+# import sbk.ecc_lt
+
 
 TEST_INPUT  = "Hello, 世界!\n"
 TEST_OUTPUT = "48656c6c6f2c20e4b896e7958c210a51ee32d3ac1bee26daac14d3b95428"
@@ -80,12 +82,13 @@ else:
 
 
 @pytest.mark.parametrize("msg_len", ALL_MSG_LENS)
-def test_rs(msg_len):
+def test_rs_round_trip(msg_len):
     msg_in  = os.urandom(msg_len)
     block   = sbk.ecc_rs.encode(msg_in)
     ecc_len = len(block) - msg_len
     assert ecc_len >= msg_len
     assert len(block) % 4 == 0
+    assert block.startswith(msg_in)
     msg_out = sbk.ecc_rs.decode(block, msg_len)
     assert msg_out == msg_in
 
@@ -125,7 +128,8 @@ def test_rs_corruption(msg_len):
         assert msg_out == msg_in
 
 
-def test_xor_bytes():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_xor_bytes():
     cases = [
         (b"\x00\x00", b"\x00\x00", b"\x00\x00"),
         (b"\x12\x34", b"\x00\x00", b"\x12\x34"),
@@ -136,7 +140,8 @@ def test_xor_bytes():
         assert sbk.ecc_lt.xor_bytes(x, y) == z
 
 
-def test_packet_block_indexes():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_packet_block_indexes():
     _bi = sbk.ecc_lt.BlockIndex
 
     expected = [
@@ -153,7 +158,8 @@ def test_packet_block_indexes():
     assert indexes == expected
 
 
-def test_encode():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_encode():
     message = b'a1b2c3d4'
     block   = sbk.ecc_lt.encode(message)
     assert len(block) == 16
@@ -173,13 +179,15 @@ def test_encode():
     assert block == b'a1b2c3d4' + ecc_data
 
 
-def test_block2packets():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_block2packets():
     msg     = b'0123456789ABCDEF'
     packets = sbk.ecc_lt.block2packets(msg)
     assert packets == [b'01', b'23', b'45', b'67', b'89', b'AB', b'CD', b'EF']
 
 
-def test_residual_xor():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_residual_xor():
     a_bi = sbk.ecc_lt.BlockIndex(0, 2)
     b_bi = sbk.ecc_lt.BlockIndex(2, 4)
 
@@ -202,7 +210,8 @@ def test_residual_xor():
     assert z.data    == b"\x02\x02"
 
 
-def test_candidate_counts():
+@pytest.mark.skip(reason="LT Codes only for documentation")
+def test_lt_candidate_counts():
     message          = b'01234567'
     block            = sbk.ecc_lt.encode(message)
     packets          = sbk.ecc_lt.block2packets(block)
@@ -218,6 +227,7 @@ def test_candidate_counts():
     assert candidate_counts == sbk.ecc_lt.CANDIDATE_COUNTS_BY_NUM_PACKETS
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode():
     message = b'01234567'
     block   = sbk.ecc_lt.encode(message)
@@ -230,6 +240,7 @@ def test_lt_decode():
         assert decoded == message
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_packets():
     message = b'01234567'
     block   = sbk.ecc_lt.encode(message)
@@ -239,6 +250,7 @@ def test_lt_decode_packets():
     assert decoded == message
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_packets_corrupted():
     message = b'01234567'
     block   = sbk.ecc_lt.encode(message)
@@ -251,6 +263,7 @@ def test_lt_decode_packets_corrupted():
         assert decoded == message, f"invalid result: {decoded}"
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_packets_missing():
     data    = os.urandom(12)
     block   = sbk.ecc_lt.encode(data)
@@ -286,6 +299,7 @@ def _lt_fuzz_iter():
         yield data, block, packets
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_fuzz_basic():
     for data, block, packets in _lt_fuzz_iter():
         assert len(block) == len(data) * 2
@@ -295,6 +309,7 @@ def test_lt_decode_fuzz_basic():
         assert decoded == data
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_fuzz_missing_packets():
     for data, block, packets in _lt_fuzz_iter():
         for packet_err_count in [0, 1, 2, 3]:
@@ -307,6 +322,7 @@ def test_lt_decode_fuzz_missing_packets():
             assert decoded == data
 
 
+@pytest.mark.skip(reason="LT Codes only for documentation")
 def test_lt_decode_error_detect():
     for num_errs in [1, 2]:
         errors  = 0

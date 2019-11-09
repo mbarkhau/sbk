@@ -33,6 +33,7 @@ def test_wordlist_constraints(wordlist):
     assert len(set(wordlist)) == 256
 
 
+@pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Basically this can't fail")
 @pytest.mark.parametrize("wordlist", [ENTITY_WORDLIST, LOCATION_WORDLIST])
 def test_wordlist_distances(wordlist):
     for w1, w2 in itertools.product(wordlist, wordlist):

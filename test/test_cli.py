@@ -13,7 +13,7 @@ import click.testing
 
 import sbk.cli
 import sbk.cli_io
-import sbk.ecc_lt
+import sbk.ecc_rs
 from sbk.cli_util import *
 from sbk.mnemonic import *
 
@@ -85,7 +85,7 @@ def test_intcode_order_fail(data_len):
             try:
                 decoded = intcodes2bytes(intcodes_kaputt)
                 assert decoded == data
-            except sbk.ecc_lt.DecodeError:
+            except sbk.ecc_rs.ECCDecodeError:
                 pass
         else:
             try:

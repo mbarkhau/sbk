@@ -7,6 +7,8 @@
 """Error correction coding using Luby Transform Codes.
 
 This module is no longer used and has been replaced by ecc_rs.py
+It is only kept around because it will become a minor chapter in
+the later documentation.
 
 The encoding scheme here is quite simple and is based on LT-Codes. I'm
 not smart enough/don't have the time for a more general implementation

@@ -57,7 +57,8 @@ DEFAULT_BRAINKEY_LEN = 8
 SHARE_X_COORD_LEN    = 1
 DEFAULT_SHARE_LEN    = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + DEFAULT_BRAINKEY_LEN
 
-PARAM_SCALING = 5
+PARAM_SCALING = 3
+KDF_MEASUREMENT_SIGNIFIGANCE_THRESHOLD: Seconds = 0.2
 
 DEFAULT_KDF_THREADS_RATIO = 2
 DEFAULT_KDF_MEM_RATIO     = 0.9
@@ -69,7 +70,8 @@ FALLBACK_MEM_TOTAL_MB = int(os.getenv("SBK_FALLBACK_MEM_TOTAL_MB", "1024"))
 DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
 XDG_CONFIG_HOME         = pl.Path(os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME))
 
-SBK_APP_DIR         = XDG_CONFIG_HOME / "sbk"
+SBK_APP_DIR_STR     = os.getenv('SBK_APP_DIR')
+SBK_APP_DIR         = pl.Path(SBK_APP_DIR_STR) if SBK_APP_DIR_STR else XDG_CONFIG_HOME / "sbk"
 SYSINFO_CACHE_FNAME = "sys_info_measurements.json"
 SYSINFO_CACHE_FPATH = SBK_APP_DIR / SYSINFO_CACHE_FNAME
 
@@ -82,6 +84,17 @@ class Measurement(typ.NamedTuple):
     h: kdf.HashAlgoVal
 
     duration: Seconds
+
+
+def measure(kdf_params: kdf.KDFParams) -> Measurement:
+    tzero = time.time()
+    kdf.derive_key(b"dummy secret", b"saltsaltsaltsalt", kdf_params, hash_len=16)
+    duration = round(time.time() - tzero, 5)
+
+    log.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
+
+    p, m, t, h = kdf_params
+    return Measurement(p=p, m=m, t=t, h=h, duration=duration)
 
 
 class SystemInfo(typ.NamedTuple):
@@ -112,18 +125,42 @@ def mem_total() -> kdf.MebiBytes:
     return FALLBACK_MEM_TOTAL_MB
 
 
-def measure(kdf_params: kdf.KDFParams) -> Measurement:
-    tzero = time.time()
-    kdf.derive_key(b"dummy secret", b"saltsaltsaltsalt", kdf_params, hash_len=16)
-    duration = round(time.time() - tzero, 5)
+def _init_sys_info() -> SystemInfo:
+    num_cores = len(os.sched_getaffinity(0))
+    total_mb  = mem_total()
 
-    log.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
+    initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
+    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
 
-    p, m, t, h = kdf_params
-    return Measurement(p=p, m=m, t=t, h=h, duration=duration)
+    while True:
+        try:
+            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
+            initial_p  = kdf_params.p
+            initial_m  = kdf_params.m
+            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
+            measure(kdf_params)
+            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
+            break  # success
+        except argon2.exceptions.HashingError as err:
+            if "Memory allocation error" not in str(err):
+                raise
+            initial_m = (2 * initial_m) // 3
+
+    return SystemInfo(
+        num_cores, total_mb, initial_p=initial_p, initial_m=initial_m, measurements=[]
+    )
 
 
-MaybeMeasurements = typ.Optional[typ.List[Measurement]]
+_SYS_INFO: typ.Optional[SystemInfo] = None
+
+
+def init_sys_info() -> SystemInfo:
+    InitSysInfoThread    = cli_util.EvalWithProgressbar[SystemInfo]
+    init_sys_info_thread = InitSysInfoThread(target=_init_sys_info, args=())
+    init_sys_info_thread.start_and_wait(eta_sec=2, label="Memory test for KDF parameters")
+    sys_info = init_sys_info_thread.retval
+    _dump_sys_info(sys_info)
+    return sys_info
 
 
 def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
@@ -154,27 +191,7 @@ def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
     return measurements
 
 
-def _init_sys_info() -> SystemInfo:
-    num_cores = len(os.sched_getaffinity(0))
-    total_mb  = mem_total()
-
-    initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
-
-    while True:
-        try:
-            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
-            initial_p  = kdf_params.p
-            initial_m  = kdf_params.m
-            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
-            measure(kdf_params)
-            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
-            break  # success
-        except argon2.exceptions.HashingError as err:
-            if "Memory allocation error" not in str(err):
-                raise
-            initial_m = (2 * initial_m) // 3
-
+def _update_measurements(sys_info: SystemInfo) -> SystemInfo:
     # NOTE: choice of the baseline memory probably has the
     #   largest influence on the accuracy of cost estimation
     #   for parameters. Presumably you'd want to do something
@@ -182,9 +199,7 @@ def _init_sys_info() -> SystemInfo:
     #   to see if curve of the durations is past some inflection
     #   point that is presumably related to a bottleneck.
 
-    # import pudb; pudb.set_trace()
-
-    p = initial_p
+    p = sys_info.initial_p
     m = 1
 
     while True:
@@ -192,28 +207,31 @@ def _init_sys_info() -> SystemInfo:
         p          = kdf_params.p
         m          = kdf_params.m
         sample     = measure(kdf_params)
-        if sample.duration > 0.2:
+        if sample.duration > KDF_MEASUREMENT_SIGNIFIGANCE_THRESHOLD:
             break
         else:
             m = math.ceil(m * 1.5)
 
     kdf_params   = kdf.init_kdf_params(p=p, m=m, t=2)
     baseline     = measure(kdf_params)
-    measurements = _measure_scaled_params(baseline)
-    return SystemInfo(num_cores, total_mb, initial_p, initial_m, measurements)
+    measurements = _measure_scaled_params(baseline=baseline)
+    sys_info     = sys_info._replace(measurements=measurements)
+    _dump_sys_info(sys_info)
+    return sys_info
 
 
-_SYS_INFO: typ.Optional[SystemInfo] = None
+def update_measurements(sys_info: SystemInfo) -> SystemInfo:
+    UpdateMeasurementsThread   = cli_util.EvalWithProgressbar[SystemInfo]
+    update_measurements_thread = UpdateMeasurementsThread(
+        target=_update_measurements, args=(sys_info,)
+    )
+    update_measurements_thread.start_and_wait(eta_sec=10, label="Calibration for KDF parameters")
+    return update_measurements_thread.retval
 
 
-def init_sys_info() -> SystemInfo:
-    InitSysInfoThread    = cli_util.EvalWithProgressbar[SystemInfo]
-    init_sys_info_thread = InitSysInfoThread(target=_init_sys_info, args=())
-    init_sys_info_thread.start_and_wait(eta_sec=25, label="Calibrating KDF parameters.")
-    return init_sys_info_thread.retval
-
-
-def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: kdf.KDFParams) -> Seconds:
+def estimate_param_cost(
+    tgt_kdf_params: kdf.KDFParams, sys_info: typ.Optional[SystemInfo] = None
+) -> Seconds:
     """Estimate the runtime for parameters in seconds.
 
     This extrapolates based on a few short measurements and
@@ -221,10 +239,19 @@ def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: kdf.KDFParams) -> 
     """
     tgt_p, tgt_m, tgt_t, _ = tgt_kdf_params
 
-    measurements = sys_info.measurements
-    assert len(measurements) >= 8
-    if any(p != tgt_p for p, m, t, h, d in measurements):
-        log.warning(f"Estimated kdf may be inacurate for --parallelism={tgt_p}")
+    if tgt_m < 10 and tgt_t < 10:
+        return 1
+
+    if sys_info is None:
+        _sys_info = load_sys_info()
+        if len(_sys_info.measurements) < 8:
+            _sys_info = update_measurements(_sys_info)
+    else:
+        _sys_info = sys_info
+
+    assert len(_sys_info.measurements) >= 8
+
+    measurements = _sys_info.measurements
 
     min_measurements: typ.Dict[kdf.KDFParams, float] = {}
     for measurement in measurements:
@@ -256,22 +283,24 @@ def estimate_param_cost(sys_info: SystemInfo, tgt_kdf_params: kdf.KDFParams) -> 
     return sum(s) / ((m1 - m0) * (t1 - t0))
 
 
-def get_default_params(sys_info: SystemInfo) -> kdf.KDFParams:
-    p = sys_info.initial_p
-    m = sys_info.initial_m
+def get_default_params() -> kdf.KDFParams:
+    sys_info = load_sys_info()
+    p        = sys_info.initial_p
+    m        = sys_info.initial_m
 
     t = 1
     while True:
         test_kdf_params = kdf.init_kdf_params(p=p, m=m, t=t)
 
-        est_cost = estimate_param_cost(sys_info, test_kdf_params)
+        est_cost = estimate_param_cost(test_kdf_params)
         if est_cost > DEFAULT_KDF_TIME_SEC:
             return test_kdf_params
         else:
             t = math.ceil(t * 1.5)
 
 
-def _load_cached_sys_info(cache_path: pl.Path = SYSINFO_CACHE_FPATH) -> SystemInfo:
+def _load_cached_sys_info() -> SystemInfo:
+    cache_path = SYSINFO_CACHE_FPATH
     try:
         with cache_path.open(mode="rb") as fobj:
             sys_info_data = json.load(fobj)
@@ -283,35 +312,32 @@ def _load_cached_sys_info(cache_path: pl.Path = SYSINFO_CACHE_FPATH) -> SystemIn
         log.warning(f"Error reading cache file {cache_path}: {ex}")
         sys_info = init_sys_info()
 
-    _dump_sys_info(sys_info, cache_path)
-
     return sys_info
 
 
-def load_sys_info(app_dir: pl.Path = SBK_APP_DIR, use_cache: bool = True) -> SystemInfo:
+def load_sys_info(use_cache: bool = True) -> SystemInfo:
     global _SYS_INFO
     if _SYS_INFO:
         return _SYS_INFO
 
-    cache_path = app_dir / SYSINFO_CACHE_FNAME
-
-    if use_cache and cache_path.exists():
-        sys_info = _load_cached_sys_info(cache_path)
+    if use_cache and SYSINFO_CACHE_FPATH.exists():
+        sys_info = _load_cached_sys_info()
     else:
         sys_info = init_sys_info()
-
-    if not cache_path.exists():
-        _dump_sys_info(sys_info, cache_path)
 
     _SYS_INFO = sys_info
     return sys_info
 
 
-def _dump_sys_info(sys_info: SystemInfo, cache_path: pl.Path) -> None:
+def _dump_sys_info(sys_info: SystemInfo) -> None:
+    global _SYS_INFO
+    _SYS_INFO = sys_info
+
+    cache_path = SYSINFO_CACHE_FPATH
     try:
-        cache_path.parent.mkdir(exist_ok=True)
-    except Exception:
-        log.warning(f"Unable to create cache dir {cache_path.parent}")
+        cache_path.parent.mkdir(exist_ok=True, parents=True)
+    except Exception as ex:
+        log.warning(f"Unable to create cache dir {cache_path.parent}: {ex}")
         return
 
     measurements_data = [m._asdict() for m in sys_info.measurements]
@@ -405,9 +431,7 @@ def init_param_config(
         err_msg = f"threshold must be <= num_shares, got {threshold} > {_num_shares}"
         raise ValueError(err_msg)
 
-    sys_info = load_sys_info()
-
-    kdf_params = get_default_params(sys_info)
+    kdf_params = get_default_params()
     kdf_params = kdf_params._replace_any(p=kdf_parallelism, m=kdf_memory_cost, t=kdf_time_cost)
 
     raw_salt_len = RAW_SALT_LEN
@@ -434,7 +458,7 @@ def init_param_config(
         threshold=threshold,
         num_shares=_num_shares,
         kdf_params=kdf_params,
-        sys_info=sys_info,
+        sys_info=load_sys_info(),
     )
 
     return param_cfg
@@ -511,16 +535,16 @@ def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
 
 def fresh_sys_info() -> SystemInfo:
     global _SYS_INFO
-    _SYS_INFO  = None
-    cache_path = SYSINFO_CACHE_FPATH
-    if cache_path.exists():
-        cache_path.unlink()
+    _SYS_INFO = None
+
+    if SYSINFO_CACHE_FPATH.exists():
+        SYSINFO_CACHE_FPATH.unlink()
 
     return load_sys_info()
 
 
-def measure_in_thread(sys_info: SystemInfo, kdf_params: kdf.KDFParams) -> Measurement:
-    eta                = estimate_param_cost(sys_info, kdf_params)
+def measure_in_thread(kdf_params: kdf.KDFParams, sys_info: SystemInfo) -> Measurement:
+    eta                = estimate_param_cost(kdf_params, sys_info)
     MeasurementThread  = cli_util.EvalWithProgressbar[Measurement]
     measurement_thread = MeasurementThread(target=measure, args=(kdf_params,))
     measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
@@ -530,12 +554,13 @@ def measure_in_thread(sys_info: SystemInfo, kdf_params: kdf.KDFParams) -> Measur
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
+    kdf_params = get_default_params()
     sys_info   = fresh_sys_info()
-    kdf_params = get_default_params(sys_info)
-    eta        = estimate_param_cost(sys_info, kdf_params)
+    sys_info   = update_measurements(sys_info)
+    eta        = estimate_param_cost(kdf_params, sys_info)
 
     log.info(f"estimated cost {eta}")
-    measurement = measure_in_thread(sys_info, kdf_params)
+    measurement = measure_in_thread(kdf_params, sys_info)
     log.info(f"measured  cost {round(measurement.duration)}")
 
 

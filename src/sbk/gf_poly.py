@@ -25,8 +25,8 @@ import itertools
 from . import gf
 from . import gf_util
 
-_rand       = random.SystemRandom()
 _debug_rand = random.Random(0)
+_rand       = random.SystemRandom()
 
 
 def randrange(*args, **kwargs) -> int:

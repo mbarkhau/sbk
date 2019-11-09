@@ -288,7 +288,7 @@ def _derive_key(
     label      : str,
     wallet_name: str = DEFAULT_WALLET_NAME,
 ) -> MasterKey:
-    eta_sec          = params.estimate_param_cost(param_cfg.sys_info, param_cfg.kdf_params)
+    eta_sec          = params.estimate_param_cost(param_cfg.kdf_params)
     hash_len         = param_cfg.master_key_len
     wallet_name_data = wallet_name.encode('utf-8')
 
@@ -396,8 +396,7 @@ def kdf_info(
     time_cost  : typ.Optional[kdf.Iterations] = None,
 ) -> None:
     """Show info for each available parameter config."""
-    sys_info   = params.load_sys_info()
-    kdf_params = params.get_default_params(sys_info)
+    kdf_params = params.get_default_params()
     kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
 
     echo("Estimated durations for KDF parameter choices")
@@ -417,7 +416,7 @@ def kdf_info(
             suffix = "<- default" if test_params == kdf_params else ""
             prefix = f"-p={test_params.p:<3} -m={test_params.m:<5} -t={test_params.t:<4}"
 
-            eta = params.estimate_param_cost(sys_info, test_params)
+            eta = params.estimate_param_cost(test_params)
             echo(f"   {prefix} : {round(eta):>4} sec {suffix}")
         m = int(m / 1.5)
     return
@@ -432,8 +431,7 @@ def kdf_test(
     memory_cost: typ.Optional[kdf.MebiBytes ] = None,
     time_cost  : typ.Optional[kdf.Iterations] = None,
 ) -> None:
-    sys_info   = params.load_sys_info()
-    kdf_params = params.get_default_params(sys_info)
+    kdf_params = params.get_default_params()
     kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
     params_str = f"-p={kdf_params.p:<3} -m={kdf_params.m:<5} -t={kdf_params.t:<4}"
 
@@ -441,7 +439,7 @@ def kdf_test(
     echo(f"Parameters after rounding: {params_str}")
     echo()
 
-    eta = params.estimate_param_cost(sys_info, kdf_params)
+    eta = params.estimate_param_cost(kdf_params)
     echo(f"Estimated duration: {round(eta):>4} sec")
     MeasurementThread  = cli_util.EvalWithProgressbar[params.Measurement]
     measurement_thread = MeasurementThread(target=params.measure, args=(kdf_params,))

@@ -1,4 +1,5 @@
 import os
+import re
 import math
 import time
 import random
@@ -231,12 +232,9 @@ def test_cli_create_validation():
         "\n".join(DEBUG_RANDOM_SHARE_3) + "\n",
         "accept\n",
     ]
-    os.environ['SBK_DEBUG_RANDOM'] = 'DANGER'
-    try:
-        runner = click.testing.CliRunner()
-        result = runner.invoke(sbk.cli.create, argv, input="".join(inputs))
-    finally:
-        del os.environ['SBK_DEBUG_RANDOM']
+    env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
+    runner = click.testing.CliRunner()
+    result = runner.invoke(sbk.cli.create, argv, input="".join(inputs), env=env)
 
     assert not result.exception
     assert result.exit_code == 0
@@ -251,8 +249,9 @@ def test_cli_create():
         "--memory-cost=1",
         "--time-cost=1",
     ]
+    env    = {'SBK_PROGRESS_BAR': '0'}
     runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.create, argv)
+    result = runner.invoke(sbk.cli.create, argv, env=env)
     assert not result.exception
     assert result.exit_code == 0
 
@@ -415,5 +414,5 @@ def test_cli_kdf_test():
     assert not result.exception
     assert result.exit_code == 0
 
-    assert "Estimated duration:    0 sec" in result.output
-    assert "Actual duration   :    0 sec" in result.output
+    assert re.search(r"Estimated duration\s*:\s+\d+ sec", result.output)
+    assert re.search(r"Actual duration\s*:\s+\d+ sec", result.output)

@@ -259,7 +259,7 @@ class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
 
                 done_ms  = (time.time() - tzero) * 1000
                 rest_ms  = max(0, total_ms - done_ms)
-                rest_pct = 100 * rest_ms / total_ms
+                rest_pct = 100 * rest_ms / total_ms if total_ms > 0 else 50
 
                 # Lies, damn lies, and progress bars
                 if rest_pct > 10:

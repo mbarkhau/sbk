@@ -12,9 +12,9 @@ import time
 import struct
 import typing as typ
 import logging
+import pathlib as pl
 
 import argon2
-import pathlib2 as pl
 
 from . import kdf
 from . import primes

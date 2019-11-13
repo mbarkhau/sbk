@@ -162,16 +162,6 @@ cassette headset earpiece camel
 """
 
 
-# plane table space field metro hill store ocean river coast sirius academy street
-# peak void station volvo java train carpet path road tree
-# fort soil chad xerox bottle floor ferrari
-# club city palm town safe shop cafe moon house movie kingdom room port
-# island iceland home hall board company sixties embassy
-# studio earth garden museum punjab library beach valley eighties
-# hospital bridge mountain park    lake       forest temple     bank
-# stadium turkey pocket basket theatre pool campus village ground school hotel
-# church office court bedroom kitchen factory cinema volcano
-# podium garage harbor casino villa balcony airport meadow patio swamp disco jungle
 WORDLIST2_STR = """
 ithaca ottawa korea dakota virginia maryland michigan chicago austria
 donegal galway kildare wexford yorkshire norfolk suffolk sussex cornwall harvard stanford
@@ -317,11 +307,8 @@ spielberg  abacus     koran      koala      unicorn    tofu       asterix    yog
 rambo      gymnast    teacup     kimono     artichoke  ronaldo    confucius  jihadi
 meatball   maradona   iphone     wambat
 """
-# musician attorney merchant present origami tsunami
-# holmes corpse reporter desk staff
-# deputy engine card paper note queen hubble artist
 
-WORDLIST4_STR = """
+WORDLIST4_STR += """
 photo      computer   obama      server     messi      lambo      heart      gift
 baby       smith      satoshi    blood      rock       camera     horse      fire
 bitcoin    chief      button     bible      letter     chair      stone      jesus
@@ -368,9 +355,6 @@ priest     puppet     purse      rambo      rifle      rose       sherlock   spa
 spinach    swan       tomato     truck      tyson      wallet     whisky     wine
 """
 
-# toyota citroen renault peugeot yamaha porsche mercedes
-# samsung hyundai intel ford nintendo dell acer asus sega
-# canon
 WORDLIST5_STR = """
 youtube    uruguay    suffolk    vietnam    norfolk    gdansk     yahoo      ebay
 texas      fujitsu    oxford     china      pacific    canada     google
@@ -457,11 +441,34 @@ rwanda     saxony     somalia    syria      visa
 zurich
 """
 
+WORDLIST6_STR = """
+toyota citroen renault peugeot yamaha porsche mercedes
+samsung hyundai intel ford nintendo dell acer asus sega
+canon
+
+present origami tsunami
+reporter desk staff
+deputy engine card paper note queen hubble artist
+
+plane table space field metro hill store ocean river coast sirius academy street
+peak void station volvo java train carpet path road tree
+fort soil chad xerox bottle floor ferrari
+club city palm town safe shop cafe moon house movie kingdom room port
+island iceland home hall board company sixties embassy
+studio earth garden museum punjab library beach valley eighties
+hospital bridge mountain park    lake       forest temple     bank
+stadium turkey pocket basket theatre pool campus village ground school hotel
+church office court bedroom kitchen factory cinema volcano
+podium garage harbor casino villa balcony airport meadow patio swamp disco jungle
+"""
+
+
 WORDLIST1 = list(sorted(re.findall(r"[a-z]+", WORDLIST1_STR)))
 WORDLIST2 = list(sorted(re.findall(r"[a-z]+", WORDLIST2_STR)))
 WORDLIST3 = list(sorted(re.findall(r"[a-z]+", WORDLIST3_STR)))
 WORDLIST4 = list(sorted(re.findall(r"[a-z]+", WORDLIST4_STR)))
 WORDLIST5 = list(sorted(re.findall(r"[a-z]+", WORDLIST5_STR)))
+WORDLIST6 = list(sorted(re.findall(r"[a-z]+", WORDLIST6_STR)))
 
 
 def check_things():
@@ -478,13 +485,84 @@ def check_things():
 
 # check_things()
 
-ALL_WORDS = set(WORDLIST1 + WORDLIST2 + WORDLIST3)
+ALL_WORDS = set(WORDLIST1 + WORDLIST2 + WORDLIST3 + WORDLIST4 + WORDLIST5 + WORDLIST6)
 
 PLACES = WORDLIST2
 THINGS = ALL_WORDS - set(PLACES)
 
 # check for duplicates
 # assert len(ALL_WORDS) == len(WORDLIST1) + len(WORDLIST2)
+
+
+ALL_WORDS2_STR = """
+abacus     acid       admiral    alcohol    angel      antenna    artichoke  asterix
+avocado    baby       balloon    banana     barbie     battery    bazooka    beehive
+beggar     bell       bible      bicycle    bishop     bitcoin    blanket    blood
+boat       boxer      brain      bride      broccoli   buddha     buffalo    bullet
+burger     button     cabbage    caesar     cake       camera     canvas     captain
+cassette   chair      cherry     chief      chocolate  cinnamon   coconut    coffee
+columbus   computer   confucius  cookie     coupon     cowboy     crown      crystal
+darwin     dentist    devil      diamond    diesel     dildo      disc       dollar
+donut      dragon     eagle      earpiece   edison     einstein   elephant   elvis
+engineer   escort     euro       falcon     father     fire       flag       flower
+flute      football   freddie    galileo    gameboy    gandhi     garlic     geisha
+ghost      gift       gorilla    guitar     gymnast    hammer     hannibal   heart
+hepburn    hippo      holmes     honey      horse      hunter     husky      iphone
+ironman    jacket     jellyfish  jesus      jewel      jigsaw     joystick   judge
+jukebox    kafka      kangaroo   kebab      kennedy    keyboard   kidney     kimono
+kiwi       knight     koala      kurosawa   lambo      laptop     lasagna    lawyer
+leibniz    lenin      letter     lincoln    lobster    luigi      macbook    madonna
+manatee    mario      mason      meatball   mechanic   medusa     messi      miller
+mirror     miyazaki   moses      motor      mozart     muffin     muhammad   murderer
+mushroom   napoleon   necklace   needle     newton     ninja      obama      obelix
+octopus    olive      onion      orange     ostrich    pancake    papaya     parrot
+peanut     pelican    penguin    pepper     petrol     pharaoh    photo      piano
+picasso    pigeon     pilot      pineapple  pirate     pistol     pizza      plumber
+popcorn    potato     printer    prophet    pumpkin    pyramid    python     rabbit
+rainbow    raspberry  raven      razor      rhino      rock       rolex      ronaldo
+rousseau   saddam     salad      samurai    santa      satoshi    sausage    scorpion
+server     shampoo    sheriff    shrimp     sinatra    sisyphus   skull      smith
+socrates   spider     spoon      squid      stalin     steak      stone      sultan
+sushi      swan       teacup     tequila    tiger      tobacco    tofu       toilet
+torch      troll      trumpet    tshirt     turtle     tuxedo     umbrella   unicorn
+vader      viagra     violin     vladimir   vodka      waffle     walnut     wasabi
+webcam     witch      wizard     wolf       xbox       yoghurt    zebra      zombie
+
+abraham    academy    acrobat    admiral    airport    alaska     albino     amazon
+america    android    antenna    apollo     aquarium   artist     athens     atlantic
+attorney   auburn     austria    baghdad    barbeque   basket     beehive    beggar
+belfast    benjamin   berlin     bhutan     bicycle    bishop     bitcoin    blood
+boeing     bridge     broccoli   brussels   buddha     buffalo    builder    caesar
+canada     captain    caucasus   champion   chicago    church     clarinet   coconut
+colombia   computer   corsica    cowboy     crown      crystal    cyprus     damascus
+deputy     detroit    diamond    diesel     diploma    doctor     dolphin    dortmund
+dubai      edison     egypt      einstein   elephant   embassy    emperor    engine
+escort     ethiopia   fairy      ferrari    firefly    flower     football   forest
+france     freddie    gameboy    gandhi     geisha     georgia    germany    ghost
+glasgow    google     gorilla    gotham     guitar     hannibal   harvard    hawaii
+headset    heineken   hendrix    hippo      hogwarts   hospital   hotel      hubble
+hyundai    ironman    island     istanbul   italy      jakarta    jericho    jigsaw
+joystick   jukebox    julius     kangaroo   karachi    kashmir    kennedy    keyboard
+kingdom    kodak      kyoto      laptop     lasagna    leather    leibniz    leonardo
+library    lobster    london     macbook    madonna    mechanic   mercedes   messi
+mosquito   movie      muffin     muhammad   mushroom   nagasaki   nairobi    namibia
+necklace   netflix    newton     nigeria    nintendo   norway     obama      octopus
+office     okinawa    ontario    origami    orwell     ostrich    oxford     package
+pakistan   paper      pelican    peugeot    pharaoh    picasso    pilot      plumber
+podium     popcorn    porsche    potato     present    princess   prophet    pumpkin
+pyramid    python     queen      radio      rainbow    redneck    renault    reporter
+rhubarb    romania    rousseau   saddam     salmon     samurai    santiago   satoshi
+school     scorpion   seattle    server     shanghai   sheriff    siemens    simpson
+slippers   smith      socrates   soldier    sparrow    squid      stone      student
+sunlight   surgeon    suzuki     taiwan     teacup     temple     tequila    texas
+theatre    titanic    tobacco    tokyo      tolstoy    toronto    toshiba    trinidad
+trumpet    tsunami    tunisia    turkey     tuscany    tuxedo     ukraine    umbrella
+uranium    uruguay    valley     vampire    veteran    viagra     vietnam    village
+virginia   vivaldi    vladimir   volcano    voyager    waffle     walnut     warrior
+watanabe   webcam     whisky     wizard     xerox      yoghurt    yokohama   zimbabwe
+"""
+
+ALL_WORDS2 = list(sorted(re.findall(r"[a-z]+", ALL_WORDS2_STR)))
 
 
 def read_word_frequencies():
@@ -508,7 +586,7 @@ def read_word_frequencies():
     return result
 
 
-def pretty_wordlists(wordlist, max_len, label):
+def pretty_wordlists(wordlist, min_len, max_len, label):
     word_frequencies = read_word_frequencies()
     distances        = load_distances(wordlist)
 
@@ -521,34 +599,49 @@ def pretty_wordlists(wordlist, max_len, label):
         return -n
 
     def score(word):
-        l = 10 - abs(6.0 - len(word))
+        l = 10 - abs(6.5 - len(word))
         n = math.log(word_frequencies[word])
-        d = 1 / sum(1 for w in wordlist if distances[w + ":" + word] < 4)
-        return l * 3.0 + n * 3.0 + d * 10.0
+        d = 1 / sum(1 for w in wordlist if distances[w + ":" + word] < 5)
+        return l * 3.0 + n * 8.0 + d * 3.0
+
+    words_by_prefix = collections.defaultdict(list)
+    for word in wordlist:
+        if not min_len <= len(word) <= max_len:
+            continue
+        words_by_prefix[word[:3]].append(word)
 
     wordlist = list(reversed(sorted(wordlist, key=score)))
 
     filtered_wordlist = []
 
     for word in wordlist:
-        if not 4 <= len(word) <= max_len:
+        if not min_len <= len(word) <= max_len:
             continue
 
         collisions = [
             fword
             for fword in filtered_wordlist
-            if fword != word and (word.startswith(fword[:3]) or distances[fword + ":" + word] < 3)
+            if fword != word and (word.startswith(fword[:3]) or distances[fword + ":" + word] < 4)
         ]
         if not any(collisions):
             filtered_wordlist.append(word)
 
-    _pretty_wordlist({w: score(w) for w in filtered_wordlist}, label=label)
+    for word in filtered_wordlist:
+        if len(words_by_prefix[word[:3]]) == 1:
+            continue
+        print(word.ljust(9), " ".join(w.ljust(9) for w in words_by_prefix[word[:3]] if w != word))
 
+    scores_by_word = {w: score(w) for w in filtered_wordlist}
+    _wordlist_diff(scores_by_word, label=label)
+    # _pretty_wordlist(filtered_wordlist, label=label, words_per_line=16)
+
+    print()
     print(label, len(filtered_wordlist))
     print()
+    return list(sorted(filtered_wordlist[:256]))
 
 
-def _pretty_wordlist(scores_by_word, label):
+def _wordlist_diff(scores_by_word, label):
     wordlist = sorted(list(scores_by_word)[:256], key=len)
 
     path = f"/tmp/old_wordlist_{label}.txt"
@@ -564,18 +657,21 @@ def _pretty_wordlist(scores_by_word, label):
     with open(path, mode="w") as fobj:
         fobj.write(" ".join(wordlist))
 
-    wordlist = list(scores_by_word)
-
-    for i, word in enumerate(wordlist):
-        s = scores_by_word[word]
-        print(f"{word:<9} ", end=" ")
-        # print(f"{word:<9} {s:5.2f}", end=" ")
-        if (i + 1) % 8 == 0:
-            print()
-
     print()
     print("old words", " ".join(removed_words))
     print("new words", " ".join(new_words    ))
+    print()
+
+
+def _pretty_wordlist(wordlist, label, words_per_line=8):
+    for i, word in enumerate(wordlist):
+        print(f"{word:<9} ", end=" ")
+        # s = scores_by_word[word]
+        # print(f"{word:<9} {s:5.2f}", end=" ")
+        if (i + 1) % words_per_line == 0:
+            print()
+            if (i + 1) % 256 == 0:
+                print()
 
     return
 
@@ -894,13 +990,136 @@ def generate_filtered():
                 fobj.write(f"{word:<9} {math.log(n):.2f}\n")
 
 
+NEW_SHITLIST_STR = """
+harbor sheet board ground punjab
+ocean tacoma 3halifax    garden     bedroom    square field
+burgundy   valencia slovakia
+store hungary
+myanmar sirius cornell company lychee cornwall nanjing
+flute houston wicklow galway
+staff michigan
+court fujitsu
+europe     dakota     carolina   oregon
+adelaide knight
+midwest toulouse
+augustus
+kosovo
+munich mumbai
+latvia
+zambia monitor
+unicef
+zagreb
+maryland atlanta
+marshal clerk
+prussia
+bolivia
+sixties
+sussex
+calgary
+malta santiago
+mallorca
+moldova
+adviser
+meadow
+eighties
+ithaca
+donegal impala
+krakow hepburn rafael bulgaria
+kolkata lebanon bordeaux bohemia
+ulysses
+murderer
+zanzibar
+beach
+table
+dortmund
+
+scotland
+kentucky kenya
+chain chair chairman
+mercury merchant
+torch
+colorado cologne
+bristol ninja portugal
+mountain antwerp
+claudius romulus
+earpiece earth
+satan saturn
+sergent vinyl
+canberra madrid
+kinshasa salad
+packet pacific
+england engineer
+printer priest
+airman newport
+honolulu  honda     honduras
+bangkok   banner
+brooklyn  brownie   brother   bronx
+hitachi   warsaw
+station   stadium   stanford  stage
+botswana heart
+shenzhen  sherlock  shelve valet
+album     albania   alberta
+barbados  barbie battery
+campus    cambodia  camel
+museum    musician
+helsinki cinnamon serbia
+mecca officer cancer    canvas    canon volvo serbia
+santa sanyo studio papaya cinnamon
+beirut spinach moscow    moses florida   floor
+china     chile     chief     chicken
+medicine dracula bismarck  biscuit
+villa redmond
+algiers   andes
+tolkien   toledo
+burrito   burqa     burma
+kansas jersey hanoi
+samsung manatee   mandela
+plastic   plate     plasma    plant
+jacket unesco
+spain     sparta    space
+bride     britain   brick
+indiana moscow    moses
+spinach columbia  columbus
+hawking shampoo
+angola    lappland
+casino    cassette  cashier   alabama potter
+pearl     peach     peasant
+machine   pillow bagle kabul lunatic cisco alibaba
+walkman ramses   facebook     wallet
+phantom nagoya
+dollar babylon jackson memphis
+gamepad   gambia
+fairfax cocktail skull
+budapest dublin
+cabinet   cabbage
+turin     turnip    turtle    turban
+disney
+belgium   belize
+montana   monaco    monster   montreal  money
+quebec
+truck
+taipei tobago
+normandy  norwich   norfolk
+denmark   denver
+cartoon   carpet    cardiff
+vienna
+capella trailer
+cheese    chechnya  chemist
+"""
+
+NEW_SHITLIST = set(sorted(re.findall(r"[a-z]+", NEW_SHITLIST_STR)))
+
+
 def main():
     # generate_filtered()
     # yayornay_words()
-    # pretty_wordlists(WORDLIST4, max_len=9, label="things")
-    pretty_wordlists(WORDLIST5, max_len=9, label="places")
-    # pretty_wordlists(WORDLIST2)
-    print(len(ALL_WORDS))
+    # pretty_wordlists(WORDLIST4, min_len=4, max_len=9, label="things")
+    # pretty_wordlists(WORDLIST5, min_len=4, max_len=9, label="places")
+    NEW_WORDS = set(ALL_WORDS2) - NEW_SHITLIST
+    chosen_words = pretty_wordlists(NEW_WORDS, min_len=5, max_len=8, label="all")
+    _pretty_wordlist(chosen_words, label="all", words_per_line=8)
+
+    # print(len(NEW_WORDS))
     # show_distances(sorted(ALL_WORDS), threshold=3)
     # common_prefixes(sorted(ALL_WORDS), prefix_len=3)
     # common_prefixes(WORDLIST1, prefix_len=3)

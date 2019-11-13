@@ -9,7 +9,6 @@
 
 click
 click-repl
-pathlib2
 
 pylev
 argon2-cffi

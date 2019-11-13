@@ -327,11 +327,6 @@ Wallet Name {n}
 </text>
 </g>
 <g>
-<text class="fg_fill" x="41" y="284">
-SBK-Piece 1..n
-</text>
-</g>
-<g>
 <text class="fg_fill" x="49" y="236">
 .
 </text>
@@ -339,6 +334,11 @@ SBK-Piece 1..n
 <g>
 <text class="fg_fill" x="49" y="396">
 .
+</text>
+</g>
+<g>
+<text class="fg_fill" x="57" y="284">
+Share 1..n
 </text>
 </g>
 <g>

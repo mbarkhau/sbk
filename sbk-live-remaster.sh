@@ -259,7 +259,7 @@ export live_os="debian";
 
  	$CHROOT apt-get update
 
- 	$CHROOT apt-get install -y lxde-core;
+ 	$CHROOT apt-get install -y lxde-core libzbar-dev;
 
     # TODO: all dependencies should be vendored
     #   (for electrum that appears to be the case)

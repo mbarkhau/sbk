@@ -11,33 +11,9 @@ With SBK you can create cold-storage Bitcoin wallets that are highly secure. Thi
  - Your coins are safe, even if you trusted somebody you shouldn't have (not too often though).
  - Your coins are safe, even if something happens to you, your family will still be able to recover your coins.
 
-All of this is only true of course, as long as you follow the reccomended procedures. They can be a bit tedious, but they are simple and well documented.
+All of this is only true of course, as long as you follow the reccomended procedures. They can be tedious, but they are simple and well documented.
 
-
-## How SBK Works
-
-SBK has two ways to load/recover your wallet, one is for normal use and the other is a backup method.
-
- 1. `Salt` + `Brainkey`: A `brainkey` is passphrase which only you know and which is not stored on any computer or written on any piece of paper. The `brainkey` is only in your brain. (This method uses an additional secret input called a "salt", which *is written on paper*; more on that later).
- 2. Backup Shares: A set of secrets which form backup of your wallet when combined together. The [Shamir's Secret Sharing][href_wiki_sss] algorithm is used to generate these. You can distribute these shares in secure locations or give them to people you trust. Each share is useless by itself, so you don't have to trust a person completely. Not every share is required for recovery, so if some of them are lost or destroyed, your wallet will still be recoverable.
-
-Using the `brainkey`, you have direct access to your wallet, independent of any third party and without risk of theft because somebody found a list of words. If you forget your `brainkey` or your salt is destroyed, you can collect the shares and recover your wallet from this backup.
-
-SBK is not itself a wallet, it only creates and recovers wallet seeds. SBK currently supports only the [Electrum Bitcoin Wallet][href_electrum_org].
-
-[href_wiki_sss]: https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing
-
-[href_electrum_org]: https://electrum.org/
-
-> *DISCLAIMERS*
->
->  - As of November 2019, SBK is still in alpha development and has not had 
->    sufficient review for serious use! 
->  - Do not use this software for any purpose other than for review and to
->    provide feedback or contributions.
->  - The SBK project is not associated with the Electrum Bitoin Wallet or
->    Electrum Technologies GmbH.
->  - The SBK project is not associated with SatoshiLabs s.r.o. in any way.
+<hr/>
 
 Project/Repo:
 
@@ -72,27 +48,89 @@ Code Quality/CI:
 [](TOC)
 
 
+## How SBK Works
+
+SBK has two ways to load/recover your wallet, one is for normal use and the other is a backup method.
+
+ 1. `Salt` + `Brainkey`: A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written down on paper. In other words, the `brainkey` is only in your brain. (This method uses an additional secret input called a "salt", which *is written on paper*; more on that later).
+ 2. `Shares`: A single `share` is one part of a backup of your wallet. When enough `shares` are combined together (e.g. 3 of 5 in total), your wallet can be recovered even if the `salt` or `brainkey` are lost. The [Shamir's Secret Sharing][href_wiki_sss] algorithm is used to generate the `shares`. You can distribute them in secure locations or give them to people you trust. Each `share` is useless by itself, so you don't have to trust a person completely. Not every `share` is required for recovery, so if some of them are lost or destroyed, your wallet can still be recovered.
+
+Using the `brainkey`, you have direct access to your wallet, independent of any third party and without risk of theft (though the [$5 wrench attack][href_xkcd_538] is still a risk of course). This is in contrast to a typical 12-word wallet seed, which is written down on paper. If the piece of paper is lost, stolen or destroyed, your wallet and coins are probably lost forever. If on the other hand you forget your `brainkey` or your `salt` is lost, stolen or destroyed, then you can still recover your wallet using the backup `shares`.
+
+SBK is not itself a wallet, it only creates and recovers wallet seeds. SBK currently supports only the [Electrum Bitcoin Wallet][href_electrum_org].
+
+[href_wiki_sss]: https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing
+
+[href_xkcd_538]: https://xkcd.com/538/
+
+[href_electrum_org]: https://electrum.org/
+
+> *DISCLAIMERS*
+>
+>  - As of November 2019, SBK is still an experimental pre-alpha evaluation only
+>    prototype (hedge, hedge :-P). It is not suitable for serious use! If you use it,
+>    assume that all of your coins will be lost .
+>  - Do not use this software for any purpose other than for review and to
+>    provide feedback or to make contributions.
+>  - The SBK project is not associated with the Electrum Bitoin Wallet or
+>    Electrum Technologies GmbH.
+>  - The SBK project is not associated with SatoshiLabs s.r.o. in any way.
+
+
 # Implementation
 
-For the time being, the documentation is geared towards programmers/contributors rather than novices and end users. You can skip ahead to the [User Guide](#user-guide) if you don't care about implementation details.
+For the time being, the documentation is mainly for contributors rather than users. You can skip ahead to the [User Guide](#user-guide) if you don't care about implementation details.
 
 
-## High Level Overview: Splitting and Joining Keys
+## High Level Overview: Generating, Splitting and Joining Keys
 
-The basic idea of what SBK does:
-
- - Wallet Setup:
-    1. Pick `--scheme=TofN` for shares and `kdf-parameters` appropriate to the system. The defaults are `--scheme=3of5` and the default [key derivation](#key-derivation) parameters are chosen so that the wallet seed will take 1-2 minutes to derive. The `parameters` are encoded as 4 bytes/words which must be written down and kept together with the `salt`.
-    2. Randomly generate secrets: `salt` and `brainkey`. Both are needed to load a wallet. The `salt` is written down and kept in a safe and secure place, similar to how a typical 12 word seed phrase for a wallet would be treated. The `brainkey` is committed to memory over the course of a few days of practice.
-    3. The `salt+brainkey` is split into multiple `shares` (eg. 3of5: a minimum `threshold` of 3 that are required for recovery of 5 in total that are generated). Shares should be kept in physically separate locations and only accessible the owner themselves or to people they trust. Each `share` should also include a copy of the `parameters`. 
- - Wallet Loading: 
-    4. Typical usage involves entring the `parameters, the `salt`, and the `brainkey`. An optional `wallet-name` can also be used, but is not reccomended as it may be a single point of failure if only the owner knows about it. Using these inputs the wallet seed is derived and used to load the wallet.
- - Wallet Recovery:
-    5. Join a minimum of the `shares` together in order to retreive your `salt` and `brainkey`. You only need to do this if either are lost/forgotten.
-
+<p align="center">
 <img alt="SBK Dataflow Diagram" src="https://mbarkhau.keybase.pub/sbk/sbk_dataflow_diagram.svg" height="650" />
+</p>
 
-Apart from giving a general overview, this doesn't tell you much of course. Some of the boxes might as well be labled with "Magic". The next few sections will explain the terms "Shamir's Secret Sharing" (SSS) and "Key Derivation Function" (KDF) in more detail.
+Apart from giving a general overview, this diagram doesn't tell you much of course. Some of the boxes might as well be labled "Magic". The next few sections will explain in a little more detail, thought not in such detail to be a specification. 
+
+
+### Key Generation
+
+ 1. Specify `sheme` (eg. `3of5`). This means that a total of 5 shares are generated, any 3 of which are enough for recovery.
+ 2. Optionally specify `kdf-parameters`. If not specified, these are determined automatically based on the available memory and processing resources.
+ 3. The `salt` is generated randomly. The `salt` should be written down and kept safe, similarly to a typical 12-word wallet seed. 
+ 4. The `brainkey` is generated randomly and should be memorized.
+ 5. The `shares` are generated by concatenating the `salt` and `brainkey`, which is then split using Shamir's Secret Sharing. Shares should be kept in separate locations and they should be accessible only to the owner or to people trusted by the owner.
+
+
+### Key Recovery
+
+Let's assume that the `brainkey` has already been forgotten or that the `salt` has been destroyed. To recover both, the backup `shares` can be joined.
+
+ 1. Enter as many `shares` as required.
+ 2. The `shares` are joined using Shamir's Secret Sharing and the resulting secret is split into the `salt` and `brainkey`.
+ 3. Write down `salt`.
+ 4. Write down `brainkey`.
+
+If you do the recovery as the owner, it may be safe to continue to use the wallet and to not generate new keys. If you have any suspicion that any of the secrets have been compromised during recovery, you should move all coins to a new wallet.
+
+
+### Loading Wallet
+
+The wallet can be loaded if the `salt` and `brainkey` are available, either by the owner who has direct access to them, or after they have been recovered from the `shares`. 
+
+ 1. Optionally specify a `wallet-name`. 
+ 2. Enter the `salt`.
+ 3. Enter the `brainkey`.
+ 4. The `wallet-seed` is calculated.
+ 5. The electrum wallet is created in a temporary directory.
+ 6. The electrum gui is started in offline mode.
+ 7. Use wallet/sign transactions...
+ 8. The wallet files are [overwritten and deleted][href_wiki_data_remanence].
+
+[href_wiki_active_recall]: https://en.wikipedia.org/wiki/Active_recall
+
+[href_wiki_tampering]: https://en.wikipedia.org/wiki/Tamper-evident_technology
+
+[href_wiki_data_remanence]: https://en.wikipedia.org/wiki/Data_remanence
+
 
 ## Shamirs Secret Sharing
 
@@ -100,33 +138,38 @@ Apart from giving a general overview, this doesn't tell you much of course. Some
 
 It's fairly obvoius why you might want to split a secret key into multiple parts: Anybody who finds or steals the full key will have access to your wallet. To reduce your risk if being robbed, you can split the key into multiple parts. 
 
-If for example you have a wallet seed of 12 words "abcd efgh ijkl", you could split it into fragments: "1: abcd", "2: efgh", "3: ijkl". This way each cannot be used by itself and to recover your wallet. The downside is that you increase the risk of losing your wallet: If you lose even one fragment, you lose the whole wallet.
+If for example you have a wallet seed of 12 bytes `"abcd efgh ijkl"` (with 96 bits of entropy), you could split it into fragments: `"1: abcd"`, `"2: efgh"`, `"3: ijkl"`. This way each fragment is not enough by itself to recover your wallet. The downside is that you increase the risk of losing your wallet: If you lose even one fragment, you lose the wallet.
 
-To reduce this risk, you might want to add redundancy by making a copy of your each fragment: "4: abcd", "5: efgh", "6: ijkl".
+To reduce this risk, you might want to add redundancy by making a copy of your each fragment: `"4: abcd"`, `"5: efgh"`, `"6: ijkl"`. Now if fragment 1 is lost, you may still have access to fragment 4, which is a copy.
 
 There are two downsides to this approach:
 
  1. Some of the fragments are identical or have overlapping parts of the secret. and so the redundancy is not as great as you might hope. This means that two fragments could be lost and if they are the only ones with that part of the secret (for exapmle fragment 1 and 4), then you may have lost your wallet.
- 2. If a fragment falls in the hands of an attacker, they can try to guess the remaining 8 words, which is a factor of 2048**4 = 17.592.186.044.416 fewer combinations to search through than if they knew nothing about your wallet seed. If you have trusted people who turn end up colluding with each other (which they have a financial incentive to do) then, then they only have 2048**4 combinations left to search through.
+ 2. If a fragment falls in the hands of an attacker, they can try to guess the remaining 8 bytes, which leaves `2**64` combinations to search through to find your wallet seed. If you have wrongfully trusted two people, and they collude with each other (which they have a financial incentive to do), then they only have `2**32` combinations left to search through.
 
-There may be slightly more clever schemes along these lines, but fortunately there is a better alternative: Keys can be split into `shares` in a way that each `share` is completely independent of every other. This means that e.g. in a 3 of 5 scheme, any 2 can be lost and the remaining 3 can be used to recover the original key (solving problem 1.). In this scheme each individual `share` does not contain any useful information by itself, so that an attacker gains no advantage if they have fewer `shares` than the minimum `threshold` (solving problem 2.). This scheme is called Shamir's Secret Sharing.
+There may be slightly more clever schemes along these lines, but fortunately there is a better alternative: Shamir's Secret Sharing.
+
+Keys can be split into `shares` in a way that each `share` is completely independent of every other. Assuming a `3of5` scheme:
+
+ 1. Any two `shares` can be lost and the remaining three are enough to recover the original key.
+ 2. Any individual `share` (or subset of `shares` below the `threshold`) does not contain any useful information. This means that access to a `share` does not provide an attacker with any advantage if they try to brute-force your wallet seed.
 
 
 ### SSS: Shamir's Secret Sharing
 
-To get an intuition of how SSS works, it is enough to recall high-school calculus.
+To get an intuition of how SSS works, it is enough to recall some high-school calculus.
 
-Consider a point `A(x=1, y=a)` on the cartesian plane:
+Consider a point `S(x=0, y=s)` on the cartesian plane, where the coordinate `y=s` is your secret encoded as a number:
 
-<img alt="Cartesian plane with single point A" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_1.svg" height="220" />
+<img alt="Cartesian plane with single point S" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_1.svg" height="220" />
 
-Now consider a polinomial of degree 1 (aka. a linear equation, aka. a line) which goes through point A.
+Now consider a polinomial of degree 1 (aka. a linear equation, aka. a line equation) which goes through point S.
 
 <img alt="Cartesian plane with line sloping down through points S, A and B" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_2.svg" height="220" />
 
-There are further points `S(x=0, y=s)` and `B(x=2, y=b)` through which the line goes. Recall that a polinomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you have `A` and `B`, you can derive the parameters `j` and `k` in the equation `y = jx + k` and solve for `x=0` to get the `y` value of `S`. If you have *only* A or *only* B on the other hand, then there are an infinite number of lines you could draw through either. In other words, it is impossible to derive `S` from `A` individually, or from `B` individually. To take this further, we could have a point `C` and we could recover `S` if we had any two of `A`, `B` and `C`.
+There are further points `A(x=1, y=a)` and `B(x=2, y=b)` through which the linear equation `y = jx + k` goes. Recall that a polinomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you know `A` and `B`, you can derive the parameters `j` and `k` of the equation `y = jx + k` and solve for `x=0` to get `y=s`. If on the other hand, you have *only* A or *only* B, then there are an infinite number of lines you could draw through either. In other words, it is impossible to derive `S` from `A` individually, or from `B` individually. To take this further, we could have a point `C` and we could recover `S` if we had any two of `A`, `B` and `C`. This allows us to create a `2ofN` scheme.
 
-Similarly, for a polynomial of degree 2 (aka. a quadratic equation, aka. a parabola), we need at least three points through which the parabola goes, for it to be fully specified.
+Similarly we can create a `3ofN` scheme with a polynomial of degree 2 (aka. a quadratic equation, aka. a parabola). With three points through which the parabola goes, the equation is fully specified and we can calculate for x=0.
 
 <img alt="Cartesian plane with parabola through points S, A, B and C" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_3.svg" height="220" />
 
@@ -135,32 +178,32 @@ Similarly, for a polynomial of degree 2 (aka. a quadratic equation, aka. a parab
 
 Using this insight, we can 
 
- 1. Encode our `brainkey` as a number and generate `S(x=0, y=brainkey)`
- 2. Generate random parameters `i`, `j`, `k`, ... for a polynomial which goes
-    through `S`
- 3. Calculate 5 points `A`, `B`, `C`, `D` and `E` which lie on the polynomial.
- 4. Use polynomial interpolation to recover `S` using any 3 of `A` - `E`
+ 1. Encode a `secret` as a point: `S(x=0, y=secret)`
+ 2. For a polynomial `y = ix² + jx + k` which goes through `S`, we choose `k=secret` and random values for `i` and `j`.
+ 3. Calculate 5 points `A`, `B`, `C`, `D` and `E` which lie on the polynomial (but do **not** have `x=0`).
+ 4. Use polynomial interpolation to recover `S` using any 3 of `A`, `B`, `C`, `D` or `E`.
 
-The degree of the polynomial allows us control of the minimum number of points required to recover the secret (the `threshold`). Calculating additional/redundant points allows us to protect against the loss of any individual point.
+The degree of the polynomial allows us control of the minimum number of points/`shares` required to recover the secret (the `threshold`). Calculating redundant `shares` allows us to protect against the loss of any individual `share`.
 
 
 ### SSS: Some Implementation Details
 
 There is more to story of course. I don't claim to understand in full how the attack works, but in the preceeding simplified/naive scheme there is some information leakage. Perhaps an attacker who knows fewer points than the `threshold` could narrow down their search space, because they know for example that the polynomial is continuous. I'm taking the cryptographer/mathematicians word that this is the case and that the solution to is to use finite field arithmetic.
 
-Rather than doing calculations in the traditional cartesian plane, they are done in `GF(p)` or `GF(p^n)` (typically `GF(2^8) == GF(256)`. The current implementation of SBK uses `GF(p)` with a value for `p` that corresponds to the level of entropy of the `brainkey`. For a `--level=4` (64 bit) `brainkey` this would be `GF(2^64 - 59) == GF(18446744073709551557)`. Other Shamir's Secret Sharing schemes have chosen `GF(256)`. 
+Rather than doing calculations in the traditional cartesian plane, they are done in `GF(p)` or `GF(p^n)` (typically `GF(2^8) == GF(256)`. The current implementation of SBK uses `GF(p)` with a value for `p` (chosen from [oeis.org/A014234][href_oeis_a014234]) that corresponds to the level of entropy of the `brainkey`. For the default `brainkey` length of 8 byte/64 bit and 12 byte/96 bit for the `salt`,  this would be `GF(2**160 - 59) == GF(146...929)`. Other implementations typically use `GF(2**8) == GF(256)`, which has a little harder to understand due to the requirement for polynomial division, but SBK may switch to that before public release. 
 
-I did not choose this approach for SBK since:
+Reasons to maybe stick with `GF(p)`:
 
- 1. Implementing finite field arithmetic for `GF(p^n) | n > 1` rather than
-    `GF(p)` was too complicated for me when I last attempted it. Arithmetic with
-    `GF(p)` is easier to understand and should be easier to review.
- 2. Since a computationally and memory intensive KDF is used to harden the
-    `brainkey`, low powered embedded systems are not a target for SBK.
+ 1. Implementing finite field arithmetic for `GF(p^n) | n > 1` is easier to understand
+    and should be easier to review.
+ 2. Since a computationally and memory intensive KDF is used to harden the `brainkey`,
+    low powered embedded systems are not a target for SBK, which is one of the 
+    reasons `GF(2**8)` is usually preferred.
  3. Python has native support for big integers, so arithmetic with large values
-    is not an issue, which would otherwise be a motivation to use `GF(256)`.
-    Since SBK uses Electrum (implemented with python), it is not an extra
-    dependency to require a python interpreter. 
+    is not an issue. Since SBK uses Electrum (implemented with python), it is not an extra dependency to require a python interpreter.
+
+[href_oeis_a014234]: https://oeis.org/A014234
+
 
 ## Data Format
 
@@ -291,11 +334,9 @@ Even so, I would reccomend a `brainkey` of at least `--level=3` (48bits).
 
 If you do not wish to ever use the `salt+brainkey` method to load your wallet, then you can simply discard them during the initial generation. To recover your wallet, your only option will then be to collect and join the `shares`. If you find yourself the the subject of a [$5 wrench attack][href_xkcd_538], you can plausibly deny that you memorized the `brainkey` and say that your attackers will have to go to the locations where you put and people/institutions to whom you gave the `shares`. Non-state attackers may find it difficult to convince a bank to open safety deposit box. Assuming state attackers can even find out who your trustees are, they may find it difficult to convince enough of them to betray you.
 
-[href_github_phc_winner_argon2]: https://github.com/P-H-C/phc-winner-argon2
-
-[href_xkcd_538]: https://xkcd.com/538/
-
 [^fnote_quantum_resistance]: Even with access to a quantum computer, it is my understanding that there are no algorithms which improve on a brute-force attack by more than a factor of two. While the seed derivation may be quantum resistant, the existing caveats wrt. [quantum resistance of Bitcoin][href_bitcoin_it_quantum_resistance] itself still apply.
+
+[href_github_phc_winner_argon2]: https://github.com/P-H-C/phc-winner-argon2
 
 [href_wiki_kdf]: https://en.wikipedia.org/wiki/Key_derivation_function
 
@@ -303,6 +344,8 @@ If you do not wish to ever use the `salt+brainkey` method to load your wallet, t
 
 
 ## Wallet Name/Phassphrase
+
+Some care is needed if a `wallet-name` is used. SBK is designed to avoid creating any single point of failure. Depending on how the `wallet-name` is used, it may represent a single point of failure. The default value for `wallet-name` is `disabled`.
 
 While we're on the topic of [plausible deniability][href_wiki_plausible_deniability]: You can use a single `salt+brainkey` to generate multiple wallet seeds. To do this, provide an additional `wallet-name` for each wallet. One of these wallets (usually the unnamed default wallet) might not be your main wallet, but rather it can be a decoy. If you are under duress and forced to divulge your `salt+brainkey`, then the attackers will probably start by loading the default wallet and if they are happy enough with what they find, they may never be the wiser and let you free. Or if they press you further, you can give them a different `wallet-name` which is perhaps also a decoy. 
 
@@ -509,6 +552,10 @@ sbk_shares = shamir_split(
 for i, share in enumerate(sbk_shares):
     share_text = mnemonic_encode(share)
     print(f"Write down share {i + 1}: {share_text}")
+
+# /run/user/$UID is a "tmpfs" directory provided by pam_systemd,
+uid = subprocess.check_output(["id", "-u"])
+f"/run/user/{uid}/sbk_electrum_wallet_01234"
 ```
 
 
@@ -665,6 +712,13 @@ There are three areas of risk to be aware of:
 
 # Unsorted
 
+## misc 
+
+ 1. Specify `--scheme=TofN` parameter (the default is `--scheme=3of5`).  The maximum value for `T` (the `threshold`) is 16 and there is no limit to `N` (the total number of shares). 
+ 2. Optionally specify `kdf-parameters` appropriate the current system and/or level of paranoia. The default parameters for the [Argon2][href_github_phc_winner_argon2] [key derivation function](#key-derivation) are determined automatically based on the available memory and processor. The automatically chosen parameters target a runtime of about 1-2 minutes for the wallet seed to be calculated.
+ 3. The `raw_salt` is generated randomly. The previously specified `parameters` are encoded in the first few bytes to form the `salt`, which is written down and kept in a safe and secure location. The `salt` should be treated similarly to a typical 12-word wallet seed. 
+ 4. The `brainkey` is generated randomly. It should be committed to memory by practicing regular [active recall][href_wiki_active_recall] over the course of a few days and every few weeks from there on forward.
+ 5. The `shares` are generated by concatenating the `raw_salt` and `brainkey`, which is then split using Shamir's Secret Sharing. The `parameters` are also encoded in the first few bytes of every share. Shares should be copied onto paper (using the provided templates) and sealed so that [tampering can be detected][href_wiki_tampering]. Shares should be kept in physically distributed locations and they should be accessible only to the owner or to people trusted by the owner.
 
 ## Related Work and Alternatives
 

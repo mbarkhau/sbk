@@ -9,6 +9,8 @@
 
 import os
 import typing as typ
+import logging
+import pathlib as pl
 import tempfile
 import subprocess as sp
 
@@ -35,6 +37,9 @@ if os.environ.get('NOPYTB') is None and os.environ.get('ENABLE_BACKTRACE') == '1
         backtrace.hook(align=True, strip_path=True, enable_on_envvar_only=True)
     except ImportError:
         pass
+
+
+log = logging.getLogger(__name__)
 
 
 def urandom(size: int) -> bytes:
@@ -255,14 +260,7 @@ _non_segwit_option = click.option(
 )
 
 
-SHOW_SEED_OPTION_HELP = "Show wallet seed. Don't load electrum wallet"
-
-_show_seed_option = click.option(
-    '--show-seed', type=bool, is_flag=True, default=False, help=SHOW_SEED_OPTION_HELP
-)
-
-
-DEFAULT_WALLET_NAME = "default"
+DEFAULT_WALLET_NAME = "disabled"
 
 WALLET_NAME_OPTION_HELP = "Wallet name"
 
@@ -272,6 +270,20 @@ _wallet_name_option = click.option(
     default=DEFAULT_WALLET_NAME,
     show_default=True,
     help=WALLET_NAME_OPTION_HELP,
+)
+
+
+SHOW_SEED_OPTION_HELP = "Show wallet seed. Don't load electrum wallet"
+
+_show_seed_option = click.option(
+    '--show-seed', type=bool, is_flag=True, default=False, help=SHOW_SEED_OPTION_HELP
+)
+
+
+ONLINE_MODE_OPTION_HELP = "Start electrum gui in online mode (--offline is the default)"
+
+_online_mode_option = click.option(
+    "-o", '--online-mode', type=bool, is_flag=True, default=False, help=ONLINE_MODE_OPTION_HELP
 )
 
 
@@ -677,12 +689,47 @@ def recover() -> None:
     echo("\n".join(brainkey_lines))
 
 
+def mk_tmp_wallet_fpath() -> pl.Path:
+    tempdir = tempfile.tempdir
+    try:
+        uid_output = sp.check_output(["id", "-u"])
+        uid        = int(uid_output.strip())
+        uid_dir    = pl.Path(f"/run/user/{uid}")
+        if uid_dir.exists():
+            tempdir = str(uid_dir)
+    except Exception as ex:
+        log.warning(f"Error creating temp directory in /run/user/ : {ex}")
+
+    _fd, wallet_fpath_str = tempfile.mkstemp(prefix="sbk_electrum_wallet_", dir=tempdir)
+    wallet_fpath = pl.Path(wallet_fpath_str)
+    return wallet_fpath
+
+
+def _clean_wallet(wallet_fpath: pl.Path) -> None:
+    if not os.path.exists(wallet_fpath):
+        return
+
+    garbage = os.urandom(4096)
+    # On HDDs it may serve some marginal purpose.
+    # On SSDs this may be pointless, due to wear leveling.
+    size = wallet_fpath.stat().st_size
+    with wallet_fpath.open(mode="wb") as fobj:
+        for _ in range(0, size, 4096):
+            fobj.write(garbage)
+    wallet_fpath.unlink()
+    assert not wallet_fpath.exists()
+
+
 @cli.command()
 @_wallet_name_option
 @_show_seed_option
+@_online_mode_option
 @_yes_all_option
 def load_wallet(
-    wallet_name: str = "default", show_seed: bool = False, yes_all: bool = False
+    wallet_name: str  = DEFAULT_WALLET_NAME,
+    show_seed  : bool = False,
+    online_mode: bool = False,
+    yes_all    : bool = False,
 ) -> None:
     """Open wallet using Salt+Brainkey."""
     yes_all or clear()
@@ -710,13 +757,16 @@ def load_wallet(
     int_seed    = enc_util.bytes2int(master_key)
     wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
 
-    _, wallet_path = tempfile.mkstemp(prefix="sbk_electrum_wallet")
+    wallet_fpath = mk_tmp_wallet_fpath()
 
-    restore_cmd = ["electrum", "restore", "--wallet", wallet_path, wallet_seed]
-    load_cmd    = ["electrum", "gui"    , "--wallet", wallet_path, "--offline"]
+    restore_cmd = ["electrum", "restore", "--wallet", str(wallet_fpath), wallet_seed]
+    load_cmd    = ["electrum", "gui"    , "--wallet", str(wallet_fpath)]
+
+    if not online_mode:
+        load_cmd.append("--offline")
 
     if show_seed:
-        os.remove(wallet_path)
+        _clean_wallet(wallet_fpath)
         echo("Electrum commands:")
         echo()
         echo("\t" + " ".join(restore_cmd))
@@ -726,9 +776,10 @@ def load_wallet(
         return
 
     try:
+        wallet_fpath.unlink()
         retcode = sp.call(restore_cmd)
         if retcode != 0:
-            cmd_str = " ".join(restore_cmd[:-1]) + " <wallet seed hidden>"
+            cmd_str = " ".join(restore_cmd[:-1] + ["<wallet seed hidden>"])
             raise click.Abort(f"Error calling '{cmd_str}'")
 
         retcode = sp.call(load_cmd)
@@ -736,9 +787,7 @@ def load_wallet(
             cmd_str = " ".join(load_cmd)
             raise click.Abort(f"Error calling '{cmd_str}'")
     finally:
-        if os.path.exists(wallet_path):
-            # TODO: bleachbit ?
-            os.remove(wallet_path)
+        _clean_wallet(wallet_fpath)
 
 
 @cli.command()

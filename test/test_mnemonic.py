@@ -17,36 +17,28 @@ def _print_words(wl):
     print()
 
 
-@pytest.mark.parametrize("wordlist", [ENTITY_WORDLIST, LOCATION_WORDLIST])
-def test_wordlist_constraints(wordlist):
-    if sorted(wordlist) != wordlist:
-        _print_words(wordlist)
+def test_wordlist_constraints():
+    if sorted(WORDLIST) != WORDLIST:
+        _print_words(WORDLIST)
         raise Exception("Wordlist not sorted!")
 
     # whitespace check
-    assert [w.strip().replace(" ", "").lower() for w in wordlist] == wordlist
+    assert [w.strip().replace(" ", "").lower() for w in WORDLIST] == WORDLIST
     # length check
-    assert all(4 <= len(w) <= 9 for w in wordlist)
+    assert all(5 <= len(w) <= 8 for w in WORDLIST)
     # unique 3 letter prefixes
-    assert len({w[:3] for w in wordlist}) == 256
+    assert len({w[:3] for w in WORDLIST}) == 256
     # no duplicates
-    assert len(set(wordlist)) == 256
+    assert len(set(WORDLIST)) == 256
 
 
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Basically this can't fail")
-@pytest.mark.parametrize("wordlist", [ENTITY_WORDLIST, LOCATION_WORDLIST])
-def test_wordlist_distances(wordlist):
-    for w1, w2 in itertools.product(wordlist, wordlist):
+def test_wordlist_distances():
+    for w1, w2 in itertools.product(WORDLIST, WORDLIST):
         if w1 == w2:
             continue
         d = pylev.damerau_levenshtein(w1, w2)
-        assert d >= 3, (w1, w2)
-
-
-def test_wordlists():
-    wl1 = set(ENTITY_WORDLIST)
-    wl2 = set(LOCATION_WORDLIST)
-    assert len(wl1 & wl2) == 0
+        assert d >= 4, (w1, w2)
 
 
 def test_bytes2phrase_fail():
@@ -58,20 +50,14 @@ def test_bytes2phrase_fail():
 
 
 def test_phrase2bytes_fail():
-    assert phrase2bytes("abacus adelaide") == b"\x00\x00"
-    assert phrase2bytes("abakus adilaide") == b"\x00\x00"
+    assert phrase2bytes("abraham academy"  ) == b"\x00\x01"
+    assert phrase2bytes("abbrahame akadimy") == b"\x00\x01"
 
     try:
-        phrase2bytes("abbakuss adilaid")
+        phrase2bytes("abbakuss akadimy")
         assert False, "Expected ValueError"
     except ValueError as ex:
         assert "Unknown word" in str(ex)
-
-    try:
-        phrase2bytes("adelaide abacus")
-        assert False, "Expected ValueError"
-    except ValueError as ex:
-        assert "Invalid word order" in str(ex)
 
 
 def test_fuzz_bytes2phrase():
@@ -86,8 +72,8 @@ def test_fuzz_bytes2phrase():
 
 def test_fuzz_phrase2bytes():
     for i in range(1, 100):
-        words_1 = random.sample(ENTITY_WORDLIST  , 8)
-        words_2 = random.sample(LOCATION_WORDLIST, 8)
+        words_1 = random.sample(WORDLIST, 8)
+        words_2 = random.sample(WORDLIST, 8)
         words   = "\n".join(w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2))
 
         data = phrase2bytes(words)
@@ -105,8 +91,8 @@ def test_fuzz_phrase2words_fuzzymatch(num_typos, max_fail_ratio):
     ok   = 0
     fail = 0
     for i in range(5):
-        words_1 = random.sample(ENTITY_WORDLIST  , 8)
-        words_2 = random.sample(LOCATION_WORDLIST, 8)
+        words_1 = random.sample(WORDLIST, 8)
+        words_2 = random.sample(WORDLIST, 8)
 
         expected_phrase = "\n".join(
             w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2)
@@ -135,7 +121,7 @@ def test_fuzz_phrase2words_fuzzymatch(num_typos, max_fail_ratio):
 
 def test_phrase_hardcoded():
     # this is to prevent accidental changes to the wordlists
-    wl_text = " ".join(ENTITY_WORDLIST + LOCATION_WORDLIST)
-    assert wl_text.count(" ") == 511
+    wl_text = " ".join(WORDLIST)
+    assert wl_text.count(" ") == 255
     wl_digest = hashlib.sha1(wl_text.encode("ascii")).hexdigest()
-    assert wl_digest == "d424a4ea958c8dc7d04cc9ac77028ade6b877c45"
+    assert wl_digest == "f65545bcc55d66efe1894f7f8c944f9557a70f99"

@@ -240,7 +240,7 @@ def estimate_param_cost(
     tgt_p, tgt_m, tgt_t, _ = tgt_kdf_params
 
     if tgt_m < 10 and tgt_t < 10:
-        return 1
+        return 1.0
 
     if sys_info is None:
         _sys_info = load_sys_info()
@@ -280,7 +280,7 @@ def estimate_param_cost(
         d11 * (tgt_m - m0   ) * (tgt_t - t0),
     ]
 
-    return sum(s) / ((m1 - m0) * (t1 - t0))
+    return max(0.0, sum(s) / ((m1 - m0) * (t1 - t0) + 0.0))
 
 
 def get_default_params() -> kdf.KDFParams:

@@ -30,13 +30,13 @@ def test_fresh_sys_info(capsys):
 def test_estimate_param_cost():
     sys_info = params.load_sys_info()
 
-    cost1 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=10, t=1))
-    cost2 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=10, t=2))
-    cost3 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=20, t=1))
-    cost4 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=20, t=2))
+    cost1 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=100, t=10))
+    cost2 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=100, t=20))
+    cost3 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=200, t=10))
+    cost4 = params.estimate_param_cost(kdf.init_kdf_params(p=sys_info.initial_p, m=200, t=20))
 
-    assert all(isinstance(c, float) for c in [cost1, cost2, cost3, cost4])
-    assert round(cost1) == 0
+    costs = [cost1, cost2, cost3, cost4]
+    assert all(isinstance(c, float) for c in costs)
     assert cost2 > cost1
     assert cost3 > cost1
     assert cost4 > cost3

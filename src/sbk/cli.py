@@ -19,11 +19,10 @@ import click_repl
 
 import sbk
 
-from . import gf
 from . import kdf
 from . import cli_io
 from . import params
-from . import gf_poly
+from . import shamir
 from . import cli_util
 from . import enc_util
 from . import electrum_mnemonic
@@ -287,9 +286,8 @@ _online_mode_option = click.option(
 )
 
 
-Salt      = bytes
+Salt      = bytes  # prefixed with ParamConfig
 BrainKey  = bytes
-Share     = bytes
 MasterKey = bytes
 
 
@@ -325,65 +323,6 @@ def _show_secret(label: str, data: bytes, data_type: str) -> None:
     echo(f"{label:^{len_padding}}")
     echo()
     echo("\n".join(output_lines) + "\n\n")
-
-
-def _split_into_shares(
-    param_cfg : params.ParamConfig,
-    raw_salt  : Salt,
-    brainkey  : BrainKey,
-    threshold : int,
-    num_shares: int,
-) -> typ.Iterable[Share]:
-    errmsg = f"{threshold} > {num_shares}"
-    assert threshold <= num_shares, errmsg
-
-    errmsg = f"{len(raw_salt)} != {params.RAW_SALT_LEN}"
-    assert len(raw_salt) == params.RAW_SALT_LEN, errmsg
-
-    master_key = raw_salt + brainkey
-    errmsg     = f"{len(master_key)} != {param_cfg.master_key_len}"
-    assert len(master_key) == param_cfg.master_key_len, errmsg
-
-    param_cfg_data = params.param_cfg2bytes(param_cfg)
-
-    secret_int = enc_util.bytes2int(master_key)
-
-    field    = gf.GFNum.field(param_cfg.prime)
-    gfpoints = gf_poly.split(
-        field=field, threshold=threshold, num_shares=num_shares, secret=secret_int
-    )
-    for gfpoint in gfpoints:
-        raw_share_data = enc_util.gfpoint2bytes(gfpoint)
-        errmsg         = f"{len(raw_share_data)} != {param_cfg.master_key_len + 1}"
-        assert len(raw_share_data) == param_cfg.master_key_len + 1, errmsg
-
-        share_data = param_cfg_data + raw_share_data
-        errmsg     = f"{len(share_data)} != {param_cfg.share_len}"
-        assert len(share_data) == param_cfg.share_len, errmsg
-        yield share_data
-
-
-def _join_shares(
-    param_cfg: params.ParamConfig, shares: typ.List[Share]
-) -> typ.Tuple[Salt, BrainKey]:
-    field      = gf.GFNum.field(order=param_cfg.prime)
-    raw_shares = [share[params.PARAM_CFG_LEN :] for share in shares]
-    points     = tuple(enc_util.bytes2gfpoint(share, field) for share in raw_shares)
-
-    secret_int = gf_poly.join(field, param_cfg.threshold, points)
-    master_key = enc_util.int2bytes(secret_int)
-
-    assert len(master_key) == param_cfg.master_key_len
-
-    salt_end = param_cfg.raw_salt_len
-    bk_start = param_cfg.raw_salt_len
-
-    raw_salt = master_key[:salt_end]
-    brainkey = master_key[bk_start:]
-
-    assert len(raw_salt) == param_cfg.raw_salt_len
-    assert len(brainkey) == param_cfg.brainkey_len
-    return (raw_salt, brainkey)
 
 
 @click.group()
@@ -484,7 +423,7 @@ def _validate_data(data_type: str, header_text: str, data: bytes) -> None:
             anykey_confirm("Invalid input. Data mismatch.")
 
 
-def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[Share]) -> bool:
+def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[shamir.Share]) -> bool:
     header_text = 'Validate your copy of the "Salt"'
     _validate_data(cli_io.DATA_TYPE_SALT, header_text, salt)
 
@@ -522,7 +461,7 @@ def _show_created_data(
     param_cfg: params.ParamConfig,
     salt     : Salt,
     brainkey : BrainKey,
-    shares   : typ.List[Share],
+    shares   : typ.List[shamir.Share],
 ) -> None:
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT.strip())
@@ -610,9 +549,9 @@ def create(
     salt           = param_cfg_data + raw_salt
     brainkey       = urandom(param_cfg.brainkey_len)
 
-    shares = list(_split_into_shares(param_cfg, raw_salt, brainkey, threshold, num_shares))
+    shares = list(shamir.split(param_cfg, raw_salt, brainkey))
 
-    recoverd_salt, recovered_brainkey = _join_shares(param_cfg, shares)
+    recoverd_salt, recovered_brainkey = shamir.join(param_cfg, shares)
 
     assert recoverd_salt      == raw_salt
     assert recovered_brainkey == brainkey
@@ -648,7 +587,7 @@ def recover_salt() -> None:
 def recover() -> None:
     """Recover Salt and BrainKey by combining Shares."""
     param_cfg: typ.Optional[params.ParamConfig] = None
-    shares   : typ.List[Share] = []
+    shares   : typ.List[shamir.Share] = []
 
     while param_cfg is None or len(shares) < param_cfg.threshold:
         share_len: typ.Optional[int] = None
@@ -670,7 +609,7 @@ def recover() -> None:
         elif param_cfg != cur_param_cfg:
             raise click.Abort("Invalid share. Shares are perhaps for different wallets.")
 
-    raw_salt, brainkey = _join_shares(param_cfg, shares)
+    raw_salt, brainkey = shamir.join(param_cfg, shares)
     salt = param_cfg_data + raw_salt
 
     salt_lines     = cli_io.format_secret_lines(cli_io.DATA_TYPE_SALT    , salt)

@@ -35,6 +35,10 @@ class GFNum:
         self.p   = p
         self.val = val % p
 
+    @property
+    def order(self) -> int:
+        return self.p
+
     def _new_gf(self, val: int) -> 'GFNum':
         # Mod p is done so often as a last operation on val,
         # so we do it here as part of the initialisation.
@@ -106,12 +110,12 @@ class GFNum:
         if self is other:
             return False
 
-        self._check_comparable(other)
-        if isinstance(other, int):
-            return self.val < other
+        if isinstance(other, GFNum) and self.p == other.p:
+            return self.val < other.val
 
-        assert isinstance(other, GFNum)
-        return self.val < other.val
+        self._check_comparable(other)
+        assert isinstance(other, int)
+        return self.val < other
 
     def __repr__(self) -> str:
         return f"GFNum({self.val:>3}, p={self.p})"
@@ -129,6 +133,10 @@ class GF256(GFNum):
     def __init__(self, val: int, order: int = 256) -> None:
         assert order == 256
         self.val = val
+
+    @property
+    def order(self) -> int:
+        return 256
 
     def __add__(self, other: Num) -> 'GF256':
         val = self.val ^ other.val
@@ -158,15 +166,19 @@ class GF256(GFNum):
         inv = gf_util.MUL_INVERSE_LUT[other.val]
         return self * ALL_GF256[inv]
 
+    def __hash__(self) -> int:
+        return hash(self.val)
+
     def __eq__(self, other: object) -> bool:
         if self is other:
             return True
 
-        if isinstance(other, GFNum):
+        if isinstance(other, GF256):
             return self.val == other.val
-        else:
-            errmsg = f"Cannot compare {repr(self)} with {repr(other)}"
-            raise NotImplementedError(errmsg)
+
+        self._check_comparable(other)
+        assert isinstance(other, int)
+        return self.val == other
 
     def __repr__(self) -> str:
         return f"GF256({self.val:>3})"

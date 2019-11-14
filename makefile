@@ -480,10 +480,9 @@ devtest:
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";
 
-ifdef FILTER
 	ENABLE_BACKTRACE=0 \
 		ENV=$${ENV-dev} \
-		PYTEST_SKIP=slow \
+		PYTEST_SKIP=$${PYTEST_SKIP:-slow} \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
@@ -493,23 +492,8 @@ ifdef FILTER
 		--capture=no \
 		--exitfirst \
 		--failed-first \
-		-k $(FILTER) \
+		-k "$${PYTEST_FILTER}" \
 		test/ src/;
-else
-	ENABLE_BACKTRACE=0 \
-		ENV=$${ENV-dev} \
-		PYTEST_SKIP=slow \
-		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
-		$(DEV_ENV_PY) -m pytest -v \
-		--doctest-modules \
-		--no-cov \
-		--durations 15 \
-		--verbose \
-		--capture=no \
-		--exitfirst \
-		--failed-first \
-		test/ src/;
-endif
 
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";

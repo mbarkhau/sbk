@@ -81,7 +81,8 @@ def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
 
 
 def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
-    # specialization to speed up ecc_rs.decode_packets
+    # Specialization to speed up ecc_rs.decode_packets. This should return
+    # the exact same result as _interpolation_terms  in principle.
     assert isinstance(at_x, gf.GF256)
     assert all(isinstance(p.x, gf.GF256) for p in points)
     assert all(isinstance(p.y, gf.GF256) for p in points)
@@ -178,7 +179,7 @@ def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[
     return eval_at
 
 
-def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -> Points:
+def _split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int) -> Points:
     # The coefficients of the polynomial are ordered in ascending
     # powers of x, so coeffs = [2, 5, 3] represents 2x° + 5x¹ + 3x²
     #
@@ -197,17 +198,17 @@ def _split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret) -
     assert len(points) == num_shares
 
     # make sure we only return pieces that we can join again
-    recoverd_secret = join(field, threshold, points)
+    recoverd_secret = join(field, points, threshold)
     assert recoverd_secret == secret
 
     for points_subset in itertools.combinations(points, threshold):
-        recoverd_secret = join(field, threshold, points_subset)
+        recoverd_secret = join(field, points_subset, threshold)
         assert recoverd_secret == secret
 
     return points
 
 
-def split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret: int) -> Points:
+def split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int) -> Points:
     """Generate points of a split secret."""
 
     if num_shares <= 1:
@@ -222,17 +223,13 @@ def split(field: gf.Field[gf.GFNum], threshold: int, num_shares: int, secret: in
     if secret < 0:
         raise ValueError("Invalid secret, must be a positive integer")
 
-    # TODO: if field.order != 256
-    # - 256 splits the secret up into bytes and encodes each separately.
-    # - we could do this generally for any order, and chunk up the secret
-    # - secret should perhaps be bytes instead of int
     if field.order <= secret:
         raise ValueError("Invalid prime for secret, must be greater than secret.")
 
-    return _split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
+    return _split(field=field, secret=secret, threshold=threshold, num_shares=num_shares)
 
 
-def join(field: gf.Field[gf.Num], threshold: int, points: Points) -> int:
+def join(field: gf.Field[gf.Num], points: Points, threshold: int) -> int:
     if len(points) < threshold:
         raise ValueError("Not enough pieces to recover secret")
 

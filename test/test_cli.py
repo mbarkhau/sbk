@@ -6,6 +6,7 @@ import random
 import string
 import typing as typ
 import itertools
+import collections
 
 import click
 import pytest
@@ -182,67 +183,141 @@ def test_progress_bar():
     assert 0.1 < elapsed < 0.3
 
 
-DEBUG_RANDOM_SHARE_1 = [
-    "000-305 081-920 131-487 253-640",
-    "297-496 334-650 440-054 474-496",
-    "581-782 644-003 717-580 745-532",
-    "786-914",
-]
+DEBUG_NONRANDOM_OUTPUT = """
+                     Share 1/3
+   01: 000-305   academy   colombia    14: 037-658
+   02: 081-920   dubai     abraham     15: 081-662
+   03: 131-569   academy   vivaldi     16: 183-057
+   04: 254-752   turkey    blood       17: 225-330
+   05: 307-404   pumpkin   sparrow     18: 278-996
+   06: 392-111   wizard    prophet     19: 385-574
 
-DEBUG_RANDOM_SHARE_2 = [
-    "000-305 081-920 131-595 231-772",
-    "319-484 328-257 407-992 476-877",
-    "560-377 619-283 700-900 756-803",
-    "851-420",
-]
+   07: 442-499   school    london      20: 435-840
+   08: 482-163   gotham    julius      21: 484-052
+   09: 566-387   peugeot   julius      22: 571-535
+   10: 591-028   airport   radio       23: 595-329
+   11: 688-042   leibniz   popcorn     24: 711-418
+   12: 722-449   albino    auburn      25: 731-805
+   13: 826-795   orwell    porsche     26: 843-687
 
-DEBUG_RANDOM_SHARE_3 = [
-    "000-305 081-920 131-959 209-905",
-    "275-935 387-399 441-466 479-258",
-    "538-972 594-563 684-220 768-075",
-    "838-315",
-]
+                     Share 2/3
+   01: 000-305   academy   colombia    14: 038-962
+   02: 081-920   dubai     abraham     15: 130-443
+   03: 131-749   acrobat   pharaoh     16: 191-593
+   04: 229-660   library   bhutan      17: 216-884
+   05: 272-351   builder   trinidad    18: 297-526
+   06: 373-017   pyramid   belfast     19: 357-771
 
-DEBUG_RANDOM_SALT = [
-    "000-305 081-920 144-436 209-972",
-    "275-508 341-044 406-580 472-116",
-]
+   07: 444-225   simpson   edison      20: 405-759
+   08: 518-842   valley    romania     21: 484-008
+   09: 528-314   atlantic  romania     22: 573-246
+   10: 611-375   geisha    clarinet    23: 615-865
+   11: 696-851   paper     baghdad     24: 675-041
+   12: 741-502   france    leather     25: 765-191
+   13: 818-617   lasagna   rhubarb     26: 837-046
 
-DEBUG_RANDOM_BRAINKEY = [
-    "013-364 078-900 144-436 209-972",
-]
+                     Share 3/3
+   01: 000-305   academy   colombia    14: 026-666
+   02: 081-920   dubai     abraham     15: 113-745
+   03: 131-936   admiral   hawaii      16: 192-833
+   04: 218-632   germany   america     17: 219-702
+   05: 303-911   pelican   builder     18: 277-096
+   06: 360-066   leather   lobster     19: 389-401
+
+   07: 406-518   corsica   walnut      20: 410-147
+   08: 493-053   madonna   yoghurt     21: 483-957
+   09: 565-245   oxford    yoghurt     22: 543-569
+   10: 615-599   hippo     prophet     23: 638-040
+   11: 715-149   uruguay   mushroom    24: 671-464
+   12: 746-075   heineken  gotham      25: 774-257
+   13: 840-887   teacup    renault     26: 801-465
+
+                       Salt
+   01: 000-305   academy   colombia    09: 525-073
+   02: 081-920   dubai     abraham     10: 650-518
+   03: 144-436   cowboy    cowboy      11: 716-972
+   04: 209-972   cowboy    cowboy      12: 753-341
+
+   05: 275-508   cowboy    cowboy      13: 840-190
+   06: 341-044   cowboy    cowboy      14: 005-891
+   07: 406-580   cowboy    cowboy      15: 090-070
+   08: 472-116   cowboy    cowboy      16: 187-496
+
+                     Brainkey
+   01: 013-364   cowboy    cowboy      05: 275-508
+   02: 078-900   cowboy    cowboy      06: 341-044
+   03: 144-436   cowboy    cowboy      07: 406-580
+   04: 209-972   cowboy    cowboy      08: 472-116
+"""
+
+
+def _parse_output(output: str) -> typ.Dict[str, ParsedSecret]:
+    secret_lines = collections.defaultdict(list)
+    headline     = None
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        match = FORMATTED_LINE_RE.match(line.strip())
+        if match is None:
+            headline = line.strip()
+        else:
+            assert headline
+            secret_lines[headline].append(line)
+
+    return {
+        headline.lower(): parse_formatted_secret("\n".join(lines))
+        for headline, lines in secret_lines.items()
+    }
 
 
 def test_cli_create_validation():
-    return
     argv = [
         "--scheme=2of3",
         "--memory-cost=1",
         "--time-cost=1",
     ]
-    inputs = [
-        "\n\n\n\n\n\n\n\n\n",  # confirmations
-        "\n".join(DEBUG_RANDOM_SALT) + "\n",
+    debug_secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    inputs        = [
+        "\n\n\n\n\n\n\n",  # confirmations
+        "\n".join(debug_secrets['salt'].data_codes) + "\n",
         "accept\n",
-        "\n".join(DEBUG_RANDOM_BRAINKEY) + "\n",
+        "\n".join(debug_secrets['brainkey'].data_codes) + "\n",
         "accept\n",
-        "\n".join(DEBUG_RANDOM_SHARE_1) + "\n",
+        "\n".join(debug_secrets["share 1/3"].data_codes) + "\n",
         "accept\n",
-        "\n".join(DEBUG_RANDOM_SHARE_2) + "\n",
+        "\n".join(debug_secrets["share 2/3"].data_codes) + "\n",
         "accept\n",
-        "\n".join(DEBUG_RANDOM_SHARE_3) + "\n",
+        "\n".join(debug_secrets["share 3/3"].data_codes) + "\n",
         "accept\n",
     ]
     env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.create, argv, input="".join(inputs), env=env)
+    result = _run(sbk.cli.create, argv, input="".join(inputs), env=env)
 
     assert not result.exception
     assert result.exit_code == 0
 
 
+def _run(*args, **kwargs):
+    runner = click.testing.CliRunner()
+    result = runner.invoke(*args, **kwargs)
+
+    if result.exit_code != 0:
+        print()
+        lookback = collections.deque(maxlen=4)
+        for line in result.output.splitlines():
+            if line in lookback:
+                continue
+            else:
+                print(line)
+            lookback.append(line)
+
+    assert not result.exception
+    assert result.exit_code == 0
+
+    return result
+
+
 def test_cli_create():
-    return
     argv = [
         "--scheme=2of3",
         "--brainkey-len=6",
@@ -252,26 +327,14 @@ def test_cli_create():
         "--time-cost=1",
     ]
     env    = {'SBK_PROGRESS_BAR': '0'}
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.create, argv, env=env)
-    assert not result.exception
-    assert result.exit_code == 0
+    result = _run(sbk.cli.create, argv, env=env)
 
-    step_outputs = result.output.split("Step")
-
-    assert len(step_outputs) == 6
-    assert " Share 1/3" in step_outputs[1]
-    assert " Share 2/3" in step_outputs[2]
-    assert " Share 3/3" in step_outputs[3]
-    assert " Salt" in step_outputs[4]
-    assert " Brainkey" in step_outputs[5]
-
-    share1   = parse_formatted_secret(step_outputs[1], strict=False)
-    share2   = parse_formatted_secret(step_outputs[2], strict=False)
-    share3   = parse_formatted_secret(step_outputs[3], strict=False)
-    salt     = parse_formatted_secret(step_outputs[4], strict=False)
-    brainkey = parse_formatted_secret(step_outputs[5], strict=False)
-
+    out_secrets = _parse_output(result.output)
+    salt        = out_secrets['salt']
+    brainkey    = out_secrets['brainkey']
+    share1      = out_secrets["share 1/3"]
+    share2      = out_secrets["share 2/3"]
+    share3      = out_secrets["share 3/3"]
     assert len({share1, share2, share3, salt, brainkey}) == 5
     shares = [share1, share2, share3]
     random.shuffle(shares)
@@ -283,10 +346,7 @@ def test_cli_create():
                 [" ".join(share.words[:4]) + "\n", " ".join(share.words[4:]) + "\n", "accept\n",]
             )
 
-        runner = click.testing.CliRunner()
-        result = runner.invoke(sbk.cli.recover, input="".join(recover_inputs))
-        assert not result.exception
-        assert result.exit_code == 0
+        result = _run(sbk.cli.recover, input="".join(recover_inputs))
 
         secrets = result.output.split("RECOVERED SECRETS")[-1]
         assert "Salt" in secrets
@@ -300,125 +360,100 @@ def test_cli_create():
         assert brainkey == recovered_brainkey
 
 
-FULL_SALT_LINES = [
-    "01: 000-034   abraham   bordeaux    09: 563-651",
-    "02: 081-920   donut     adelaide    10: 605-856",
-    "03: 180-251   rainbow   bavaria     11: 694-358",
-    "04: 212-020   diesel    china       12: 769-089",
-    "05: 308-920   pizza     oxford      13: 801-938",
-    "06: 371-125   pelican   oregon      14: 007-134",
-    "07: 396-714   battery   nevada      15: 083-252",
-    "08: 475-210   donut     egypt       16: 167-533",
-]
-
-
-SALT_WORD_INPUTS = [
-    "abacus    bordeaux   donut     adelaide\n",
-    "rainbow   bavaria    diesel    china\n",
-    "pizza     oxford     pelican   oregon\n",
-    "battery   nevada     donut     egypt\n",
-    "\n",
-]
-
-
-BRAINKEY_WORD_INPUTS = [
-    "donut     adelaide\n",
-    "rainbow   bavaria\n",
-    "donut     egypt\n",
-    "\n",
-]
-
-
 def test_cli_recover_salt_from_words():
-    return
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.recover_salt, input="".join(SALT_WORD_INPUTS))
-    assert not result.exception
-    assert result.exit_code == 0
-    assert all(line in result.output for line in FULL_SALT_LINES)
+    secrets     = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    salt_inputs = (
+        " ".join(secrets['salt'].words[:4]),
+        " ".join(secrets['salt'].words[4:8]),
+        " ".join(secrets['salt'].words[8:]),
+        "accept",
+        "",
+    )
+    result = _run(sbk.cli.recover_salt, input="\n".join(salt_inputs))
 
+    # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("=> 07: ___-___") == 1
-    assert result.output.count("09: 563-651 <=") == 1
+    assert result.output.count("09: 525-073 <=") == 1
+
+    codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
+    for i, code in enumerate(codes):
+        assert f"{i + 1:02}: {code} " in result.output
 
 
 def test_cli_recover_salt_from_data():
-    return
-    inputs = [
-        "000-034 081-920 180-251 212-020\n",
-        "308-920 371-125 396-714 475-210\n",
-        "\n",
+    secrets     = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    salt_inputs = [
+        " ".join(secrets['salt'].data_codes[:4]),
+        " ".join(secrets['salt'].data_codes[4:]),
+        "accept",
+        "",
     ]
 
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.recover_salt, input="".join(inputs))
-    assert not result.exception
-    assert result.exit_code == 0
-    assert all(line in result.output for line in FULL_SALT_LINES)
+    result = _run(sbk.cli.recover_salt, input="\n".join(salt_inputs))
+
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 563-651 <=") == 1
+    assert result.output.count("09: 525-073 <=") == 1
+
+    codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
+    for i, code in enumerate(codes):
+        assert f"{i + 1:02}: {code} " in result.output
 
 
 def test_cli_recover_salt_from_ecc():
-    return
-    inputs = [
-        "next\nnext\nnext\nnext\n",
-        "next\nnext\nnext\nnext\n",
-        "563-651 605-856 694-358 769-089\n",
-        "801-938 007-134 083-252 167-533\n",
-        "accept\n",
+    secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    inputs  = [
+        "next\nnext\nnext\nnext",
+        "next\nnext\nnext\nnext",
+        " ".join(secrets['salt'].ecc_codes[:4]),
+        " ".join(secrets['salt'].ecc_codes[4:]),
+        "accept",
+        "",
     ]
 
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.recover_salt, input="".join(inputs))
-    assert not result.exception
-    assert result.exit_code == 0
+    result = _run(sbk.cli.recover_salt, input="\n".join(inputs))
 
-    assert all(line in result.output for line in FULL_SALT_LINES)
+    codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
+    for i, code in enumerate(codes):
+        assert f"{i + 1:02}: {code} " in result.output
 
 
 def test_cli_load_wallet():
-    return
-    wallet_names = ["default", "test1", "test2", "Hello, 世界!"] * 2
-    inputs       = SALT_WORD_INPUTS + BRAINKEY_WORD_INPUTS
+    secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    inputs  = (
+        " ".join(secrets['salt'].words),
+        "accept",
+        " ".join(secrets['brainkey'].words[:4]),
+        " ".join(secrets['brainkey'].words[4:]),
+        "accept",
+        "",
+        "",
+    )
 
-    all_seeds = []
+    all_seeds    = []
+    wallet_names = ["disabled", "Hello, 世界!"] * 2
     for name in wallet_names:
         args = ("--show-seed", "--yes-all", "--wallet-name", name)
 
-        runner = click.testing.CliRunner()
-        result = runner.invoke(sbk.cli.load_wallet, args=args, input="".join(inputs))
-
-        assert not result.exception
-        assert result.exit_code == 0
+        result = _run(sbk.cli.load_wallet, args=args, input="\n".join(inputs))
 
         commands, wallet_seed = result.output.lower().split("electrum wallet seed")
         all_seeds.append(wallet_seed.strip())
 
-    # same name, same seed
+    # same name -> same seed
     assert len(set(wallet_names)) == len(set(all_seeds))
 
 
 def test_cli_kdf_info():
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.kdf_info)
-
-    assert not result.exception
-    assert result.exit_code == 0
+    result = _run(sbk.cli.kdf_info)
     assert "<- default" in result.output
 
 
 def test_cli_kdf_test():
     args   = ("--memory-cost", "1", "--time-cost", "1")
-    runner = click.testing.CliRunner()
-    result = runner.invoke(sbk.cli.kdf_test, args=args)
-
-    assert not result.exception
-    assert result.exit_code == 0
-
+    result = _run(sbk.cli.kdf_test, args=args)
     assert re.search(r"Estimated duration\s*:\s+\d+ sec", result.output)
     assert re.search(r"Actual duration\s*:\s+\d+ sec", result.output)

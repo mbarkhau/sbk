@@ -3705,6 +3705,9 @@ old_wordlist = [
 ]
 
 
+wordlist_indexes     = {w: i for i, w in enumerate(wordlist    )}
+old_wordlist_indexes = {w: i for i, w in enumerate(old_wordlist)}
+
 N = len(old_wordlist)
 assert N == 1626
 
@@ -3734,15 +3737,12 @@ def old_mn_decode(wlist: Mnemonic) -> str:
     out = ''
     for i in range(len(wlist) // 3):
         word1, word2, word3 = wlist[3 * i : 3 * i + 3]
-        w1 = old_wordlist.index(word1)
-        w2 = (old_wordlist.index(word2)) % N
-        w3 = (old_wordlist.index(word3)) % N
+        w1 = old_wordlist_indexes[word1]
+        w2 = (old_wordlist_indexes[word2]) % N
+        w3 = (old_wordlist_indexes[word3]) % N
         x  = w1 + N * ((w2 - w1) % N) + N * N * ((w3 - w2) % N)
         out += "%08x" % x
     return out
-
-
-is_in_wordlist = set(wordlist).__contains__
 
 
 RawSeed    = int
@@ -3756,7 +3756,7 @@ def mnemonic_decode(seed: SeedPhrase) -> RawSeed:
     words = seed.split()
     while words:
         w = words.pop()
-        k = wordlist.index(w)
+        k = wordlist_indexes[w]
         i = i * n + k
     return i
 
@@ -3860,14 +3860,13 @@ def seed_raw2phrase(int_seed: RawSeed, seed_type='segwit') -> SeedPhrase:
         i = int_seed + nonce
 
         seed = mnemonic_encode(i)
+        if not is_new_seed(seed, prefix) or is_old_seed(seed):
+            continue
+
         if i != mnemonic_decode(seed):
             raise Exception("Cannot extract same entropy from mnemonic!")
 
-        if is_old_seed(seed):
-            continue
-
-        if is_new_seed(seed, prefix):
-            return seed
+        return seed
 
 
 def bytes2int(data: bytes) -> int:

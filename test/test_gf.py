@@ -132,7 +132,8 @@ def test_interpolate_deg1_float():
 
 def test_interpolate_deg2_float():
     def f(x: float) -> float:
-        return 3 * x * x + 2 * x + 1
+        xsq = x * x
+        return 3 * xsq + 2 * x + 1
 
     points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0, 4.0]]
 
@@ -142,6 +143,18 @@ def test_interpolate_deg2_float():
 
     assert interpolate(points[:-1], at_x=0.5) == f(0.5)
     assert interpolate(points[1:], at_x=0.5) == f(0.5)
+
+
+def test_interpolate_overspecified():
+    def f(x: float) -> float:
+        xsq = x * x
+        return 3 * xsq + 2 * x + 1
+
+    points = [Point(x, f(x)) for x in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]]
+    for at_x in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
+        assert interpolate(points, at_x=at_x) == f(at_x)
+        assert interpolate(points[:-2], at_x=at_x) == f(at_x)
+        assert interpolate(points[2:], at_x=at_x) == f(at_x)
 
 
 def test_gf_arithmetic():
@@ -245,15 +258,15 @@ def test_split_and_join_2of3():
     assert [p.x.val for p in points] == [1, 2, 3]
     assert not any(p.y.val == secret for p in points)
 
-    assert join(field, threshold=2, points=points) == secret
+    assert join(field, points=points, threshold=2) == secret
 
     sample1 = [points[0], points[1]]
     sample2 = [points[0], points[2]]
     sample3 = [points[1], points[2]]
 
-    assert join(field, threshold=2, points=sample1) == secret
-    assert join(field, threshold=2, points=sample2) == secret
-    assert join(field, threshold=2, points=sample3) == secret
+    assert join(field, points=sample1, threshold=2) == secret
+    assert join(field, points=sample2, threshold=2) == secret
+    assert join(field, points=sample3, threshold=2) == secret
 
 
 TEST_PRIME_INDEXES = random.sample([i for i, p in enumerate(sbk.primes.PRIMES) if p > 10], 10)

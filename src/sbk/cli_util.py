@@ -196,6 +196,16 @@ def parse_scheme(scheme: str) -> Scheme:
         errmsg += ", num_shares must be larger than threshold"
         raise click.Abort(errmsg)
 
+    if not threshold <= 16:
+        errmsg = f"Invalid parameter for --scheme={scheme}"
+        errmsg += f", threshold must be <= 16, but was {threshold}"
+        raise click.Abort(errmsg)
+
+    if not num_shares < 64:
+        errmsg = f"Invalid parameter for --scheme={scheme}"
+        errmsg += f", num_shares must be < 64, but was {num_shares}"
+        raise click.Abort(errmsg)
+
     return Scheme(threshold, num_shares)
 
 

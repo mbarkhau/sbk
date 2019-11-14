@@ -21,7 +21,7 @@ def test_fresh_sys_info(capsys):
     assert len(sys_info.measurements) == 0
 
     sys_info = params.update_measurements(sys_info)
-    assert len(sys_info.measurements) >= 8
+    assert len(sys_info.measurements) >= 4
 
     assert params._load_cached_sys_info() == sys_info
 

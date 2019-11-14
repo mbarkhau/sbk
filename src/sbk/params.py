@@ -57,8 +57,8 @@ DEFAULT_BRAINKEY_LEN = 8
 SHARE_X_COORD_LEN    = 1
 DEFAULT_SHARE_LEN    = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + DEFAULT_BRAINKEY_LEN
 
-PARAM_SCALING = 3
-KDF_MEASUREMENT_SIGNIFIGANCE_THRESHOLD: Seconds = 0.2
+PARAM_SCALING = 2
+KDF_MEASUREMENT_SIGNIFIGANCE_THRESHOLD: Seconds = 0.1
 
 DEFAULT_KDF_THREADS_RATIO = 2
 DEFAULT_KDF_MEM_RATIO     = 0.9
@@ -165,7 +165,7 @@ def init_sys_info() -> SystemInfo:
 
 def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
     measurements = [baseline]
-    while len(measurements) < 8:
+    while len(measurements) < 4:
         baseline = measurements[0]
 
         if len(measurements) == 1:
@@ -178,7 +178,8 @@ def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
             m = baseline.m * PARAM_SCALING
             t = baseline.t * PARAM_SCALING
         else:
-            # repeat measurement with previous parameters
+            # To increase accuracy, repeat measurement with previous
+            # parameters and use the lower measurement.
             measurement = measurements[len(measurements) % 4]
 
             m = measurement.m
@@ -203,7 +204,7 @@ def _update_measurements(sys_info: SystemInfo) -> SystemInfo:
     m = 1
 
     while True:
-        kdf_params = kdf.init_kdf_params(p=p, m=m, t=1)
+        kdf_params = kdf.init_kdf_params(p=p, m=m, t=2)
         p          = kdf_params.p
         m          = kdf_params.m
         sample     = measure(kdf_params)
@@ -212,8 +213,7 @@ def _update_measurements(sys_info: SystemInfo) -> SystemInfo:
         else:
             m = math.ceil(m * 1.5)
 
-    kdf_params   = kdf.init_kdf_params(p=p, m=m, t=2)
-    baseline     = measure(kdf_params)
+    baseline     = sample
     measurements = _measure_scaled_params(baseline=baseline)
     sys_info     = sys_info._replace(measurements=measurements)
     _dump_sys_info(sys_info)
@@ -225,7 +225,7 @@ def update_measurements(sys_info: SystemInfo) -> SystemInfo:
     update_measurements_thread = UpdateMeasurementsThread(
         target=_update_measurements, args=(sys_info,)
     )
-    update_measurements_thread.start_and_wait(eta_sec=10, label="Calibration for KDF parameters")
+    update_measurements_thread.start_and_wait(eta_sec=5, label="Calibration for KDF parameters")
     return update_measurements_thread.retval
 
 
@@ -244,12 +244,12 @@ def estimate_param_cost(
 
     if sys_info is None:
         _sys_info = load_sys_info()
-        if len(_sys_info.measurements) < 8:
+        if len(_sys_info.measurements) < 4:
             _sys_info = update_measurements(_sys_info)
     else:
         _sys_info = sys_info
 
-    assert len(_sys_info.measurements) >= 8
+    assert len(_sys_info.measurements) >= 4
 
     measurements = _sys_info.measurements
 
@@ -552,13 +552,16 @@ def measure_in_thread(kdf_params: kdf.KDFParams, sys_info: SystemInfo) -> Measur
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
+    os.environ['SBK_PROGRESS_BAR'] = "0"
+
+    sys_info = fresh_sys_info()
+    sys_info = update_measurements(sys_info)
 
     kdf_params = get_default_params()
-    sys_info   = fresh_sys_info()
-    sys_info   = update_measurements(sys_info)
     eta        = estimate_param_cost(kdf_params, sys_info)
 
+    os.environ['SBK_PROGRESS_BAR'] = "1"
     log.info(f"estimated cost {eta}")
     measurement = measure_in_thread(kdf_params, sys_info)
     log.info(f"measured  cost {round(measurement.duration)}")

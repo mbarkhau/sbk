@@ -17,7 +17,7 @@ import click
 from . import ecc_rs
 from . import enc_util
 
-# https://regex101.com/r/iQKt5L/5
+# https://regex101.com/r/iQKt5L/6
 FORMATTED_LINE_PATTERN = r"""
 [AB0-9]\d:[ ]
     (\d{3}-\d{3})
@@ -162,10 +162,10 @@ def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
 
         line_no = i + 1
 
-        match = FORMATTED_LINE_RE.match(line)
+        match = FORMATTED_LINE_RE.match(line.strip())
         if match is None:
             if strict:
-                err_msg = f"Invalid input at line {line_no}: {line}"
+                err_msg = f"Invalid input at line {line_no}: {repr(line)}"
                 raise ValueError(err_msg)
             else:
                 continue

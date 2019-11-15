@@ -284,7 +284,7 @@ class Interaction(typ.NamedTuple):
     timeout: typ.Optional[float]
 
 
-def interaction(expect=None, send=None, timeout=1) -> Interaction:
+def interaction(expect=None, send=None, timeout=5) -> Interaction:
     return Interaction(expect, send, timeout)
 
 
@@ -298,6 +298,7 @@ def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
     subcommand = cli_fn.name.replace("_", "-")
 
     sub_env = os.environ.copy()
+    sub_env['SBK_PROGRESS_BAR'] = "0"
     if env:
         sub_env.update(env)
 
@@ -320,6 +321,7 @@ def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
     except pexpect.exceptions.TIMEOUT:
         buf.seek(0)
         output = buf.read().decode("utf-8")
+        output, _ = re.subn("\x1b\\[\\d+m", "", output)
         print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         print(output)
         print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -329,6 +331,7 @@ def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
 
     buf.seek(0)
     output = buf.read().decode("utf-8")
+    output, _ = re.subn("\x1b\\[\\d+m", "", output)
     return Result(output, proc.exitstatus)
 
 
@@ -358,9 +361,9 @@ def test_cli_create_basic():
         playbook = []
         for share in combo:
             share_interactions = [
-                interaction(expect=r".*Enter code/words at 01: $", send=" ".join(share.words[:4])),
-                interaction(expect=r".*Enter code/words at 03: $", send=" ".join(share.words[4:])),
-                interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+                interaction(expect=r".*Enter code/words at 01: ", send=" ".join(share.words[:4])),
+                interaction(expect=r".*Enter code/words at 03: ", send=" ".join(share.words[4:])),
+                interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
             ]
             playbook.extend(share_interactions)
 
@@ -386,23 +389,23 @@ def test_cli_create_validation():
     share_2_codes  = " ".join(debug_secrets["share 2/3"].data_codes)
     share_3_codes  = " ".join(debug_secrets["share 3/3"].data_codes)
     playbook       = [
-        interaction(expect=r".*Press enter to continue $", send=""),
-        interaction(expect=r".*Share 1/3, press enter to continue\. $", send=""),
-        interaction(expect=r".*Share 2/3, press enter to continue\. $", send=""),
-        interaction(expect=r".*Share 3/3, press enter to continue\. $", send=""),
-        interaction(expect=r".*Salt, press enter to continue $", send=""),
-        interaction(expect=r".*Press enter to show your brainkey $", send=""),
-        interaction(expect=r".*press enter to continue $", send=""),
-        interaction(expect=r".*Enter code/words at 01: $", send=salt_codes),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: $", send=brainkey_codes,),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: $", send=share_1_codes,),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: $", send=share_2_codes,),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: $", send=share_3_codes,),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Press enter to continue ", send=""),
+        interaction(expect=r".*Share 1/3, press enter to continue\. ", send=""),
+        interaction(expect=r".*Share 2/3, press enter to continue\. ", send=""),
+        interaction(expect=r".*Share 3/3, press enter to continue\. ", send=""),
+        interaction(expect=r".*Salt, press enter to continue ", send=""),
+        interaction(expect=r".*Press enter to show your brainkey ", send=""),
+        interaction(expect=r".*press enter to continue ", send=""),
+        interaction(expect=r".*Enter code/words at 01: ", send=salt_codes),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=brainkey_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_1_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_2_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_3_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
 
     argv   = ["--scheme=2of3", "--memory-cost=1", "--time-cost=1"]
@@ -422,16 +425,12 @@ def test_cli_create_validation():
 def test_cli_recover_salt_from_words():
     secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
     playbook = [
+        interaction(expect=r".*Enter code/words at 01: ", send=" ".join(secrets['salt'].words[:4])),
         interaction(
-            expect=r".*Enter code/words at 01: $", send=" ".join(secrets['salt'].words[:4])
+            expect=r".*Enter code/words at 03: ", send=" ".join(secrets['salt'].words[4:8])
         ),
-        interaction(
-            expect=r".*Enter code/words at 03: $", send=" ".join(secrets['salt'].words[4:8])
-        ),
-        interaction(
-            expect=r".*Enter code/words at 05: $", send=" ".join(secrets['salt'].words[8:])
-        ),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 05: ", send=" ".join(secrets['salt'].words[8:])),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)
 
@@ -447,15 +446,13 @@ def test_cli_recover_salt_from_words():
 
 
 def test_cli_recover_salt_from_data():
-    secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    playbook = [
-        interaction(
-            expect=r".*Enter code/words at 01: $", send=" ".join(secrets['salt'].data_codes[:4])
-        ),
-        interaction(
-            expect=r".*Enter code/words at 05: $", send=" ".join(secrets['salt'].data_codes[4:])
-        ),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+    secrets      = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    salt_codes_1 = " ".join(secrets['salt'].data_codes[:4])
+    salt_codes_2 = " ".join(secrets['salt'].data_codes[4:])
+    playbook     = [
+        interaction(expect=r".*Enter code/words at 01: ", send=salt_codes_1),
+        interaction(expect=r".*Enter code/words at 05: ", send=salt_codes_2),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)
 
@@ -472,17 +469,17 @@ def test_cli_recover_salt_from_data():
 def test_cli_recover_salt_from_ecc():
     secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
     playbook = [
-        interaction(expect=r".*Enter code/words at 01: $", send="next"),
-        interaction(expect=r".*Enter code/words at 02: $", send="next"),
-        interaction(expect=r".*Enter code/words at 03: $", send="next"),
-        interaction(expect=r".*Enter code/words at 04: $", send="next"),
-        interaction(expect=r".*Enter code/words at 05: $", send="next"),
-        interaction(expect=r".*Enter code/words at 06: $", send="next"),
-        interaction(expect=r".*Enter code/words at 07: $", send="next"),
-        interaction(expect=r".*Enter code/words at 08: $", send="next"),
-        interaction(expect=r".*Enter code at 09: $", send=" ".join(secrets['salt'].ecc_codes[:4])),
-        interaction(expect=r".*Enter code at 13: $", send=" ".join(secrets['salt'].ecc_codes[4:])),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send="next"),
+        interaction(expect=r".*Enter code/words at 02: ", send="next"),
+        interaction(expect=r".*Enter code/words at 03: ", send="next"),
+        interaction(expect=r".*Enter code/words at 04: ", send="next"),
+        interaction(expect=r".*Enter code/words at 05: ", send="next"),
+        interaction(expect=r".*Enter code/words at 06: ", send="next"),
+        interaction(expect=r".*Enter code/words at 07: ", send="next"),
+        interaction(expect=r".*Enter code/words at 08: ", send="next"),
+        interaction(expect=r".*Enter code at 09: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
+        interaction(expect=r".*Enter code at 13: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)
 
@@ -496,10 +493,10 @@ def test_cli_load_wallet():
     salt_words     = " ".join(secrets['salt'].words)
     brainkey_words = " ".join(secrets['brainkey'].words)
     playbook       = [
-        interaction(expect=r".*Enter code/words at 01: $", send=salt_words),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: $", send=brainkey_words),
-        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=salt_words),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: ", send=brainkey_words),
+        interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
 
     all_seeds    = []

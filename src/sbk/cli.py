@@ -322,14 +322,16 @@ def _derive_seed(
 
     data = salt + brainkey + wallet_name_data
 
-    with click.progressbar(label=label, length=100, show_eta=True) as bar:
-        digest_partial = functools.partial(
-            kdf.digest,
-            data=data,
-            kdf_params=param_cfg.kdf_params,
-            hash_len=SEED_DATA_LEN,
-            progress_cb=bar.update,
-        )
+    digest_partial = functools.partial(
+        kdf.digest, data=data, kdf_params=param_cfg.kdf_params, hash_len=SEED_DATA_LEN,
+    )
+    if os.getenv('SBK_PROGRESS_BAR', "1") == '1':
+        with click.progressbar(label=label, length=100, show_eta=True) as bar:
+            digest_partial = functools.partial(digest_partial, progress_cb=bar.update)
+            runner         = cli_util.ThreadRunner[bytes](digest_partial)
+            seed_data      = runner.start_and_join()
+    else:
+        # Use the ThreadRunner regardless, so that Ctrl-C works.
         runner    = cli_util.ThreadRunner[bytes](digest_partial)
         seed_data = runner.start_and_join()
     return seed_data

@@ -25,15 +25,28 @@ import itertools
 from . import gf
 from . import gf_util
 
-_debug_rand = random.Random(0)
+
+class DebugRandom:
+
+    _state: int
+
+    def __init__(self) -> None:
+        self._state = 4294967291
+
+    def randrange(self, stop: int):
+        self._state = (self._state + 4294967291) % 2 ** 63
+        return self._state % stop
+
+
+_debug_rand = DebugRandom()
 _rand       = random.SystemRandom()
 
 
-def randrange(*args, **kwargs) -> int:
+def randrange(stop: int) -> int:
     if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
-        return _debug_rand.randrange(*args, **kwargs)
+        return _debug_rand.randrange(stop)
     else:
-        return _rand.randrange(*args, **kwargs)
+        return _rand.randrange(stop)
 
 
 Coefficients = typ.List[gf.GFNum]

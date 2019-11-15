@@ -11,9 +11,8 @@ def out(*msg: typ.Any) -> None:
 
 
 class CustomEdit(urwid.Edit):
-
     def __init__(self, *args, **kwargs):
-        self._max_chars = kwargs.pop('max_chars')
+        self._max_chars   = kwargs.pop('max_chars')
         self._valid_chars = kwargs.pop('valid_chars')
         super().__init__(*args, **kwargs)
 
@@ -23,7 +22,7 @@ class CustomEdit(urwid.Edit):
     def keypress(self, size, key):
         out("!;!;!;!", size, key)
         (maxcol,) = size
-        unhandled = super().keypress(self, (maxcol, ), key)
+        unhandled = super().keypress(self, (maxcol,), key)
         return unhandled
 
 
@@ -34,10 +33,10 @@ def cli() -> None:
 
 @cli.command()
 def urwidtest() -> None:
-
     def make_attr_wrapper(*attrs):
         def attr_wrapper(elem):
             return urwid.AttrWrap(elem, *attrs)
+
         return attr_wrapper
 
     def pad(elem, w):
@@ -63,19 +62,11 @@ def urwidtest() -> None:
             phrase_boxes((lambda i: urwid.Text(f"{i:>2}: ")), 6),
             phrase_boxes((lambda i: pad(editbx(hex_edit()), w=2)), 6),
             phrase_boxes((lambda i: pad(editbx(hex_edit()), w=2)), 6),
-            phrase_boxes(
-                (lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6
-            ),
-            phrase_boxes(
-                (lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6
-            ),
+            phrase_boxes((lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6),
+            phrase_boxes((lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6),
             phrase_boxes((lambda i: urwid.Text(" at the ")), 6),
-            phrase_boxes(
-                (lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6
-            ),
-            phrase_boxes(
-                (lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6
-            ),
+            phrase_boxes((lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6),
+            phrase_boxes((lambda i: pad(editbx(urwid.Edit("", "", align="left")), w=6)), 6),
             phrase_boxes((lambda i: urwid.Text(".")), 6),
         ],
         dividechars=1,
@@ -104,7 +95,7 @@ def urwidtest() -> None:
         if 'q' in keys or 'Q' in keys:
             raise urwid.ExitMainLoop()
 
-        if keys == ['shift tab']:
+        if keys == ["shift tab"]:
             # focus prev
             state['focus'] -= 1
 
@@ -125,10 +116,5 @@ def urwidtest() -> None:
     out("---", frame.get_focus_widgets())
     out("000", frame.get_focus_path())
 
-    loop = urwid.MainLoop(
-        frame,
-        palette,
-        unhandled_input=unhandled,
-        input_filter=input_filter,
-    )
+    loop = urwid.MainLoop(frame, palette, unhandled_input=unhandled, input_filter=input_filter,)
     loop.run()

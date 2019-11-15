@@ -1,9 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import typing as typ
-
 import curses
+import typing as typ
 import curses.textpad
 
 
@@ -35,8 +34,8 @@ def main(stdscr):
 
     return
     # index, foreground, background
-    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-    curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLUE)
+    curses.init_pair(1, curses.COLOR_WHITE , curses.COLOR_BLACK)
+    curses.init_pair(1, curses.COLOR_GREEN , curses.COLOR_BLUE)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     stdscr.bkgd(curses.color_pair(1))
     stdscr.refresh()
@@ -52,7 +51,7 @@ def main(stdscr):
 
     # Textbox
     textbox = curses.textpad.Textbox(win1)
-    text = textbox.edit()
+    text    = textbox.edit()
 
     # Text übernehmen
     win2.addstr(0, 0, text)

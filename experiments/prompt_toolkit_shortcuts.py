@@ -8,7 +8,6 @@
 
 import importlib
 
-
 shortcuts = [
     "prompt_toolkit.Application",
     "prompt_toolkit.buffer.Buffer",

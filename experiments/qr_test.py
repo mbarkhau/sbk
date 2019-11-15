@@ -6,10 +6,7 @@ import qrcode
 
 def main(args=sys.argv[1:]):
     qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
+        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4,
     )
     if args:
         data = " ".join(args)
@@ -30,6 +27,7 @@ def main(args=sys.argv[1:]):
     print()
     for bw_line, wb_line in zip(bw_lines, wb_lines):
         print(bw_line, wb_line)
+
 
 if __name__ == '__main__':
     main()

@@ -7,12 +7,12 @@
 
 import os
 import hmac
+import math
 import string
+import typing as typ
 import hashlib
 import binascii
 import unicodedata
-
-import typing as typ
 
 wordlist = [
     "abandon",
@@ -2066,29 +2066,29 @@ wordlist = [
 ]
 
 
-RawSeed = int
+RawSeed    = int
 SeedPhrase = str
 
 
 def mnemonic_decode(seed: SeedPhrase) -> RawSeed:
-    n = len(wordlist)
+    n     = len(wordlist)
     words = seed.split()
-    i = 0
+    i     = 0
     while words:
         w = words.pop()
         k = wordlist.index(w)
-        i = i*n + k
+        i = i * n + k
     return i
 
 
 def mnemonic_encode(i: RawSeed) -> SeedPhrase:
-    n = len(wordlist)
+    n     = len(wordlist)
     words = []
     while i:
-        x = i%n
-        i = i//n
+        x = i % n
+        i = i // n
         words.append(wordlist[x])
-    return ' '.join(words)
+    return " ".join(words)
 
 
 VALID_CHARS = set(string.ascii_lowercase + " ")
@@ -2098,15 +2098,15 @@ def normalize_text(seed: str) -> str:
     # lower
     seed = seed.lower()
     # normalize whitespaces
-    seed = ' '.join(seed.strip().split())
+    seed = " ".join(seed.strip().split())
     assert all(c in VALID_CHARS for c in seed)
     return seed
 
 
 # The hash of the mnemonic seed must begin with this
-SEED_PREFIX      = '01'      # Standard wallet
-SEED_PREFIX_SW   = '100'     # Segwit wallet
-SEED_PREFIX_2FA  = '101'     # Two-factor authentication
+SEED_PREFIX     = '01'  # Standard wallet
+SEED_PREFIX_SW  = '100'  # Segwit wallet
+SEED_PREFIX_2FA = '101'  # Two-factor authentication
 
 
 def seed_prefix(seed_type):
@@ -2151,20 +2151,22 @@ def is_new_seed(x, prefix=SEED_PREFIX):
     return s.startswith(prefix)
 
 
-test_seed = " ".join([
-    "region",
-    "critic",
-    "option",
-    "whip",
-    "repair",
-    "age",
-    "tobacco",
-    "divide",
-    "reveal",
-    "chest",
-    "saddle",
-    "venue",
-])
+test_seed = " ".join(
+    [
+        "region",
+        "critic",
+        "option",
+        "whip",
+        "repair",
+        "age",
+        "tobacco",
+        "divide",
+        "reveal",
+        "chest",
+        "saddle",
+        "venue",
+    ]
+)
 
 assert is_new_seed(test_seed, prefix=SEED_PREFIX_SW)
 
@@ -2182,7 +2184,7 @@ def raw2electrum_seed(int_seed: int, seed_type='standard') -> ElectrumSeed:
     nonce = 0
     while True:
         nonce += 1
-        i = int_seed ^ nonce
+        i    = int_seed ^ nonce
         seed = mnemonic_encode(i)
         assert i == mnemonic_decode(seed)
         assert not is_old_seed(seed)
@@ -2201,11 +2203,10 @@ def bytes2int(data: bytes) -> int:
     return int(binascii.hexlify(data), 16)
 
 
-
 RandumFn = typ.Callable[[int], bytes]
 
 
-def gen_int_seed(num_bits: int, random_fn: typ.Optional[RandumFn]=None):
+def gen_raw_seed(num_bits: int, random_fn: typ.Optional[RandumFn] = None):
     if num_bits % 8 != 0:
         raise ValueError("Argument 'num_bits' must be divisible by 8.")
     if num_bits < 1:
@@ -2220,11 +2221,9 @@ def gen_int_seed(num_bits: int, random_fn: typ.Optional[RandumFn]=None):
     return bytes2int(data)
 
 
-import math
-
 print(160 / 8)
 
 for _ in range(20):
-    i = gen_int_seed(160)
+    i = gen_raw_seed(160)
     print(i)
     print(mnemonic_encode(i))

@@ -1115,7 +1115,7 @@ def main():
     # yayornay_words()
     # pretty_wordlists(WORDLIST4, min_len=4, max_len=9, label="things")
     # pretty_wordlists(WORDLIST5, min_len=4, max_len=9, label="places")
-    NEW_WORDS = set(ALL_WORDS2) - NEW_SHITLIST
+    NEW_WORDS    = set(ALL_WORDS2) - NEW_SHITLIST
     chosen_words = pretty_wordlists(NEW_WORDS, min_len=5, max_len=8, label="all")
     _pretty_wordlist(chosen_words, label="all", words_per_line=8)
 

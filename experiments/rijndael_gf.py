@@ -1,6 +1,5 @@
 import time
 
-
 RIJNDAEL_REDUCING_POLYNOMIAL = 0x11B
 
 assert RIJNDAEL_REDUCING_POLYNOMIAL == 0b100011011
@@ -13,7 +12,7 @@ assert b == 0b11001010
 
 
 def _gf_div(a: int, b: int) -> int:
-    val = a
+    val     = a
     divisor = b
     assert divisor > 0
 
@@ -30,20 +29,20 @@ def _gf_div(a: int, b: int) -> int:
             val = val ^ divisor
 
         divisor = divisor >> 1
-        mask = mask >> 1
+        mask    = mask    >> 1
 
     return val
 
 
 def _gf_div_by_rrp(val: int) -> int:
     divisor = RIJNDAEL_REDUCING_POLYNOMIAL << 8
-    mask = 0x10000
+    mask    = 0x10000
     while divisor > 0xFF:
         if (val & mask) > 0:
             val = val ^ divisor
 
         divisor = divisor >> 1
-        mask = mask >> 1
+        mask    = mask    >> 1
 
     return val
 
@@ -71,7 +70,7 @@ def _gf_mul(a: int, b: int) -> int:
 
 
 def _gf_pow(a: int, b: int) -> int:
-    n = b
+    n   = b
     res = 1
     while n > 0:
         res = _gf_mul(res, a)

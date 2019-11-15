@@ -1,6 +1,7 @@
 import typing as typ
 
 import click
+
 from sbk import enc_util
 
 from . import prompt_toolkit_shortcuts as pts
@@ -34,9 +35,7 @@ def out(*msg: typ.Any) -> None:
 
 
 class PhraseCompleter(pts.FuzzyWordCompleter):
-    def get_completions(
-        self, document: pts.Document, complete_event: pts.CompleteEvent
-    ):
+    def get_completions(self, document: pts.Document, complete_event: pts.CompleteEvent):
         out("-->", document)
         out("-->", complete_event)
         for c in super().get_completions(document, complete_event):
@@ -44,9 +43,7 @@ class PhraseCompleter(pts.FuzzyWordCompleter):
 
 
 class NoopProcessor(pts.Processor):
-    def apply_transformation(
-        self, ti: pts.TransformationInput
-    ) -> pts.Transformation:
+    def apply_transformation(self, ti: pts.TransformationInput) -> pts.Transformation:
 
         # out(">>>", ti.lineno)
         # out("...", ti)
@@ -63,9 +60,7 @@ class NoopProcessor(pts.Processor):
                 return 1
             return from_position
 
-        return pts.Transformation(
-            fragments=new_fragments, display_to_source=display_to_source
-        )
+        return pts.Transformation(fragments=new_fragments, display_to_source=display_to_source)
 
 
 def _reformat_phrases(value: str) -> str:
@@ -146,17 +141,11 @@ def pt_matrix_test() -> None:
     for row_idx in range(num_phrases):
         for col_idx in range(num_phrase_words):
             if col_idx == 0:
-                container_matrix[row_idx].append(
-                    pts.Window(pts.FormattedTextControl("The "))
-                )
+                container_matrix[row_idx].append(pts.Window(pts.FormattedTextControl("The ")))
             elif col_idx == 2:
-                container_matrix[row_idx].append(
-                    pts.Window(pts.FormattedTextControl(" at the "))
-                )
+                container_matrix[row_idx].append(pts.Window(pts.FormattedTextControl(" at the ")))
             else:
-                container_matrix[row_idx].append(
-                    pts.Window(pts.FormattedTextControl(" "))
-                )
+                container_matrix[row_idx].append(pts.Window(pts.FormattedTextControl(" ")))
             # input_index = row_idx * num_phrase_words + col_idx
             textarea = pts.TextArea(
                 text="",
@@ -171,9 +160,7 @@ def pt_matrix_test() -> None:
 
             inputs.append(textarea)
             container_matrix[row_idx].append(textarea)
-        container_matrix[row_idx].append(
-            pts.Window(pts.FormattedTextControl("."))
-        )
+        container_matrix[row_idx].append(pts.Window(pts.FormattedTextControl(".")))
 
     state = {'focus': 0}
 
@@ -194,21 +181,13 @@ def pt_matrix_test() -> None:
     for row_containers in container_matrix:
         phrase_layouts.append(
             pts.VSplit(
-                row_containers,
-                align=pts.HorizontalAlign.LEFT,
-                width=num_phrase_words * 8 + 20,
+                row_containers, align=pts.HorizontalAlign.LEFT, width=num_phrase_words * 8 + 20,
             )
         )
 
     layout = pts.Layout(
         pts.VSplit(
-            [
-                pts.HSplit(
-                    phrase_layouts,
-                    height=num_phrases,
-                    width=num_phrase_words * 8 + 20,
-                )
-            ],
+            [pts.HSplit(phrase_layouts, height=num_phrases, width=num_phrase_words * 8 + 20,)],
             align=pts.HorizontalAlign.LEFT,
         )
     )
@@ -216,10 +195,7 @@ def pt_matrix_test() -> None:
     pts.CompleteStyle.COLUMN
 
     app = pts.Application(
-        layout=layout,
-        key_bindings=bindings,
-        full_screen=True,
-        mouse_support=True,
+        layout=layout, key_bindings=bindings, full_screen=True, mouse_support=True,
     )
     app.run()
 

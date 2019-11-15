@@ -1,8 +1,7 @@
 # https://www.youtube.com/watch?v=kkMps3X_tEE
 
-import functools
 import typing as typ
-
+import functools
 
 FFPolyArithmeticMethod = typ.Callable[['FFPoly', 'FFPoly'], typ.Any]
 
@@ -36,7 +35,7 @@ def egcd(a: int, b: int) -> EGCDResult:
     q = b // a
     r = b % a
     g, s, t = egcd(r, a)
-    t = t - q * s
+    t   = t - q * s
     res = EGCDResult(g, t, s)
     assert res.s * a + res.t * b == res.g
     return res
@@ -73,40 +72,32 @@ def check_arithmetic_args(fn: FFPolyArithmeticMethod) -> FFPolyArithmeticMethod:
         assert self.p == other.p
         assert len(self.coeffs) == len(other.coeffs)
         return fn(self, other)
+
     return wrapper
 
 
 class FFPoly:
     """Polynomial in a finite field."""
 
-    coeffs : typ.Tuple[int]
-    p : int
+    coeffs: typ.Tuple[int]
+    p     : int
 
     def __init__(self, *coeffs, p=2) -> None:
         self.coeffs = coeffs
-        self.p = p
+        self.p      = p
 
     @check_arithmetic_args
     def __add__(self, other: 'FFPoly') -> 'FFPoly':
-        coeffs = [
-            (a + b) % self.p
-            for a, b in zip(self.coeffs, other.coeffs)
-        ]
+        coeffs = [(a + b) % self.p for a, b in zip(self.coeffs, other.coeffs)]
         return FFPoly(*coeffs, p=self.p)
 
     @check_arithmetic_args
     def __sub__(self, other: 'FFPoly') -> 'FFPoly':
-        coeffs = [
-            (a - b) % self.p
-            for a, b in zip(self.coeffs, other.coeffs)
-        ]
+        coeffs = [(a - b) % self.p for a, b in zip(self.coeffs, other.coeffs)]
         return FFPoly(*coeffs, p=self.p)
 
     def __neg__(self) -> 'FFPoly':
-        coeffs = [
-            (-c) % self.p
-            for c in self.coeffs
-        ]
+        coeffs = [(-c) % self.p for c in self.coeffs]
         return FFPoly(*coeffs, p=self.p)
 
     @check_arithmetic_args
@@ -171,29 +162,26 @@ def interpolate(points: typ.Iterable[Point], at_x=0) -> Num:
         other_points = list(points)
         other_points.remove(cur_point)
 
-        numer.append(prod(at_x - o.x for o in other_points))
+        numer.append(prod(at_x        - o.x for o in other_points))
         denum.append(prod(cur_point.x - o.x for o in other_points))
 
-    return sum([
-        (p.y * numer[i]) / denum[i]
-        for i, p in enumerate(points)
-    ])
+    return sum([(p.y * numer[i]) / denum[i] for i, p in enumerate(points)])
 
 
 points = [
-    Point(5, 3),
-    Point(7, 2),
-    Point(12, 6),
+    Point( 5,  3),
+    Point( 7,  2),
+    Point(12,  6),
     Point(30, 15),
 ]
 
 print("???", interpolate(points))
 
 points = [
-    Point(2, 10),
-    Point(3, 15),
-    Point(5, 25),
-    Point(8, 40),
+    Point( 2, 10),
+    Point( 3, 15),
+    Point( 5, 25),
+    Point( 8, 40),
     Point(12, 60),
 ]
 
@@ -205,5 +193,5 @@ print("???", at_y)
 
 new_points = points + [Point(at_x, at_y)]
 
-print("???", interpolate(points, at_x=99))
+print("???", interpolate(points    , at_x=99))
 print("???", interpolate(new_points, at_x=99))

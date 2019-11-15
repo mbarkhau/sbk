@@ -196,7 +196,7 @@ If you don't yet feel confident in your memory:
     comfortable that you have have memorized your brainkey.
  3. Destroy the memory aid before you use the wallet.
 
-When you have copied your "Brainkey", press enter to continue
+When you have copied your Brainkey, press enter to continue
 """
 
 DEFAULT_KDF_TARGET_DURATION = float(os.getenv('SBK_KDF_TARGET_DURATION', 120))
@@ -427,15 +427,15 @@ def _validate_data(data_type: str, header_text: str, data: bytes) -> None:
 
 
 def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[shamir.Share]) -> bool:
-    header_text = 'Validate your copy of the "Salt"'
+    header_text = "Validation for Salt"
     _validate_data(cli_io.DATA_TYPE_SALT, header_text, salt)
 
-    header_text = 'Validate your memorized "Brainkey"'
+    header_text = "Validation for Brainkey"
     _validate_data(cli_io.DATA_TYPE_BRAINKEY, header_text, brainkey)
 
     for i, share_data in enumerate(shares):
         share_no    = i + 1
-        header_text = f"Validate your copy of Share {share_no} of {len(shares)}"
+        header_text = f"Validation for Share {share_no}/{len(shares)}"
         _validate_data(cli_io.DATA_TYPE_SHARE, header_text, share_data)
 
     return True
@@ -735,7 +735,7 @@ def load_wallet(
 
 @cli.command()
 @click.pass_context
-def repl(ctx):
+def repl(ctx) -> None:
     """Start REPL (with completion)."""
     click.echo(cli.get_help(ctx))
     prompt_kwargs = {'message': "sbk> "}

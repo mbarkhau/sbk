@@ -14,11 +14,16 @@ def test_mem_total():
 
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Calibration is expensive")
 def test_load_sys_info(capsys):
-    nfo = sys_info.load_sys_info()
+    if sys_info.SYSINFO_CACHE_FPATH.exists():
+        sys_info.SYSINFO_CACHE_FPATH.unlink()
+
+    nfo = sys_info.load_sys_info(use_cache=False)
     assert nfo.num_cores > 0
     assert nfo.total_mb  > 0
     assert nfo.initial_p > 0
     assert nfo.initial_m > 0
+
+    assert sys_info.load_sys_info() is nfo
     assert sys_info._load_cached_sys_info() == nfo
 
 

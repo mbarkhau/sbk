@@ -257,6 +257,9 @@ class ThreadRunner(threading.Thread, typ.Generic[T]):
         return self.retval
 
 
+Seconds = float
+
+
 def run_with_progress_bar(target: typ.Callable[[], T], eta_sec: float, label: str) -> T:
     runner = ThreadRunner[T](target)
     runner.start()

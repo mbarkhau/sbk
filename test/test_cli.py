@@ -1,5 +1,7 @@
+import io
 import os
 import re
+import sys
 import math
 import time
 import random
@@ -10,11 +12,13 @@ import collections
 
 import click
 import pytest
+import pexpect
 import click.testing
 
 import sbk.cli
 import sbk.cli_io
 import sbk.ecc_rs
+from sbk import electrum_mnemonic
 from sbk.cli_util import *
 from sbk.mnemonic import *
 
@@ -256,7 +260,10 @@ def _parse_output(output: str) -> typ.Dict[str, ParsedSecret]:
     for line in output.splitlines():
         if not line.strip():
             continue
-        match = FORMATTED_LINE_RE.match(line.strip())
+        if "_" in line:
+            continue
+
+        match = FORMATTED_LINE_RE.search(line.strip())
         if match is None:
             headline = line.strip()
         else:
@@ -269,54 +276,62 @@ def _parse_output(output: str) -> typ.Dict[str, ParsedSecret]:
     }
 
 
-def test_cli_create_validation():
-    argv = [
-        "--scheme=2of3",
-        "--memory-cost=1",
-        "--time-cost=1",
-    ]
-    debug_secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    inputs        = [
-        "\n\n\n\n\n\n\n",  # confirmations
-        "\n".join(debug_secrets['salt'].data_codes) + "\n",
-        "accept\n",
-        "\n".join(debug_secrets['brainkey'].data_codes) + "\n",
-        "accept\n",
-        "\n".join(debug_secrets["share 1/3"].data_codes) + "\n",
-        "accept\n",
-        "\n".join(debug_secrets["share 2/3"].data_codes) + "\n",
-        "accept\n",
-        "\n".join(debug_secrets["share 3/3"].data_codes) + "\n",
-        "accept\n",
-    ]
-    env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
-    result = _run(sbk.cli.create, argv, input="".join(inputs), env=env)
+class Interaction(typ.NamedTuple):
 
-    assert not result.exception
-    assert result.exit_code == 0
+    expect : typ.Optional[str]
+    send   : typ.Optional[str]
+    timeout: typ.Optional[float]
 
 
-def _run(*args, **kwargs):
-    runner = click.testing.CliRunner()
-    result = runner.invoke(*args, **kwargs)
-
-    if result.exit_code != 0:
-        print()
-        lookback = collections.deque(maxlen=4)
-        for line in result.output.splitlines():
-            if line in lookback:
-                continue
-            else:
-                print(line)
-            lookback.append(line)
-
-    assert not result.exception
-    assert result.exit_code == 0
-
-    return result
+def interaction(expect=None, send=None, timeout=1) -> Interaction:
+    return Interaction(expect, send, timeout)
 
 
-def test_cli_create():
+class Result(typ.NamedTuple):
+
+    output   : str
+    exit_code: int
+
+
+def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
+    subcommand = cli_fn.name.replace("_", "-")
+
+    sub_env = os.environ.copy()
+    if env:
+        sub_env.update(env)
+
+    buf = io.BytesIO()
+
+    cmd  = [sys.executable, "-m", "sbk.cli", subcommand] + list(argv)
+    proc = pexpect.spawn(" ".join(cmd), env=sub_env, logfile=buf)
+
+    remaining_playbook = collections.deque(playbook)
+    try:
+        while remaining_playbook:
+            expect, send, timeout = remaining_playbook.popleft()
+            if expect is not None:
+                proc.expect(expect, timeout=timeout)
+            if send is not None:
+                proc.sendline(send)
+
+        proc.read()
+        proc.expect(pexpect.EOF, timeout=2)
+    except pexpect.exceptions.TIMEOUT:
+        buf.seek(0)
+        output = buf.read().decode("utf-8")
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(output)
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+        raise
+
+    assert proc.exitstatus == 0, proc.exitstatus
+
+    buf.seek(0)
+    output = buf.read().decode("utf-8")
+    return Result(output, proc.exitstatus)
+
+
+def test_cli_create_basic():
     argv = [
         "--scheme=2of3",
         "--brainkey-len=6",
@@ -326,7 +341,7 @@ def test_cli_create():
         "--time-cost=1",
     ]
     env    = {'SBK_PROGRESS_BAR': '0'}
-    result = _run(sbk.cli.create, argv, env=env)
+    result = _run(sbk.cli.create, argv, env=env, playbook=[])
 
     out_secrets = _parse_output(result.output)
     salt        = out_secrets['salt']
@@ -339,15 +354,18 @@ def test_cli_create():
     random.shuffle(shares)
 
     for combo in itertools.combinations(shares, 2):
-        recover_inputs = []
+        playbook = []
         for share in combo:
-            recover_inputs.extend(
-                [" ".join(share.words[:4]) + "\n", " ".join(share.words[4:]) + "\n", "accept\n",]
-            )
+            share_interactions = [
+                interaction(expect=r".*Enter code/words at 01: $", send=" ".join(share.words[:4])),
+                interaction(expect=r".*Enter code/words at 03: $", send=" ".join(share.words[4:])),
+                interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+            ]
+            playbook.extend(share_interactions)
 
-        result = _run(sbk.cli.recover, input="".join(recover_inputs))
-
+        result  = _run(sbk.cli.recover, playbook=playbook)
         secrets = result.output.split("RECOVERED SECRETS")[-1]
+
         assert "Salt" in secrets
         assert "Brainkey" in secrets
 
@@ -359,16 +377,62 @@ def test_cli_create():
         assert brainkey == recovered_brainkey
 
 
+def test_cli_create_validation():
+    debug_secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    salt_codes     = " ".join(debug_secrets['salt'].data_codes)
+    brainkey_codes = " ".join(debug_secrets['brainkey'].data_codes)
+    share_1_codes  = " ".join(debug_secrets["share 1/3"].data_codes)
+    share_2_codes  = " ".join(debug_secrets["share 2/3"].data_codes)
+    share_3_codes  = " ".join(debug_secrets["share 3/3"].data_codes)
+    playbook       = [
+        interaction(expect=r".*Press enter to continue $", send=""),
+        interaction(expect=r".*Share 1/3, press enter to continue\. $", send=""),
+        interaction(expect=r".*Share 2/3, press enter to continue\. $", send=""),
+        interaction(expect=r".*Share 3/3, press enter to continue\. $", send=""),
+        interaction(expect=r".*Salt, press enter to continue $", send=""),
+        interaction(expect=r".*Press enter to show your brainkey $", send=""),
+        interaction(expect=r".*press enter to continue $", send=""),
+        interaction(expect=r".*Enter code/words at 01: $", send=salt_codes),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: $", send=brainkey_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: $", send=share_1_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: $", send=share_2_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: $", send=share_3_codes,),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+    ]
+
+    argv   = ["--scheme=2of3", "--memory-cost=1", "--time-cost=1"]
+    env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
+    result = _run(sbk.cli.create, argv, env=env, playbook=playbook)
+
+    validation_output  = result.output.split("Validation", 1)[-1]
+    validation_secrets = _parse_output(validation_output)
+
+    assert validation_secrets["validation for salt"] == debug_secrets['salt']
+    assert validation_secrets["validation for brainkey"] == debug_secrets['brainkey']
+    assert validation_secrets["validation for share 1/3"] == debug_secrets["share 1/3"]
+    assert validation_secrets["validation for share 2/3"] == debug_secrets["share 2/3"]
+    assert validation_secrets["validation for share 3/3"] == debug_secrets["share 3/3"]
+
+
 def test_cli_recover_salt_from_words():
-    secrets     = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    salt_inputs = (
-        " ".join(secrets['salt'].words[:4]),
-        " ".join(secrets['salt'].words[4:8]),
-        " ".join(secrets['salt'].words[8:]),
-        "accept",
-        "",
-    )
-    result = _run(sbk.cli.recover_salt, input="\n".join(salt_inputs))
+    secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    playbook = [
+        interaction(
+            expect=r".*Enter code/words at 01: $", send=" ".join(secrets['salt'].words[:4])
+        ),
+        interaction(
+            expect=r".*Enter code/words at 03: $", send=" ".join(secrets['salt'].words[4:8])
+        ),
+        interaction(
+            expect=r".*Enter code/words at 05: $", send=" ".join(secrets['salt'].words[8:])
+        ),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+    ]
+    result = _run(sbk.cli.recover_salt, playbook=playbook)
 
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
@@ -382,15 +446,17 @@ def test_cli_recover_salt_from_words():
 
 
 def test_cli_recover_salt_from_data():
-    secrets     = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    salt_inputs = [
-        " ".join(secrets['salt'].data_codes[:4]),
-        " ".join(secrets['salt'].data_codes[4:]),
-        "accept",
-        "",
+    secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    playbook = [
+        interaction(
+            expect=r".*Enter code/words at 01: $", send=" ".join(secrets['salt'].data_codes[:4])
+        ),
+        interaction(
+            expect=r".*Enter code/words at 05: $", send=" ".join(secrets['salt'].data_codes[4:])
+        ),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
     ]
-
-    result = _run(sbk.cli.recover_salt, input="\n".join(salt_inputs))
+    result = _run(sbk.cli.recover_salt, playbook=playbook)
 
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
@@ -403,17 +469,21 @@ def test_cli_recover_salt_from_data():
 
 
 def test_cli_recover_salt_from_ecc():
-    secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    inputs  = [
-        "next\nnext\nnext\nnext",
-        "next\nnext\nnext\nnext",
-        " ".join(secrets['salt'].ecc_codes[:4]),
-        " ".join(secrets['salt'].ecc_codes[4:]),
-        "accept",
-        "",
+    secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    playbook = [
+        interaction(expect=r".*Enter code/words at 01: $", send="next"),
+        interaction(expect=r".*Enter code/words at 02: $", send="next"),
+        interaction(expect=r".*Enter code/words at 03: $", send="next"),
+        interaction(expect=r".*Enter code/words at 04: $", send="next"),
+        interaction(expect=r".*Enter code/words at 05: $", send="next"),
+        interaction(expect=r".*Enter code/words at 06: $", send="next"),
+        interaction(expect=r".*Enter code/words at 07: $", send="next"),
+        interaction(expect=r".*Enter code/words at 08: $", send="next"),
+        interaction(expect=r".*Enter code at 09: $", send=" ".join(secrets['salt'].ecc_codes[:4])),
+        interaction(expect=r".*Enter code at 13: $", send=" ".join(secrets['salt'].ecc_codes[4:])),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
     ]
-
-    result = _run(sbk.cli.recover_salt, input="\n".join(inputs))
+    result = _run(sbk.cli.recover_salt, playbook=playbook)
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -421,32 +491,39 @@ def test_cli_recover_salt_from_ecc():
 
 
 def test_cli_load_wallet():
-    secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
-    inputs  = (
-        " ".join(secrets['salt'].words),
-        "accept",
-        " ".join(secrets['brainkey'].words[:4]),
-        " ".join(secrets['brainkey'].words[4:]),
-        "accept",
-        "",
-        "",
-    )
+    secrets        = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    salt_words     = " ".join(secrets['salt'].words)
+    brainkey_words = " ".join(secrets['brainkey'].words)
+    playbook       = [
+        interaction(expect=r".*Enter code/words at 01: $", send=salt_words),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+        interaction(expect=r".*Enter code/words at 01: $", send=brainkey_words),
+        interaction(expect=r".*\(or Enter to Accept\): $", send="accept"),
+    ]
 
     all_seeds    = []
     wallet_names = ["disabled", "Hello, 世界!"] * 2
     for name in wallet_names:
-        args = ("--show-seed", "--yes-all", "--wallet-name", name)
+        argv   = ("--show-seed", "--yes-all", "--wallet-name", f'"{name}"')
+        result = _run(sbk.cli.load_wallet, argv=argv, playbook=playbook)
 
-        result = _run(sbk.cli.load_wallet, args=args, input="\n".join(inputs))
-
-        commands, wallet_seed = result.output.lower().split("electrum wallet seed")
+        commands, wallet_seed = result.output.lower().split("electrum wallet seed:")
+        seed_words = wallet_seed.strip().split()
+        assert len(seed_words) == 12, seed_words
+        assert all(w in electrum_mnemonic.wordlist_indexes for w in seed_words)
         all_seeds.append(wallet_seed.strip())
 
     # same name -> same seed
     assert len(set(wallet_names)) == len(set(all_seeds))
 
 
-def test_cli_kdf_test():
-    args   = ("--memory-cost", "1", "--time-cost", "1")
-    result = _run(sbk.cli.kdf_test, args=args)
+def test_cli_kdf_test_implicit():
+    argv   = ("--memory-cost", "1", "--target-duration", "1")
+    result = _run(sbk.cli.kdf_test, argv=argv)
+    assert re.search(r"Duration\s*:\s+\d+ sec", result.output)
+
+
+def test_cli_kdf_test_explicit():
+    argv   = ("--memory-cost", "1", "--time-cost", "1")
+    result = _run(sbk.cli.kdf_test, argv=argv)
     assert re.search(r"Duration\s*:\s+\d+ sec", result.output)

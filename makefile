@@ -380,6 +380,7 @@ test:
 		--verbose \
 		--cov-report html \
 		--cov-report term \
+		-k "$${PYTEST_FILTER}" \
 		$(shell cd src/ && ls -1 */__init__.py | awk '{ sub(/\/__init__.py/, "", $$1); print "--cov "$$1 }') \
 		test/ src/;
 
@@ -503,6 +504,7 @@ devtest:
 .PHONY: citest
 citest:
 	docker build --file Dockerfile --tag tmp_citest_$(PKG_NAME) .
+# 	docker run --tty tmp_citest_$(PKG_NAME) bash -c "PYTEST_FILTER=cli_create_validation make test"
 	docker run --tty tmp_citest_$(PKG_NAME) make lint mypy test
 
 

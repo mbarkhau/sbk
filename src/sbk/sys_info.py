@@ -57,6 +57,25 @@ SYSINFO_CACHE_FNAME = "sys_info_measurements.json"
 SYSINFO_CACHE_FPATH = SBK_APP_DIR / SYSINFO_CACHE_FNAME
 
 
+def mem_total() -> kdf.MebiBytes:
+    """Get total memory."""
+
+    # Linux
+    meminfo_path = pl.Path("/proc/meminfo")
+    if meminfo_path.exists():
+        try:
+            with meminfo_path.open(mode="rb") as fobj:
+                data = fobj.read()
+            for line in data.splitlines():
+                key, num, unit = line.decode("ascii").strip().split()
+                if key == "MemTotal:":
+                    return int(num) // 1024
+        except Exception:
+            log.error("Error while evaluating system memory", exc_info=True)
+
+    return FALLBACK_MEM_TOTAL_MB
+
+
 class Measurement(typ.NamedTuple):
 
     p: kdf.NumThreads
@@ -86,49 +105,6 @@ class SystemInfo(typ.NamedTuple):
     initial_m: kdf.MebiBytes
 
 
-def mem_total() -> kdf.MebiBytes:
-    """Get total memory."""
-
-    # Linux
-    meminfo_path = pl.Path("/proc/meminfo")
-    if meminfo_path.exists():
-        try:
-            with meminfo_path.open(mode="rb") as fobj:
-                data = fobj.read()
-            for line in data.splitlines():
-                key, num, unit = line.decode("ascii").strip().split()
-                if key == "MemTotal:":
-                    return int(num) // 1024
-        except Exception:
-            log.error("Error while evaluating system memory", exc_info=True)
-
-    return FALLBACK_MEM_TOTAL_MB
-
-
-def _init_sys_info() -> SystemInfo:
-    num_cores = len(os.sched_getaffinity(0))
-    total_mb  = mem_total()
-
-    initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
-
-    while True:
-        try:
-            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
-            initial_p  = kdf_params.p
-            initial_m  = kdf_params.m
-            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
-            measure(kdf_params)
-            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
-            break  # success
-        except argon2.exceptions.HashingError as err:
-            if "Memory allocation error" not in str(err):
-                raise
-            initial_m = (2 * initial_m) // 3
-
-    return SystemInfo(num_cores, total_mb, initial_p, initial_m)
-
-
 _SYS_INFO: typ.Optional[SystemInfo] = None
 
 
@@ -156,6 +132,30 @@ def _dump_sys_info(sys_info: SystemInfo) -> None:
     except Exception as ex:
         log.warning(f"Error writing cache file {cache_path}: {ex}")
         return
+
+
+def _init_sys_info() -> SystemInfo:
+    num_cores = len(os.sched_getaffinity(0))
+    total_mb  = mem_total()
+
+    initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
+    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
+
+    while True:
+        try:
+            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
+            initial_p  = kdf_params.p
+            initial_m  = kdf_params.m
+            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
+            measure(kdf_params)
+            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
+            break  # success
+        except argon2.exceptions.HashingError as err:
+            if "Memory allocation error" not in str(err):
+                raise
+            initial_m = (2 * initial_m) // 3
+
+    return SystemInfo(num_cores, total_mb, initial_p, initial_m)
 
 
 def init_sys_info() -> SystemInfo:

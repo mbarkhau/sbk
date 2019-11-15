@@ -188,64 +188,64 @@ def test_threading():
 
 DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
-   01: 000-305   academy   colombia    14: 007-656
-   02: 081-920   dubai     abraham     15: 101-406
-   03: 131-522   academy   seattle     16: 141-160
-   04: 247-256   sheriff   theatre     17: 231-211
-   05: 316-374   taiwan    tequila     18: 277-329
-   06: 387-564   uruguay   veteran     19: 389-965
+   01: 000-305   academy   colombia    14: 029-099
+   02: 065-536   abraham   abraham     15: 093-311
+   03: 131-522   academy   seattle     16: 175-934
+   04: 247-256   sheriff   theatre     17: 245-674
+   05: 316-374   taiwan    tequila     18: 288-548
+   06: 387-564   uruguay   veteran     19: 361-216
 
-   07: 452-602   umbrella  whisky      20: 402-685
-   08: 523-760   yoghurt   virginia    21: 520-406
-   09: 560-014   muffin    nagasaki    22: 582-784
-   10: 622-980   library   macbook     23: 623-470
-   11: 696-210   oxford    netflix     24: 692-770
-   12: 759-208   nintendo  plumber     25: 759-126
-   13: 828-165   pelican   alaska      26: 836-867
+   07: 452-602   umbrella  whisky      20: 423-606
+   08: 523-760   yoghurt   virginia    21: 495-679
+   09: 560-014   muffin    nagasaki    22: 533-390
+   10: 622-980   library   macbook     23: 594-610
+   11: 696-210   oxford    netflix     24: 683-300
+   12: 759-208   nintendo  plumber     25: 739-917
+   13: 828-213   pelican   crown       26: 793-747
 
                      Share 2/3
-   01: 000-305   academy   colombia    14: 040-909
-   02: 081-920   dubai     abraham     15: 098-896
-   03: 131-779   acrobat   server      16: 143-259
-   04: 249-335   squid     warrior     17: 244-230
-   05: 319-979   tsunami   vampire     18: 294-439
-   06: 365-983   nintendo  oxford      19: 350-045
+   01: 000-305   academy   colombia    14: 062-350
+   02: 065-536   abraham   abraham     15: 090-673
+   03: 131-779   acrobat   server      16: 174-029
+   04: 249-335   squid     warrior     17: 230-023
+   05: 319-979   tsunami   vampire     18: 270-930
+   06: 365-983   nintendo  oxford      19: 337-680
 
-   07: 428-467   mosquito  queen       20: 405-253
-   08: 507-303   salmon    pilot       21: 482-732
-   09: 545-115   freddie   gotham      22: 526-112
-   10: 607-567   embassy   forest      23: 610-940
-   11: 686-435   kingdom   hendrix     24: 711-754
-   12: 748-823   italy     beehive     25: 772-234
-   13: 786-942   academy   yokohama    26: 848-357
+   07: 428-467   mosquito  queen       20: 425-294
+   08: 507-303   salmon    pilot       21: 474-437
+   09: 545-115   freddie   gotham      22: 573-486
+   10: 607-567   embassy   forest      23: 639-904
+   11: 686-435   kingdom   hendrix     24: 664-396
+   12: 748-823   italy     beehive     25: 726-929
+   13: 786-894   academy   stone       26: 796-789
 
                      Share 3/3
-   01: 000-305   academy   colombia    14: 057-639
-   02: 081-920   dubai     abraham     15: 094-570
-   03: 131-893   admiral   crown       16: 188-106
-   04: 211-995   diesel    berlin      17: 219-165
-   05: 263-689   albino    android     18: 308-476
-   06: 346-183   escort    engine      19: 377-508
+   01: 000-305   academy   colombia    14: 036-196
+   02: 065-536   abraham   abraham     15: 102-667
+   03: 131-893   admiral   crown       16: 153-244
+   04: 211-995   diesel    berlin      17: 221-340
+   05: 263-689   albino    android     18: 321-673
+   06: 346-183   escort    engine      19: 373-481
 
-   07: 416-381   gorilla   lasagna     20: 450-468
-   08: 488-547   kangaroo  hendrix     21: 511-859
-   09: 585-441   vietnam   tsunami     22: 569-152
-   10: 651-519   virginia  zimbabwe    23: 597-362
-   11: 709-317   suzuki    sheriff     24: 714-395
-   12: 773-259   sparrow   muffin      25: 723-511
-   13: 824-926   norway    hannibal    26: 791-630
+   07: 416-381   gorilla   lasagna     20: 429-551
+   08: 488-547   kangaroo  hendrix     21: 503-706
+   09: 585-441   vietnam   tsunami     22: 550-990
+   10: 651-519   virginia  zimbabwe    23: 625-838
+   11: 709-317   suzuki    sheriff     24: 661-917
+   12: 773-259   sparrow   muffin      25: 775-468
+   13: 824-942   norway    jakarta     26: 839-134
 
 
                        Salt
-   01: 000-305   academy   colombia    09: 525-073
-   02: 081-920   dubai     abraham     10: 650-518
-   03: 144-436   cowboy    cowboy      11: 716-972
-   04: 209-972   cowboy    cowboy      12: 753-341
+   01: 000-305   academy   colombia    09: 582-581
+   02: 065-536   abraham   abraham     10: 594-210
+   03: 144-436   cowboy    cowboy      11: 693-392
+   04: 209-972   cowboy    cowboy      12: 739-197
 
-   05: 275-508   cowboy    cowboy      13: 840-190
-   06: 341-044   cowboy    cowboy      14: 005-891
-   07: 406-580   cowboy    cowboy      15: 090-070
-   08: 472-116   cowboy    cowboy      16: 187-496
+   05: 275-508   cowboy    cowboy      13: 848-823
+   06: 341-044   cowboy    cowboy      14: 048-987
+   07: 406-580   cowboy    cowboy      15: 094-511
+   08: 472-116   cowboy    cowboy      16: 150-745
 
                      Brainkey
    01: 013-364   cowboy    cowboy      05: 275-508
@@ -408,7 +408,7 @@ def test_cli_create_validation():
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
 
-    argv   = ["--scheme=2of3", "--memory-cost=1", "--time-cost=1"]
+    argv   = ["--scheme=2of3", "--parallelism=1", "--memory-cost=1", "--time-cost=1"]
     env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
     result = _run(sbk.cli.create, argv, env=env, playbook=playbook)
 
@@ -438,7 +438,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 525-073 <=") == 1
+    assert result.output.count("09: 582-581 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -459,7 +459,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 525-073 <=") == 1
+    assert result.output.count("09: 582-581 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):

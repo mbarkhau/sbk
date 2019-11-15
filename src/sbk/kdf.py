@@ -6,6 +6,7 @@
 """Logic related to KDF derivation."""
 import enum
 import math
+import time
 import typing as typ
 
 import argon2
@@ -160,3 +161,78 @@ def derive_key(secret_data: bytes, salt_data: bytes, kdf_params: KDFParams, hash
         parallelism=kdf_params.p,
         version=parse_argon2_version(kdf_params.h),
     )
+
+
+def _hash(data: bytes, kdf_params: KDFParams) -> bytes:
+    return argon2.low_level.hash_secret_raw(
+        secret=data,
+        salt=data,
+        hash_len=1024,
+        type=parse_argon2_type(kdf_params.h),
+        memory_cost=kdf_params.m * 1024,
+        time_cost=kdf_params.t,
+        parallelism=kdf_params.p,
+        version=parse_argon2_version(kdf_params.h),
+    )
+
+
+Increment = float
+Seconds   = float
+
+ProgressCallback = typ.Callable[[Increment], None]
+
+
+def digest(
+    data       : bytes,
+    kdf_params : KDFParams,
+    hash_len   : int,
+    progress_cb: typ.Optional[ProgressCallback] = None,
+) -> bytes:
+    time_cost = max(1, kdf_params.t // 100)
+    num_steps = int(kdf_params.t / time_cost)
+    step_size = 100 / num_steps
+
+    current_result = data
+    for _ in range(num_steps):
+        current_result = _hash(data, kdf_params._replace_any(t=time_cost))
+        if progress_cb:
+            progress_cb(step_size)
+
+    if progress_cb:
+        progress_cb(step_size)
+
+    return current_result[:hash_len]
+
+
+DURATION_SIGNIFICANCE_THRESHOLD = 0.5
+ITER_SIGNIFICANCE_THRESHOLD     = 10
+
+
+def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:
+    data       = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    kdf_params = baseline_kdf_params._replace_any(t=1)
+
+    while True:
+        tzero = time.time()
+        _hash(data, kdf_params)
+        duration = time.time() - tzero
+
+        iters_per_sec = kdf_params.t / duration
+        tgt_iters     = target_duration * iters_per_sec
+        # There are two cases where we want to bail out
+        #   1. The duration is high enough that we don't even want to measure
+        #      anymore, ie. so much memory is used that few iterations are
+        #      already very expensive.
+        #   2. The number of iterations is high enough for any overhead to
+        #      have been amortized.
+
+        is_duration_significant = duration > DURATION_SIGNIFICANCE_THRESHOLD
+        is_iters_significant    = kdf_params.t >= ITER_SIGNIFICANCE_THRESHOLD
+        if is_duration_significant or is_iters_significant:
+            return kdf_params._replace_any(t=math.ceil(tgt_iters * 1.25))
+
+        # min_iters is used to make sure we're always measuring with a higher value for t
+        min_iters         = math.ceil(kdf_params.t  * 1.5)
+        significant_iters = math.ceil(iters_per_sec * 2 * DURATION_SIGNIFICANCE_THRESHOLD)
+        new_t             = max(min_iters, min(ITER_SIGNIFICANCE_THRESHOLD, significant_iters))
+        kdf_params        = kdf_params._replace_any(t=new_t)

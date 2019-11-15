@@ -212,25 +212,24 @@ def parse_scheme(scheme: str) -> Scheme:
 T = typ.TypeVar('T')
 
 
-class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
+class ThreadRunner(threading.Thread, typ.Generic[T]):
 
     _exception: typ.Optional[Exception]
     _return   : typ.Optional[T]
 
-    def __init__(self, target=None, args=(), kwargs=None) -> None:
-        threading.Thread.__init__(self, target=target, args=args, kwargs=kwargs)
+    def __init__(self, target: typ.Callable[[], T]) -> None:
+        threading.Thread.__init__(self, target=target)
         self._target    = target
-        self._args      = args
-        self._kwargs    = kwargs
         self._exception = None
         self._return    = None
+        # daemon means the thread is killed if user hits Ctrl-C
+        self.daemon = True
 
     def run(self) -> None:
-        tgt = self._target
+        tgt = typ.cast(typ.Callable[[], T], self._target)
         assert tgt is not None
-        kwargs = self._kwargs or {}
         try:
-            self._return = tgt(*self._args, **kwargs)
+            self._return = tgt()
         except Exception as ex:
             self._exception = ex
             raise
@@ -248,37 +247,44 @@ class EvalWithProgressbar(threading.Thread, typ.Generic[T]):
     @property
     def retval(self) -> T:
         rv = self._return
+        # mypy pacification (join would already have raised Exception)
         assert rv is not None
         return rv
 
-    def start_and_wait(self, eta_sec: float, label: str) -> None:
-        # daemon means the thread is killed if user hits Ctrl-C
-        self.daemon = True
+    def start_and_join(self) -> T:
         self.start()
-
-        if os.getenv('SBK_PROGRESS_BAR', "1") == '0':
-            return self.join()
-
-        total_ms = int(eta_sec * 1000)
-        step_ms  = 200
-
-        with click.progressbar(label=label, length=total_ms, show_eta=True) as bar:
-            tzero = time.time()
-            while self.is_alive():
-                time.sleep(step_ms / 1000)
-
-                done_ms  = (time.time() - tzero) * 1000
-                rest_ms  = max(0, total_ms - done_ms)
-                rest_pct = 100 * rest_ms / total_ms if total_ms > 0 else 50
-
-                # Lies, damn lies, and progress bars
-                if rest_pct > 10:
-                    bar.update(step_ms)  # default
-                elif rest_pct > 3:
-                    bar.update(step_ms // 2)  # slow down
-                else:
-                    bar.update(step_ms // 10)  # just nudge
-
-            bar.update(total_ms)
-
         self.join()
+        return self.retval
+
+
+def run_with_progress_bar(target: typ.Callable[[], T], eta_sec: float, label: str) -> T:
+    runner = ThreadRunner[T](target)
+    runner.start()
+    if os.getenv('SBK_PROGRESS_BAR', "1") == '0':
+        runner.join()
+        return runner.retval
+
+    total_ms = int(eta_sec * 1000)
+    step_ms  = 100
+
+    with click.progressbar(label=label, length=total_ms, show_eta=True) as bar:
+        tzero = time.time()
+        while runner.is_alive():
+            time.sleep(step_ms / 1000)
+
+            done_ms  = (time.time() - tzero) * 1000
+            rest_ms  = max(0, total_ms - done_ms)
+            rest_pct = 100 * rest_ms / total_ms if total_ms > 0 else 50
+
+            # Lies, damn lies, and progress bars
+            if rest_pct > 10:
+                bar.update(step_ms)  # default
+            elif rest_pct > 3:
+                bar.update(step_ms // 2)  # slow down
+            else:
+                bar.update(step_ms // 10)  # just nudge
+
+        bar.update(total_ms)
+
+    runner.join()
+    return runner.retval

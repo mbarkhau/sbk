@@ -3850,7 +3850,7 @@ def is_new_seed(x: str, prefix: str = SEED_PREFIX) -> bool:
 ElectrumSeed = str
 
 
-def seed_raw2phrase(int_seed: RawSeed, seed_type='segwit') -> SeedPhrase:
+def raw_seed2phrase(int_seed: RawSeed, seed_type='segwit') -> SeedPhrase:
     # based on Mnemonic.make_seed
     prefix = seed_prefix(seed_type)
 
@@ -3876,7 +3876,7 @@ def bytes2int(data: bytes) -> int:
 RandumFn = typ.Callable[[int], bytes]
 
 
-def gen_int_seed(num_bits: int, random_fn: RandumFn = os.urandom):
+def gen_raw_seed(num_bits: int, random_fn: RandumFn = os.urandom) -> RawSeed:
     if num_bits % 8 != 0:
         raise ValueError("Argument 'num_bits' must be divisible by 8.")
     if num_bits < 1:

@@ -41,41 +41,23 @@ def test_mnemonic():
 
 
 def test_electrum_mnemonic():
-    seed = gen_int_seed(num_bits=128)
-    assert 0 <= seed < 2 ** 128
+    raw_seed = gen_raw_seed(num_bits=128)
+    assert 0 <= raw_seed < 2 ** 128
 
     try:
-        gen_int_seed(num_bits=127)
+        gen_raw_seed(num_bits=127)
         assert False, "expected ValueError"
     except ValueError as ex:
         assert "divisible by 8" in str(ex)
 
     try:
-        gen_int_seed(num_bits=0)
+        gen_raw_seed(num_bits=0)
         assert False, "expected ValueError"
     except ValueError as ex:
         assert "must be > 0" in str(ex)
 
 
-def test_seed_raw2phrase():
-    seed   = gen_int_seed(128)
-    phrase = seed_raw2phrase(seed)
+def test_raw_seed2phrase():
+    raw_seed = gen_raw_seed(128)
+    phrase   = raw_seed2phrase(raw_seed)
     assert len(phrase.split(" ")) == 12
-
-
-def main():
-    raw = mnemonic_decode(TEST_SEED)
-    print(raw)
-
-    seed = seed_raw2phrase(raw)
-
-    print(160 / 8)
-
-    for _ in range(20):
-        i = gen_int_seed(160)
-        print(i)
-        print(mnemonic_encode(i))
-
-
-if __name__ == '__main__':
-    main()

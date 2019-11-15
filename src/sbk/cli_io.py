@@ -110,7 +110,8 @@ def _parse_share_len(inputs: Inputs) -> int:
     parts = cli_util.intcodes2parts(inputs[:1])
     data  = b"".join(parts)
     assert len(data) == 2
-    param_cfg = params.parse_initial_param_cfg(data + b"\x00\x00")
+    dummy_kdf_data = b"\x00\x00"
+    param_cfg      = params.bytes2param_cfg(data + dummy_kdf_data)
     return (
         params.PARAM_CFG_LEN
         + params.SHARE_X_COORD_LEN

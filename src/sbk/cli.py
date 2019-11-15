@@ -8,10 +8,12 @@
 """CLI/Imperative shell for SBK."""
 
 import os
+import time
 import typing as typ
 import logging
 import pathlib as pl
 import tempfile
+import functools
 import subprocess as sp
 
 import click
@@ -26,6 +28,7 @@ from . import shamir
 from . import cli_util
 from . import enc_util
 from . import electrum_mnemonic
+from .sys_info import load_sys_info
 
 # To enable pretty tracebacks:
 #   echo "export ENABLE_BACKTRACE=1;" >> ~/.bashrc
@@ -196,10 +199,24 @@ If you don't yet feel confident in your memory:
 When you have copied your "Brainkey", press enter to continue
 """
 
+DEFAULT_KDF_TARGET_DURATION = float(os.getenv('SBK_KDF_TARGET_DURATION', 120))
+
+KDF_TARGET_DURATION_HELP = (
+    "Target duration for Argon2 KDF (unless --time-cost is specified explicitly)"
+)
 KDF_PARALLELISM_HELP = "Argon2 KDF Parallelism (Number of threads)"
 KDF_MEMORY_COST_HELP = "Argon2 KDF Memory Cost (MB)"
 KDF_TIME_COST_HELP   = "Argon2 KDF Time Cost (iterations)"
 
+
+_kdf_target_duration_option = click.option(
+    '-d',
+    '--target-duration',
+    type=float,
+    default=DEFAULT_KDF_TARGET_DURATION,
+    show_default=True,
+    help=KDF_TARGET_DURATION_HELP,
+)
 
 _kdf_parallelism_option = click.option('-p', '--parallelism', type=int, help=KDF_PARALLELISM_HELP)
 
@@ -286,34 +303,36 @@ _online_mode_option = click.option(
 )
 
 
-Salt      = bytes  # prefixed with ParamConfig
-BrainKey  = bytes
-MasterKey = bytes
+Salt     = bytes  # prefixed with ParamConfig
+BrainKey = bytes
+
+SeedData = bytes
+
+SEED_DATA_LEN = 16
 
 
-def _derive_key(
+def _derive_seed(
     param_cfg  : params.ParamConfig,
     salt       : Salt,
     brainkey   : BrainKey,
     label      : str,
     wallet_name: str = DEFAULT_WALLET_NAME,
-) -> MasterKey:
-    eta_sec          = params.estimate_param_cost(param_cfg.kdf_params)
-    hash_len         = param_cfg.master_key_len
+) -> SeedData:
     wallet_name_data = wallet_name.encode('utf-8')
 
-    kdf_kwargs = {
-        'salt_data'  : salt,
-        'secret_data': brainkey + wallet_name_data,
-        'kdf_params' : param_cfg.kdf_params,
-        'hash_len'   : hash_len,
-    }
+    data = salt + brainkey + wallet_name_data
 
-    KDFThread  = cli_util.EvalWithProgressbar[bytes]
-    kdf_thread = KDFThread(target=kdf.derive_key, kwargs=kdf_kwargs)
-    kdf_thread.start_and_wait(eta_sec, label)
-    master_key = kdf_thread.retval
-    return master_key
+    with click.progressbar(label=label, length=100, show_eta=True) as bar:
+        digest_partial = functools.partial(
+            kdf.digest,
+            data=data,
+            kdf_params=param_cfg.kdf_params,
+            hash_len=SEED_DATA_LEN,
+            progress_cb=bar.update,
+        )
+        runner    = cli_util.ThreadRunner[bytes](digest_partial)
+        seed_data = runner.start_and_join()
+    return seed_data
 
 
 def _show_secret(label: str, data: bytes, data_type: str) -> None:
@@ -337,66 +356,50 @@ def version() -> None:
     echo(f"SBK version: {sbk.__version__}")
 
 
-@cli.command()
-@_kdf_parallelism_option
-@_kdf_memory_cost_option
-@_kdf_time_cost_option
-def kdf_info(
-    parallelism: typ.Optional[kdf.NumThreads] = None,
-    memory_cost: typ.Optional[kdf.MebiBytes ] = None,
-    time_cost  : typ.Optional[kdf.Iterations] = None,
-) -> None:
-    """Show info for each available parameter config."""
-    kdf_params = params.get_default_params()
-    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
+def _parse_kdf_params(
+    target_duration: kdf.Seconds,
+    parallelism    : typ.Optional[kdf.NumThreads],
+    memory_cost    : typ.Optional[kdf.MebiBytes],
+    time_cost      : typ.Optional[kdf.Iterations],
+) -> kdf.KDFParams:
+    sys_info   = load_sys_info()
+    kdf_params = kdf.init_kdf_params(p=sys_info.initial_p, m=sys_info.initial_m, t=1)
+    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost)
 
-    echo("Estimated durations for KDF parameter choices")
-    echo()
-
-    high_m = kdf_params.m
-    high_t = kdf_params.t * 5
-    m      = high_m
-
-    for _ in range(3):
-        t = high_t
-        for _ in range(9):
-            t = int(t / 1.5)
-
-            test_params = kdf_params._replace_any(m=int(m), t=int(t))
-
-            suffix = "<- default" if test_params == kdf_params else ""
-            prefix = f"-p={test_params.p:<3} -m={test_params.m:<5} -t={test_params.t:<4}"
-
-            eta = params.estimate_param_cost(test_params)
-            echo(f"   {prefix} : {round(eta):>4} sec {suffix}")
-        m = int(m / 1.5)
-    return
+    if time_cost is None:
+        # time_cost estimated based on duration
+        return kdf.kdf_params_for_duration(kdf_params, target_duration)
+    else:
+        # explicit time_cost
+        return kdf_params._replace_any(t=time_cost)
 
 
 @cli.command()
+@_kdf_target_duration_option
 @_kdf_parallelism_option
 @_kdf_memory_cost_option
 @_kdf_time_cost_option
 def kdf_test(
-    parallelism: typ.Optional[kdf.NumThreads] = None,
-    memory_cost: typ.Optional[kdf.MebiBytes ] = None,
-    time_cost  : typ.Optional[kdf.Iterations] = None,
+    target_duration: kdf.Seconds = DEFAULT_KDF_TARGET_DURATION,
+    parallelism    : typ.Optional[kdf.NumThreads] = None,
+    memory_cost    : typ.Optional[kdf.MebiBytes ] = None,
+    time_cost      : typ.Optional[kdf.Iterations] = None,
 ) -> None:
-    kdf_params = params.get_default_params()
-    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost, t=time_cost)
+    kdf_params = _parse_kdf_params(target_duration, parallelism, memory_cost, time_cost)
+    param_cfg  = params.init_param_config(brainkey_len=8, threshold=2, kdf_params=kdf_params)
+
     params_str = f"-p={kdf_params.p:<3} -m={kdf_params.m:<5} -t={kdf_params.t:<4}"
-
     echo()
-    echo(f"Parameters after rounding: {params_str}")
+    echo(f"Using KDF Parameters: {params_str}")
     echo()
 
-    eta = params.estimate_param_cost(kdf_params)
-    echo(f"Estimated duration: {round(eta):>4} sec")
-    MeasurementThread  = cli_util.EvalWithProgressbar[params.Measurement]
-    measurement_thread = MeasurementThread(target=params.measure, args=(kdf_params,))
-    measurement_thread.start_and_wait(eta_sec=eta, label="Evaluating KDF")
-    measurement = measurement_thread.retval
-    echo(f"Actual duration   : {round(measurement.duration):>4} sec")
+    dummy_salt     = b"\x00" * param_cfg.raw_salt_len
+    dummy_brainkey = b"\x00" * param_cfg.brainkey_len
+
+    tzero = time.time()
+    _derive_seed(param_cfg, dummy_salt, dummy_brainkey, label="kdf-test")
+    duration = time.time() - tzero
+    echo(f"Duration   : {round(duration):>4} sec")
 
 
 def _validate_brainkey_len(brainkey_len: int) -> None:
@@ -441,7 +444,7 @@ def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[shamir
 def _validated_param_data(param_cfg: params.ParamConfig) -> bytes:
     # validate encoding round trip before we use param_cfg
     param_cfg_data    = params.param_cfg2bytes(param_cfg)
-    decoded_param_cfg = params.bytes2param_cfg(param_cfg_data, param_cfg.sys_info)
+    decoded_param_cfg = params.bytes2param_cfg(param_cfg_data)
     checks            = {
         'threshold'   : param_cfg.threshold    == decoded_param_cfg.threshold,
         'version'     : param_cfg.version      == decoded_param_cfg.version,
@@ -517,31 +520,32 @@ def _show_created_data(
 @_non_segwit_option
 @_brainkey_len_option
 @_yes_all_option
+@_kdf_target_duration_option
 @_kdf_parallelism_option
 @_kdf_memory_cost_option
 @_kdf_time_cost_option
 def create(
-    scheme      : str  = DEFAULT_SCHEME,
-    brainkey_len: int  = params.DEFAULT_BRAINKEY_LEN,
-    non_segwit  : bool = False,
-    yes_all     : bool = False,
-    parallelism : typ.Optional[kdf.NumThreads] = None,
-    memory_cost : typ.Optional[kdf.MebiBytes ] = None,
-    time_cost   : typ.Optional[kdf.Iterations] = None,
+    scheme         : str         = DEFAULT_SCHEME,
+    brainkey_len   : int         = params.DEFAULT_BRAINKEY_LEN,
+    non_segwit     : bool        = False,
+    yes_all        : bool        = False,
+    target_duration: kdf.Seconds = DEFAULT_KDF_TARGET_DURATION,
+    parallelism    : typ.Optional[kdf.NumThreads] = None,
+    memory_cost    : typ.Optional[kdf.MebiBytes ] = None,
+    time_cost      : typ.Optional[kdf.Iterations] = None,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
     threshold, num_shares = cli_util.parse_scheme(scheme)
     _validate_brainkey_len(brainkey_len)
     is_segwit = not non_segwit
 
-    param_cfg = params.init_param_config(
+    kdf_params = _parse_kdf_params(target_duration, parallelism, memory_cost, time_cost)
+    param_cfg  = params.init_param_config(
         brainkey_len=brainkey_len,
         threshold=threshold,
         num_shares=num_shares,
         is_segwit=is_segwit,
-        kdf_parallelism=parallelism,
-        kdf_memory_cost=memory_cost,
-        kdf_time_cost=time_cost,
+        kdf_params=kdf_params,
     )
 
     param_cfg_data = _validated_param_data(param_cfg)
@@ -557,7 +561,7 @@ def create(
     assert recovered_brainkey == brainkey
 
     # verify that derivation works before we show anything
-    _derive_key(param_cfg, salt, brainkey, label="Deriving Master Key")
+    _derive_seed(param_cfg, salt, brainkey, label="Deriving Master Key")
 
     _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
 
@@ -687,18 +691,18 @@ def load_wallet(
     )
 
     yes_all or echo()
-    master_key = _derive_key(
-        param_cfg, salt, brainkey, label="Deriving Master Key", wallet_name=wallet_name
+    seed_data = _derive_seed(
+        param_cfg, salt, brainkey, label="Deriving Wallet Seed", wallet_name=wallet_name
     )
 
     seed_type = 'segwit' if param_cfg.is_segwit else 'standard'
 
-    int_seed    = enc_util.bytes2int(master_key)
-    wallet_seed = electrum_mnemonic.seed_raw2phrase(int_seed, seed_type)
+    seed_int    = enc_util.bytes2int(seed_data)
+    seed_phrase = electrum_mnemonic.raw_seed2phrase(seed_int, seed_type)
 
     wallet_fpath = mk_tmp_wallet_fpath()
 
-    restore_cmd = ["electrum", "restore", "--wallet", str(wallet_fpath), wallet_seed]
+    restore_cmd = ["electrum", "restore", "--wallet", str(wallet_fpath), seed_phrase]
     load_cmd    = ["electrum", "gui"    , "--wallet", str(wallet_fpath)]
 
     if not online_mode:
@@ -711,7 +715,7 @@ def load_wallet(
         echo("\t" + " ".join(restore_cmd))
         echo("\t" + " ".join(load_cmd   ))
         echo()
-        echo("Electrum wallet seed: " + wallet_seed)
+        echo("Electrum wallet seed: " + seed_phrase)
         return
 
     try:

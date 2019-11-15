@@ -166,19 +166,18 @@ def test_parse_scheme():
         pass
 
 
-def test_progress_bar():
+def test_threading():
     # Doesn't test the output, just excercises the code to provoke
     # any runtime errors
     arg = os.urandom(4)
 
-    def dummy_func(got_arg):
+    def dummy_func():
         time.sleep(0.1)
-        return got_arg * 2
+        return arg * 2
 
-    tzero = time.time()
-    t     = EvalWithProgressbar(target=dummy_func, args=(arg,))
-    t.start_and_wait(eta_sec=0.1, label="Test")
-    assert t.retval == (arg * 2)
+    tzero  = time.time()
+    result = run_with_progress_bar(dummy_func, eta_sec=0.1, label="Test")
+    assert result == arg * 2
     elapsed = time.time() - tzero
     assert 0.1 < elapsed < 0.3
 
@@ -447,13 +446,7 @@ def test_cli_load_wallet():
     assert len(set(wallet_names)) == len(set(all_seeds))
 
 
-def test_cli_kdf_info():
-    result = _run(sbk.cli.kdf_info)
-    assert "<- default" in result.output
-
-
 def test_cli_kdf_test():
     args   = ("--memory-cost", "1", "--time-cost", "1")
     result = _run(sbk.cli.kdf_test, args=args)
-    assert re.search(r"Estimated duration\s*:\s+\d+ sec", result.output)
-    assert re.search(r"Actual duration\s*:\s+\d+ sec", result.output)
+    assert re.search(r"Duration\s*:\s+\d+ sec", result.output)

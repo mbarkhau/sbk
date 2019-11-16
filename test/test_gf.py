@@ -3,10 +3,25 @@ import random
 
 import pytest
 
+import sbk.gf_lut
 import sbk.primes
 from sbk.gf import *
 from sbk.gf_poly import *
 from sbk.gf_util import *
+
+
+def test_mul_basic():
+    cases = [
+        (0x00, 0x00, 0x00),
+        (0x00, 0x01, 0x00),
+        (0x01, 0x00, 0x00),
+        (0x03, 0x07, 0x09),
+        (0x57, 0x83, 0xC1),
+        (0x57, 0x13, 0xFE),
+    ]
+    for a, b, expected in cases:
+        assert mul(a, b) == expected
+        assert mul_slow(a, b) == expected
 
 
 def test_mul_lut():
@@ -14,6 +29,36 @@ def test_mul_lut():
         a = random.randrange(256)
         b = random.randrange(256)
         assert mul_slow(a, b) == mul(a, b)
+
+
+def test_lut_vs_slip0039_reference():
+    # https://github.com/trezor/python-shamir-mnemonic/blob/bfde987bcb/shamir_mnemonic/__init__.py#L92
+    def _precompute_exp_log():
+        exp = [0 for i in range(255)]
+        log = [0 for i in range(256)]
+
+        poly = 1
+        for i in range(255):
+            exp[i   ] = poly
+            log[poly] = i
+
+            # Multiply poly by the polynomial x + 1.
+            poly = (poly << 1) ^ poly
+
+            # Reduce poly by x^8 + x^4 + x^3 + x + 1.
+            if poly & 0x100:
+                poly ^= 0x11B
+
+        return exp, log
+
+    _EXP_TABLE, _LOG_TABLE = _precompute_exp_log()
+    assert _EXP_TABLE == sbk.gf_lut.EXP_LUT
+    assert _LOG_TABLE == sbk.gf_lut.LOG_LUT
+
+
+def test_mul_inverse_lut():
+    for n in range(256):
+        assert inverse_slow(n) == sbk.gf_lut.MUL_INVERSE_LUT[n], n
 
 
 # Case 3: xgcd(240, 46)

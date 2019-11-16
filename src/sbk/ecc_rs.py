@@ -201,6 +201,10 @@ Example usage:
 
     $ python -m sbk.ecc_rs --test
     ...
+    $ py-spy record -r 1000 --output profile.svg -- python -m sbk.ecc_rs --test
+    ...
+    $ firefox profile.svg
+
     $ python -m sbk.ecc_rs --profile
     ...
     $ echo "Hello, 世界!" | python -m sbk.ecc_rs --encode

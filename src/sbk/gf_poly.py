@@ -23,7 +23,7 @@ import typing as typ
 import itertools
 
 from . import gf
-from . import gf_util
+from . import gf_lut
 
 
 class DebugRandom:
@@ -100,8 +100,8 @@ def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.It
     assert all(isinstance(p.x, gf.GF256) for p in points)
     assert all(isinstance(p.y, gf.GF256) for p in points)
 
-    mul_lut = gf_util.MUL_LUT
-    inv_lut = gf_util.MUL_INVERSE_LUT
+    mul_lut = gf_lut.MUL_LUT
+    inv_lut = gf_lut.MUL_INVERSE_LUT
 
     _points = tuple((p.x.val, p.y.val) for p in points)
     _xs     = tuple(px for px, py in _points)
@@ -113,19 +113,19 @@ def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.It
 
         numer = 1
         for ox in _other_xs:
-            numer = mul_lut[numer * 256 + (_at_x ^ ox)]
+            numer = mul_lut[numer][_at_x ^ ox]
 
         denum = 1
         for ox in _other_xs:
-            denum = mul_lut[denum * 256 + (px ^ ox)]
+            denum = mul_lut[denum][px ^ ox]
 
         assert 0 <= py    < 256, py
         assert 0 <= numer < 256, numer
         assert 0 <= denum < 256, denum
 
-        numer2 = mul_lut[py * 256 + numer]
+        numer2 = mul_lut[py    ][numer]
         d_inv  = inv_lut[denum]
-        result = mul_lut[numer2 * 256 + d_inv]
+        result = mul_lut[numer2][d_inv]
         yield gf.ALL_GF256[result]
 
 

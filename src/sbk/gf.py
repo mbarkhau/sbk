@@ -9,6 +9,7 @@
 import typing as typ
 import functools
 
+from . import gf_lut
 from . import primes
 from . import gf_util
 
@@ -153,8 +154,14 @@ class GF256(GFNum):
         b = other.val
         assert 0 <= a <= 255, a
         assert 0 <= b <= 255, b
-        val = gf_util.MUL_LUT[a * 256 + b]
-        assert 0 <= val <= 255
+
+        if a == 0 or b == 0:
+            return ALL_GF256[0]
+
+        log_a = gf_lut.LOG_LUT[a]
+        log_b = gf_lut.LOG_LUT[b]
+        s     = (log_a + log_b) % 255
+        val   = gf_lut.EXP_LUT[s]
         return ALL_GF256[val]
 
     def __pow__(self, other: Num) -> 'GF256':
@@ -163,7 +170,7 @@ class GF256(GFNum):
         return ALL_GF256[val]
 
     def __truediv__(self, other: Num) -> 'GF256':
-        inv = gf_util.MUL_INVERSE_LUT[other.val]
+        inv = gf_lut.MUL_INVERSE_LUT[other.val]
         return self * ALL_GF256[inv]
 
     def __hash__(self) -> int:
@@ -184,6 +191,8 @@ class GF256(GFNum):
         return f"GF256({self.val:>3})"
 
 
+# Cache so we don't end up with millions of objects
+# that all represent the same set of integers.
 ALL_GF256 = [GF256(n) for n in range(256)]
 
 

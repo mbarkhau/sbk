@@ -150,19 +150,6 @@ def parse_argon2_type(h: HashAlgoVal) -> int:
     raise ValueError(err_msg)
 
 
-def derive_key(secret_data: bytes, salt_data: bytes, kdf_params: KDFParams, hash_len: int) -> bytes:
-    return argon2.low_level.hash_secret_raw(
-        secret=secret_data,
-        salt=salt_data,
-        hash_len=hash_len,
-        type=parse_argon2_type(kdf_params.h),
-        memory_cost=kdf_params.m * 1024,
-        time_cost=kdf_params.t,
-        parallelism=kdf_params.p,
-        version=parse_argon2_version(kdf_params.h),
-    )
-
-
 def _hash(data: bytes, kdf_params: KDFParams) -> bytes:
     return argon2.low_level.hash_secret_raw(
         secret=data,
@@ -176,8 +163,9 @@ def _hash(data: bytes, kdf_params: KDFParams) -> bytes:
     )
 
 
+Seconds = float
+
 Increment = float
-Seconds   = float
 
 ProgressCallback = typ.Callable[[Increment], None]
 

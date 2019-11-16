@@ -8,7 +8,7 @@
 
 import typing as typ
 
-from . import gf_256_mul_lut
+from . import gf_lut
 
 # https://en.wikipedia.org/wiki/Finite_field_arithmetic#Rijndael's_finite_field
 #
@@ -57,7 +57,7 @@ from . import gf_256_mul_lut
 # a^((p^n)−1) = 1 (for a != 0), thus the inverse of a is a^((p^n)−2).
 
 
-RIJNDAEL_REDUCING_POLYNOMIAL = 0x11B
+RIJNDAEL_REDUCING_POLYNOMIAL = 0x011B
 
 
 def div_slow(a: int, b: int) -> int:
@@ -113,13 +113,10 @@ def mul_slow(a: int, b: int) -> int:
     return div_by_rrp(res)
 
 
-MUL_LUT = gf_256_mul_lut.LOOKUP_TABLE
-
-
 def mul(a: int, b: int) -> int:
     assert 0 <= a < 256, a
     assert 0 <= b < 256, b
-    return MUL_LUT[a * 256 + b]
+    return gf_lut.MUL_LUT[a][b]
 
 
 def pow_slow(a: int, b: int) -> int:
@@ -131,7 +128,7 @@ def pow_slow(a: int, b: int) -> int:
     return res
 
 
-def inverse(val: int) -> int:
+def inverse_slow(val: int) -> int:
     """Calculate multiplicative inverse in GF(256).
 
     Since the nonzero elements of GF(p^n) form a finite group with
@@ -152,11 +149,8 @@ def inverse(val: int) -> int:
     return inv
 
 
-def _init_mul_inv_lut() -> typ.List[int]:
-    return [inverse(val) for val in range(256)]
-
-
-MUL_INVERSE_LUT = _init_mul_inv_lut()
+def inverse(val: int) -> int:
+    return gf_lut.MUL_INVERSE_LUT[val]
 
 
 # The Euclidean GCD algorithm is based on the principle that the
@@ -200,18 +194,3 @@ def xgcd(a: int, b: int) -> XGCDResult:
     res = XGCDResult(g=g, s=t - q * s, t=s)
     assert res.s * a + res.t * b == res.g
     return res
-
-
-def main() -> None:
-    """Generate lookup table for GF(2**8)."""
-    for a in range(256):
-        for b in range(256):
-            m    = mul_slow(a, b)
-            mstr = hex(m)[2:]
-            print(f"{mstr:>02}", end=" ")
-            if (b + 1) % 32 == 0:
-                print()
-
-
-if __name__ == '__main__':
-    main()

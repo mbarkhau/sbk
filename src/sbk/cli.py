@@ -655,8 +655,9 @@ def _clean_wallet(wallet_fpath: pl.Path) -> None:
         return
 
     garbage = os.urandom(4096)
-    # On HDDs it may serve some marginal purpose.
-    # On SSDs this may be pointless, due to wear leveling.
+    # On HDDs this may serve some marginal purpose.
+    # On SSDs this may be pointless, because wear leveling means that these
+    # write operations go to totally different blocks than the original file.
     size = wallet_fpath.stat().st_size
     with wallet_fpath.open(mode="wb") as fobj:
         for _ in range(0, size, 4096):

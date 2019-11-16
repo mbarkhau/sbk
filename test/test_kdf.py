@@ -5,13 +5,12 @@ import pytest
 from sbk import kdf
 
 
-def test_derive_key():
+def test_digest():
     kdf_params = kdf.init_kdf_params(p=1, m=8, t=1)
 
-    secret_data = b"\x01\x23\x45\x67"
-    salt_data   = b"\x01\x23\x45\x67" * 2
+    secret_data = b"\x01\x23\x45\x67" * 4
     for hash_len in range(4, 50):
-        res = kdf.derive_key(secret_data, salt_data, kdf_params, hash_len)
+        res = kdf.digest(secret_data, kdf_params, hash_len)
         assert len(res) == hash_len
 
 

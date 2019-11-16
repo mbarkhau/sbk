@@ -17,6 +17,7 @@ doc/%.svg : doc/%.bob
 ## Regen doc/*.bob -> doc/*.svg
 .PHONY: svgbob_images
 svgbob_images: \
+		doc/sbk_overview.svg \
 		doc/sbk_dataflow_diagram.svg \
 		doc/sss_diagram_1.svg \
 		doc/sss_diagram_2.svg \

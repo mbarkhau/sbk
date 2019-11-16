@@ -88,7 +88,7 @@ class Measurement(typ.NamedTuple):
 
 def measure(kdf_params: kdf.KDFParams) -> Measurement:
     tzero = time.time()
-    kdf.derive_key(b"dummy secret", b"saltsaltsaltsalt", kdf_params, hash_len=16)
+    kdf.digest(b"saltsaltsaltsaltbrainkey", kdf_params, hash_len=16)
     duration = round(time.time() - tzero, 5)
 
     log.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")

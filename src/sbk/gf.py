@@ -155,13 +155,7 @@ class GF256(GFNum):
         assert 0 <= a <= 255, a
         assert 0 <= b <= 255, b
 
-        if a == 0 or b == 0:
-            return ALL_GF256[0]
-
-        log_a = gf_lut.LOG_LUT[a]
-        log_b = gf_lut.LOG_LUT[b]
-        s     = (log_a + log_b) % 255
-        val   = gf_lut.EXP_LUT[s]
+        val = gf_lut.MUL_LUT[a][b]
         return ALL_GF256[val]
 
     def __pow__(self, other: Num) -> 'GF256':

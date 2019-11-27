@@ -141,12 +141,7 @@ def _interpolation_terms(points: Points, at_x: gf.Num) -> typ.Iterable[gf.Num]:
 
 
 def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
-    r"""Interpolate y value at x for a polynomial.
-
-    # \delta_i(x) = \prod{ \frac{x - j}{i - j} }
-    # \space
-    # \text{for} \space j \in C, j \not= i
-    """
+    r"""Interpolate y value at x for a polynomial."""
     if len(points) < 2:
         raise ValueError("Cannot interpolate with fewer than two points")
 
@@ -186,7 +181,6 @@ def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[
         y = field[0]
         for exp, coeff in enumerate(coeffs):
             y += coeff * field[at_x] ** field[exp]
-
         return val_of(y)
 
     return eval_at

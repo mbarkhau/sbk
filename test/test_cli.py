@@ -500,7 +500,7 @@ def test_cli_load_wallet():
     ]
 
     all_seeds    = []
-    wallet_names = ["disabled", "Hello, 世界!"] * 2
+    wallet_names = ["disabled", "hello_world"] * 2
     for name in wallet_names:
         argv   = ("--show-seed", "--yes-all", "--wallet-name", f'"{name}"')
         result = _run(sbk.cli.load_wallet, argv=argv, playbook=playbook)

@@ -8,12 +8,14 @@
 """CLI/Imperative shell for SBK."""
 
 import os
+import re
+import pwd
 import time
 import typing as typ
 import logging
 import pathlib as pl
 import tempfile
-import functools
+import functools as ft
 import subprocess as sp
 
 import click
@@ -86,7 +88,7 @@ def anykey_confirm(message: str) -> bool:
 SECURITY_WARNING_TEXT = """
 Security Warning
 
-Please ensure the following:
+I am not your mother, but please ensure the following:
 
  - Only you can currently view your screen.
  - Your computer is not connected to any network.
@@ -149,7 +151,7 @@ SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue "
 
 
 SHARE_INFO_TEXT = r"""
-Keep this "Share" hidden in a safe place or give it to a trustee
+Keep this Share hidden in a safe place or give it to a trustee
 for them to keep safe. A trustee must trustworthy in two senses:
 
   1. They are trusted to not collude with others and steal from you.
@@ -157,14 +159,16 @@ for them to keep safe. A trustee must trustworthy in two senses:
 """
 
 RECOVERY_TEXT = r"""
-Your "Master Key" is recovered by collecting a minimum of
+Your Master Key is recovered by collecting a minimum of
 {threshold} shares.
 
                  Split Master Key
-          Split                    . Join
-               \.-> Share 1 -./
-   Master Key  -O-> Share 2  +-> Master Key
-                '-> Share 3 -'
+             Split                 . Join
+                   \.-> Share 1 -./
+        Master Key -O-> Share 2  +-> Master Key
+                    +-> Share 3 -|
+                    +-> Share 4 -'
+                    '-> Share 5
 
    argon2_kdf(Master Key, Wallet Name) -> Wallet
 """
@@ -173,10 +177,10 @@ SHARE_PROMPT = r"""
 When you have copied Share {share_no}/{num_shares}, press enter to continue.
 """
 
-BRAINKEY_INFO_TEXT = r"""
-Your "Salt" and "Brainkey" are combined to produce your wallet seed.
-As long as you have access to your "Salt" and as long as you can
-remember your "Brainkey", you will be able to recover your wallet.
+BRAINKEY_INFO_TEXT = """
+Your Salt and Brainkey are combined to produce your wallet seed.
+As long as you have access to your Salt and as long as you can
+remember your Brainkey, you will be able to recover your wallet.
 
 It is important that you
  - memorize your brainkey very well,
@@ -184,14 +188,12 @@ It is important that you
  - never tell it to anybody, ever!
 """
 
-# Salt + Brainkey + Wallet Name -> Wallet
-
 BRAINKEY_LAST_CHANCE_WARNING_TEXT = """
-This is the last time your brainkey will be shown.
+This is the last time your Brainkey will be shown.
 
 If you don't yet feel confident in your memory:
 
- 1. Write down the brainkey only as a temporary memory aid.
+ 1. Write down the brainkey as a temporary memory aid.
  2. Do not use the generated wallet until you feel
     comfortable that you have have memorized your brainkey.
  3. Destroy the memory aid before you use the wallet.
@@ -318,21 +320,21 @@ def _derive_seed(
     label      : str,
     wallet_name: str = DEFAULT_WALLET_NAME,
 ) -> SeedData:
+    master_key       = salt + brainkey
     wallet_name_data = wallet_name.encode('utf-8')
+    kdf_input        = master_key + wallet_name_data
 
-    data = salt + brainkey + wallet_name_data
-
-    digest_partial = functools.partial(
-        kdf.digest, data=data, kdf_params=param_cfg.kdf_params, hash_len=SEED_DATA_LEN,
+    digester_fn = ft.partial(
+        kdf.digest, data=kdf_input, kdf_params=param_cfg.kdf_params, hash_len=SEED_DATA_LEN,
     )
     if os.getenv('SBK_PROGRESS_BAR', "1") == '1':
         with click.progressbar(label=label, length=100, show_eta=True) as bar:
-            digest_partial = functools.partial(digest_partial, progress_cb=bar.update)
-            runner         = cli_util.ThreadRunner[bytes](digest_partial)
-            seed_data      = runner.start_and_join()
+            digester_fn = ft.partial(digester_fn, progress_cb=bar.update)
+            runner      = cli_util.ThreadRunner[bytes](digester_fn)
+            seed_data   = runner.start_and_join()
     else:
-        # Use the ThreadRunner regardless, so that Ctrl-C works.
-        runner    = cli_util.ThreadRunner[bytes](digest_partial)
+        # Always the ThreadRunner so that Ctrl-C is not blocked.
+        runner    = cli_util.ThreadRunner[bytes](digester_fn)
         seed_data = runner.start_and_join()
     return seed_data
 
@@ -365,15 +367,17 @@ def _parse_kdf_params(
     time_cost      : typ.Optional[kdf.Iterations],
 ) -> kdf.KDFParams:
     sys_info   = load_sys_info()
-    kdf_params = kdf.init_kdf_params(p=sys_info.initial_p, m=sys_info.initial_m, t=1)
-    kdf_params = kdf_params._replace_any(p=parallelism, m=memory_cost)
+    kdf_params = kdf.init_kdf_params(
+        p=parallelism or sys_info.initial_p, m=memory_cost or sys_info.initial_m, t=time_cost or 1
+    )
 
     if time_cost is None:
         # time_cost estimated based on duration
-        return kdf.kdf_params_for_duration(kdf_params, target_duration)
+        kdf_pfd_fn = ft.partial(kdf.kdf_params_for_duration, kdf_params, target_duration)
+        runner     = cli_util.ThreadRunner[kdf.KDFParams](kdf_pfd_fn)
+        return runner.start_and_join()
     else:
-        # explicit time_cost
-        return kdf_params._replace_any(t=time_cost)
+        return kdf_params
 
 
 @cli.command()
@@ -456,9 +460,26 @@ def _validated_param_data(param_cfg: params.ParamConfig) -> bytes:
     }
     bad_checks = [name for name, is_ok in checks.items() if not is_ok]
     if any(bad_checks):
-        raise click.Abort(f"Integrity error -  Bad parameter fields: {bad_checks}")
+        echo(f"Invalid parameters: '{bad_checks}'")
+        raise click.Abort()
 
     return param_cfg_data
+
+
+def _validate_wallet_name(wallet_name: str) -> None:
+    invalid_char_match = re.search(r"[^a-z0-9\-_]", wallet_name)
+    if invalid_char_match is None:
+        return
+
+    invalid_char = invalid_char_match.group(0)
+    errmsg       = (
+        f"\n\tInvalid value for --wallet-name='{wallet_name}'."
+        + f"\n\tFirst Invalid character: '{invalid_char}'. "
+        + "\n\tValid characters are a-z, 0-9 and '-'"
+        + "\n"
+    )
+    echo(errmsg)
+    raise click.Abort()
 
 
 def _show_created_data(
@@ -551,19 +572,20 @@ def create(
     )
 
     param_cfg_data = _validated_param_data(param_cfg)
-    raw_salt       = urandom(param_cfg.raw_salt_len)
-    salt           = param_cfg_data + raw_salt
-    brainkey       = urandom(param_cfg.brainkey_len)
+
+    raw_salt = urandom(param_cfg.raw_salt_len)
+    salt     = param_cfg_data + raw_salt
+    brainkey = urandom(param_cfg.brainkey_len)
 
     shares = list(shamir.split(param_cfg, raw_salt, brainkey))
 
-    recoverd_salt, recovered_brainkey = shamir.join(param_cfg, shares)
+    raw_salt_recovered, brainkey_recovered = shamir.join(param_cfg, shares)
 
-    assert recoverd_salt      == raw_salt
-    assert recovered_brainkey == brainkey
+    assert raw_salt_recovered == raw_salt
+    assert brainkey_recovered == brainkey
 
     # verify that derivation works before we show anything
-    _derive_seed(param_cfg, salt, brainkey, label="Deriving Master Key")
+    _derive_seed(param_cfg, salt, brainkey, label="Validating KDF")
 
     _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
 
@@ -613,7 +635,8 @@ def recover() -> None:
         if param_cfg is None:
             param_cfg = cur_param_cfg
         elif param_cfg != cur_param_cfg:
-            raise click.Abort("Invalid share. Shares are perhaps for different wallets.")
+            echo("Invalid share. Shares are perhaps for different wallets.")
+            raise click.Abort()
 
     raw_salt, brainkey = shamir.join(param_cfg, shares)
     salt = param_cfg_data + raw_salt
@@ -637,9 +660,8 @@ def recover() -> None:
 def mk_tmp_wallet_fpath() -> pl.Path:
     tempdir = tempfile.tempdir
     try:
-        uid_output = sp.check_output(["id", "-u"])
-        uid        = int(uid_output.strip())
-        uid_dir    = pl.Path(f"/run/user/{uid}")
+        uid     = pwd.getpwnam(os.environ['USER']).pw_uid
+        uid_dir = pl.Path(f"/run/user/{uid}")
         if uid_dir.exists():
             tempdir = str(uid_dir)
     except Exception as ex:
@@ -678,6 +700,8 @@ def load_wallet(
     yes_all    : bool = False,
 ) -> None:
     """Open wallet using Salt+Brainkey."""
+    _validate_wallet_name(wallet_name)
+
     yes_all or clear()
     yes_all or echo(SECURITY_WARNING_TEXT)
     yes_all or anykey_confirm(SECURITY_WARNING_PROMPT)
@@ -695,7 +719,7 @@ def load_wallet(
 
     yes_all or echo()
     seed_data = _derive_seed(
-        param_cfg, salt, brainkey, label="Deriving Wallet Seed", wallet_name=wallet_name
+        param_cfg, salt, brainkey, wallet_name=wallet_name, label="Deriving Wallet Seed"
     )
 
     seed_type = 'segwit' if param_cfg.is_segwit else 'standard'
@@ -726,12 +750,14 @@ def load_wallet(
         retcode = sp.call(restore_cmd)
         if retcode != 0:
             cmd_str = " ".join(restore_cmd[:-1] + ["<wallet seed hidden>"])
-            raise click.Abort(f"Error calling '{cmd_str}'")
+            echo(f"Error calling '{cmd_str}'")
+            raise click.Abort()
 
         retcode = sp.call(load_cmd)
         if retcode != 0:
             cmd_str = " ".join(load_cmd)
-            raise click.Abort(f"Error calling '{cmd_str}'")
+            echo(f"Error calling '{cmd_str}'")
+            raise click.Abort()
     finally:
         _clean_wallet(wallet_fpath)
 

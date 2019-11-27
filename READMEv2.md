@@ -33,7 +33,7 @@ Code Quality/CI:
 
 
 [](TOC)
-
+mp
 [](TOC)
 
 # Introduction
@@ -57,9 +57,9 @@ All of this is only true of course, as long as you follow the reccomended proced
 SBK has two ways to load/recover your wallet, one for normal use and the other as backup.
 
  1. `Shares`: A single `share` is one part of a backup of your wallet. When enough `shares` are combined together (e.g. 3 of 5 in total), you can recover your `salt` and `brainkey`. The [Shamir's Secret Sharing][href_wiki_sss] algorithm is used to generate the `shares`, which you can distribute in secure locations or give to people you trust. Each `share` is useless by itself, so you don't have to trust a person completely. Not every `share` is required for recovery, so if a few of them are lost or destroyed, your wallet can still be recovered.
- 2. `Salt` + `Brainkey`: The `Salt` is a secret, very similar to a traditional 12-word wallet seed, written on a piece of paper and kept in a secure location, accessible only to you. By itself, the `salt` is not enough to load your wallet, for that you also need your `brainkey`. A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written on any piece of paper. In other words, the `brainkey` is only in your brain.
+ 2. `Salt` + `Brainkey`: The `Salt` is a secret, very similar to a traditional 12-word wallet seed, written on a piece of paper and kept in a secure location, accessible only to you. By itself, the `salt` is not enough to load your wallet, for that you also need your `brainkey`. A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written on any piece of paper. In other words, the `brainkey` is only in your brain. 
 
-Using the `salt` and `brainkey`, you have direct access to your wallet, independent of any third party and without risk of theft (though the [$5 wrench attack][href_xkcd_538] is still a risk of course). This is in contrast to a typical 12-word wallet seed written on a piece of paper, which represents a single point of failure. If it is lost, stolen or destroyed, your coins will be gone forever. In contrast to this, if you forget your `brainkey` or if your lose your `salt`, then you can still recover them from your backup `shares`.
+Using the `salt` and `brainkey`, you have direct access to your wallet, independent of any third party and without risk of theft (though the [$5 wrench attack][href_xkcd_538] is still a risk of course). This is in contrast to a typical 12-word wallet seed written on a piece of paper, which represents a single point of failure. If such a seed is lost, stolen or destroyed, your coins are gone with it. In contrast to this, if you forget your `brainkey` or if your lose your `salt`, then you can still recover them from your backup `shares`.
 
 SBK is not itself a wallet, it only creates and recovers the seed for your wallet. SBK currently supports the [Electrum Bitcoin Wallet][href_electrum_org].
 
@@ -81,10 +81,15 @@ SBK is not itself a wallet, it only creates and recovers the seed for your walle
 >    Electrum Technologies GmbH.
 >  - The SBK project is not associated with SatoshiLabs s.r.o. in any way.
 
+> *Aside*
+>
+> This project will be part of my adventures in literate programming. Some portions of
+> the implementation are only preserved for future didactic.
 
-# Implementation
 
-For the time being, the documentation is mainly for contributors rather than users. You can skip ahead to the [User Guide](#user-guide) if you don't care about implementation details.
+# Implementation Overview
+
+For the time being, the documentation is mainly for contributors rather than users. You can skip ahead to the [User Guide](#user-guide) if implementation details are not important to you.
 
 
 ## High Level Overview: Generating, Splitting and Joining Keys
@@ -100,13 +105,13 @@ This diagram can only tell so much of course (some of the boxes might as well be
 
  1. Specify `sheme` (eg. `"3of5"`). This means that a total of 5 shares are generated, any 3 of which are enough for recovery.
  2. Optionally specify `kdf-parameters`. If not specified, these are determined automatically based on the available memory and processing resources.
- 3. The `parameters` are a 4-byte encoding of the `scheme`, the `kdf-parameters` and some other values which are later needed to generate the wallet seed.
- 4. The `raw_salt` is a random 12-byte value.
- 5. The `salt` is a concatenation of the `parameters` and the `raw_salt`. They are kept together because both are always needed and this way there is thing less to keep track of. You should write down the `salt` and keep it safe, similarly to how you would treat a typical wallet seed. 
- 6. The `brainkey` is a random 8-byte value that you should memorize.
+ 3. The `parameters` are a 4 byte encoding of values that are required for later recovery. This includes values such as the `threshold`, the `kdf-parameters` and a version number.
+ 4. The `raw_salt` is a random 12 byte value.
+ 5. The `salt` is a concatenation of the `parameters` and the `raw_salt`. This is done so that there is one less thing to keep track of and input; since both of them are always needed it make sense to keep them together as one. You should write down the `salt` and keep it safe, similarly to how you would treat a typical wallet seed. 
+ 6. The `brainkey` is a random 8 byte value that you should memorize.
  7. The `shares` are generated by concatenating the `raw_salt` and `brainkey`, which is then split using Shamir's Secret Sharing. Each share is then also prefixed with the `parameters`. You should keep shares in separate locations and they should be accessible only to you or to people you trust.
 
-For those keeping track, the total entropy used to generate the wallet seed is `12 + 8 == 16 bytes == 160 bits`. The 4-bytes of the `parameters` are not counted as they are not random.
+For those keeping track, the total entropy used to generate the wallet seed is `12 + 8 == 16 bytes == 160 bits`. The 4 bytes of the `parameters` are not counted as they are somewhat predictable.
 
 
 ### Key Recovery
@@ -118,7 +123,7 @@ Let's assume that you've already forgotten your `brainkey` or that your handwrit
  3. Write down `salt`.
  4. Write down `brainkey`.
 
-If you are the owner, it may be safe to continue to use the wallet and to not generate new keys, but ususally all coins should be moved to a new wallet. For more information, see the [Recovery Protocol](#recovery_protocol)
+If you are the owner and you collect the required shares personally, it may be safe to continue to use the wallet and to not generate new keys. If you are not the owner, and the recovery process involves the cooperation of some trustees, then there is a risk that they gain access to more secrets than just their share. In this case it is best to prepare a new wallet in advance and move all coins to it as soon as possible. For more information, see the [Recovery Protocol](#recovery_protocol)
 
 
 ### Loading Wallet
@@ -129,10 +134,10 @@ You can load the wallet if you have the `salt` and `brainkey`, either directly a
  2. Enter the `salt`.
  3. Enter the `brainkey`.
  4. The `wallet-seed` is calculated.
- 5. The Electrum Wallet file is created in a temporary directory (in memory if possible).
+ 5. The Electrum Wallet file is created in a temporary directory (if supported, in memory only).
  6. The Electrum GUI is started in offline mode.
  7. Use wallet/sign transactions...
- 8. After you close the wallet, its files are [overwritten and deleted][href_wiki_data_remanence].
+ 8. All wallet files are [overwritten and deleted][href_wiki_data_remanence] once you close the wallet.
 
 [href_wiki_active_recall]: https://en.wikipedia.org/wiki/Active_recall
 
@@ -143,31 +148,31 @@ You can load the wallet if you have the `salt` and `brainkey`, either directly a
 
 ## Shamirs Secret Sharing
 
-This seciton describes the magic involved to generate the `shares`.
+This seciton describes how the `shares` are generated.
 
 
 ### Prelude: Naive Key Splitting
 
 It's fairly obvoius why you might want to split a secret key into multiple parts: Anybody who finds or steals the full key will have access to your wallet. To reduce the risk if being robbed, you can split the key into multiple parts. 
 
-If for example you have a wallet seed of 12 bytes `"abcd efgh ijkl"` (with 96 bits of entropy), you could split it into fragments: `"1: abcd"`, `"2: efgh"`, `"3: ijkl"`. This way each fragment (by itself) is not enough to recover your wallet. The downside is that you increase the risk of losing your wallet: If you lose even one fragment, you lose the entire wallet.
+If for example you have a wallet seed of 12 bytes `"abcd efgh ijkl"` (with 96 bits of entropy), you could split it into fragments: `"1: abcd"`, `"2: efgh"`, `"3: ijkl"`. This way each fragment (by itself) is not enough to recover your wallet. The downside is that you increase the risk of losing your wallet: If you lose even one fragment, you also lose the wallet.
 
-To reduce this risk, you might want to add redundancy by making more fragments: `"4: cdef"`, `"5: ghij"`, `"6: klab"`. Now if fragment 1 is lost, you may still have access to fragment 4 and 6 from which you can recover the secret.
+To reduce this risk, you might want to add redundancy by making more fragments: `"4: cdef"`, `"5: ghij"`, `"6: klab"`. Now if fragment 1 is lost, you may still have access to fragment 4 and 6 from which you can still recover the secret.
 
 There are two downsides to this approach:
 
- 1. Some of the fragments may be identical or have overlapping parts, so the redundancy is not as great as you might hope: Two fragments could be lost and if they are the only ones with a specific part of the secret (for example fragment 1 and 4), then you may have lost your wallet, even though you have 4 other fragments that are perfectly preserved.
- 2. If a fragment falls in the hands of an attacker, they can try to guess the remaining 8 bytes, which leaves `2**64` combinations to search through to find your wallet seed. If you have wrongfully trusted two people, and they collude with each other (which they have a financial incentive to do), then they may have only `2**32` combinations left for their brute force search.
+ 1. Some of the fragments may be identical or have overlapping parts, so the redundancy is not as great as you might hope: Two fragments could be lost and if they are the only ones with a specific part of the secret (for example fragment 1 and 4 are the only ones with the bytes `cd`), then you may have lost your wallet, even though you have 4 other fragments that are perfectly preserved.
+ 2. If a fragment falls in the hands of an attacker, they can try to guess the remaining 8 bytes, which leaves a search space of `2**64` as opposed to the full `2**96`. If you have wrongfully trusted two people, and they collude with each other (which they have a financial incentive to do), then they may have only `2**32` combinations left for their brute force search.
 
-There may be slightly more clever schemes along these lines, but I won't go into them, as there is fortunately a better alternative: Shamir's Secret Sharing.
+There may be slightly more clever schemes along these lines, but I won't go into them, as this was just to serve as a motivation for the more complex alternative: Shamir's Secret Sharing.
 
 
 ### SSS: Shamir's Secret Sharing
 
-With SSS, a key can be split into `shares` such that each `share` is completely independent of every other. Assuming a `3of5` scheme:
+With SSS, a key can be split into `shares` such that each `share` is completely independent of every other. Assuming a `3of5` scheme, where `3` is the `threshold` and `5` is the total number of shares:
 
  1. Any two `shares` can be lost and the remaining three are enough to recover the original key.
- 2. Any individual `share` (or subset of `shares` below the `threshold` of three) is useless. This means that access to fewer than three `shares` does not provide an attacker with any advantage if they attempt to brute-force a wallet seed.
+ 2. Any individual `share` (or subset of `shares` below the `threshold`) is useless. This means that access to fewer than three `shares` does not provide an attacker with any advantage if they attempt to brute-force a wallet seed.
 
 To get an intuition of how SSS works, it is enough to recall some high-school calculus.
 
@@ -175,11 +180,11 @@ Consider a point `S(x=0, y=s)` on the cartesian plane, where the coordinate `y=s
 
 <img alt="Cartesian plane with single point S" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_1.svg" height="220" />
 
-Now consider a polinomial of degree 1 (aka. a linear equation, aka. a line equation) which goes through point `S`.
+Now consider `y = jx + k`, a polinomial of degree 1 (aka. a linear equation, aka. a line equation) which goes through point `S` and further points `A(x=1, y=a)` and `B(x=2, y=b)`.
 
 <img alt="Cartesian plane with line sloping down through points S, A and B" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_2.svg" height="220" />
 
-There are further points `A(x=1, y=a)` and `B(x=2, y=b)` through which the linear equation `y = jx + k` goes. Note that the parameter `j` is generated randomly and `k` is our secret `s`, so that if `x=0` then `y=s`. Recall that a polynomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you know `A` and `B`, you can derive the parameters `j` and `k` of the equation `y = jx + k` and solve for `x=0` to get `y=s`. If on the other hand, you have *only* `A` or *only* `B`, then there are an infinite number of lines you could draw through either. In other words, it is impossible to derive `S` from `A` or from `B` if you only have one of them. To complete the picture, we could generate a further point `C`, so that we only require any two of `A`, `B` and `C` in order to recover `S`. This allows us to create a `2ofN` scheme.
+Note that the parameter `j` is generated randomly and `k` is our secret `s`, so that if `x=0` then `y=s`. Recall that a polynomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you know `A` and `B`, you can derive the parameters `j` and `k` of the equation `y = jx + k` and solve for `x=0` to get `y=s`. If on the other hand, you have *only* `A` or *only* `B`, then there are an infinite number of lines which go through either. In other words, it is impossible to derive `S` from `A` individually or from `B` individually. To complete the picture, we could generate a further point `C`, so that we only require any two of `A`, `B` and `C` in order to recover `S`. This allows us to create a `2of3` scheme.
 
 Similarly we can create a `3ofN` scheme with a polynomial of degree 2 (aka. a quadratic equation, aka. a parabola), a `4ofN` scheme with a polynomial of degree 3 (aka. a cubic equation) and so on.
 
@@ -192,17 +197,17 @@ Using this approach, we can
 
  1. Encode a `secret` as a point: `S(x=0, y=secret)`
  2. For a polynomial `y = ix² + jx + k` which goes through `S`, we choose `k=secret` and random values for `i` and `j`.
- 3. Calculate 5 points `A`, `B`, `C`, `D` and `E` which lie on the polynomial (but which are **not** at `x=0`, otherwise that `share` would leak the secret).
+ 3. Calculate 5 points `A`, `B`, `C`, `D` and `E` which lie on the polynomial (but which **crucially are not** at `x=0`, which would cause the secret to be leaked).
  4. Use polynomial interpolation to recover `S` using any 3 of `A`, `B`, `C`, `D` or `E`.
 
-The degree of the polynomial allows us control of the minimum number of points/`shares` required to recover the secret (the `threshold`). Calculating redundant `shares` allows us to protect against the loss of any individual `share`.
+The degree of the polynomial allows us control of the minimum number (aka. the `threshold`) of points/`shares` required to recover the secret. Calculating redundant `shares` allows us to protect against the loss of any individual `share`.
 
 
-### SSS: Some Implementation Details
+### SSS: Field Choice
 
-There is more to the story of course. Without claiming that I fully understand how all attacks work, my understanding is that the preceding scheme (which uses the traditional cartesian plane) does not offer complete information security. Some information about the secret is leaked with each `share` and an attacker who knows fewer points than the `threshold` may not be able to instantly determine the secret, but they could at least reduce their search space. I'm taking the cryptographer/mathematicians by their word that the solution is to use [finite field arithmetic][href_wiki_galois_field].
+There is more to the story of course. My understanding is that the preceding scheme (which uses the traditional cartesian plane) does not offer complete information security. Some information about the secret is leaked with each `share` and while an attacker who knows fewer points than the `threshold` may not be able to instantly determine the secret, they could at least derive some information to reduce their search space. I'm taking the cryptographer/mathematicians by their word that the solution is to use [finite field arithmetic][href_wiki_galois_field].
 
-Rather than calculating inside the cartesian plane, we use `GF(p)` (where `p` is a prime number) or `GF(p^n)` (where `p^n` is a power of a prime number, typically `GF(2^8) == GF(256)`. In a previous iteration of SBK, `GF(p)` was used, with a value for `p` (chosen from [oeis.org/A014234][href_oeis_a014234]) that corresponds to the level of entropy of the `brainkey`. For the default secret length of 20 byte/160 bit this would have been `GF(2**160 - 47) == GF(1461501637330902918203684832716283019655932542929)`. As you can see, this is a very large number, which is why this approach typically isn't used. In principle this would have been fine[^fnote_gfp_bignum] for the use case of SBK, but other implementations typically use `GF(256)`. Arithmetic in `GF(256)` is a bit harder to understand, due to the requirement for polynomial division. In order to make validation easier, SBK also uses `GF(256)`, which has been broadly studied already. The specific field uses the Rijndael irreducible polynomial `x^8 + x^4 + x^3 + x + 1`, which is the same as [SLIP0039][href_wiki_slip0039_sss] and [AES/Rijndael][href_doi_org_rijndael][^fnote_gf_rijndeal_validation]. 
+Rather than calculating inside the cartesian plane, we use either `GF(p)` (`p` being a prime number) or `GF(p**n)` (`p**n` being a power of a prime number, typically `GF(2**8) == GF(256)`. In a previous iteration of SBK, `GF(p)` was used, with a value for `p` (chosen from [oeis.org/A014234][href_oeis_a014234]) that corresponds to the level of entropy of the `brainkey`. For the default secret length of 20 byte/160 bit this would have been `GF(2**160 - 47) == GF(1461501637330902918203684832716283019655932542929)`. As you can see, this is a very large number, which is why this approach typically isn't used. In principle this would have been fine[^fnote_gfp_bignum] for the use case of SBK, but other implementations typically use `GF(256)` and innovation in cryptography is not always a good thing. The specific field used by SBK has been broadly studied already, which should make validation easier, even though the requirement for polynomial division makes arithmetic a bit harder to follow. The specific field uses the Rijndael irreducible polynomial `x**8 + x**4 + x**3 + x + 1`, which is the same as [SLIP0039][href_wiki_slip0039_sss] and (perhaps more importantly) [AES/Rijndael][href_doi_org_rijndael][^fnote_gf_rijndeal_validation]. 
 
 [href_wiki_galois_field]: https://en.wikipedia.org/wiki/Finite_field
 
@@ -212,112 +217,100 @@ Rather than calculating inside the cartesian plane, we use `GF(p)` (where `p` is
 
 [href_doi_org_rijndael]: https://doi.org/10.6028/NIST.FIPS.197
 
-[^fnote_gfp_bignum]: Resons it would b fine to use `GF(p)`
- 1. Since a computationally and memory intensive KDF is used to harden the `brainkey`, 
-    low powered embedded systems are not a target for SBK, which is one of the reasons
-    `GF(2**8)` is usually preferred.
- 2. Python has native support for big integers, so arithmetic with large values
-    is not an issue. Since SBK uses Electrum (implemented with python), it is not an extra dependency to require a python interpreter.
- 3. Implementing finite field arithmetic for `GF(p^n) | n > 1` is easier to understand
-    and should be easier to review.
+[^fnote_gfp_bignum]: Resons it may have been fine to use `GF(p)`
+ 1. A common reason to use `GF(2**8)` is to be compatible with low-end systems. Since SBK
+    uses a computationally and memory intensive KDF, systems with constrained CPU and RAM
+    are not a target for SBK. Such systems would either take a long time to derive a
+    hardened `seed` or the `seeds` they produce would be cracked more easily by machines
+    that are much more powerful and easily obtained.
+ 2. `GF(2**8)` uses arithmetic that is natively supported by practically every
+    programming language and hardware platform. Depending on the size of `p`, a `GF(p)`
+    field requires support for big integers. Python has native support for big integers,
+    so arithmetic with large values is not an issue for SBK. Since SBK uses Electrum
+    (which is implemented with python), it is not an extra dependency for SBK to require
+    a python interpreter.
+ 3. Implementing finite field arithmetic for `GF(p)` is slightly easier to
+    understand and should be easier to review.
 
 [^fnote_gf_rijndeal_validation]: I was quite happy to see the same numbers pop out as for [the reference implementation of SLIP0039](https://github.com/trezor/python-shamir-mnemonic/)
 
 
-## Data Format
+## Implementation Details
 
 ### Terms and Notation
 
-|       Term        |                         Meaning                          |
-| ----------------- | -------------------------------------------------------- |
-| `brainkey`        |                                                          |
-| `salt`            |                                                          |
-| `&vert;&vert;`    | Concatenation: "abc" &vert;&vert; "def" -> "abcdef"      |
-| `master_key`      | `master_key = brainkey &vert;&vert; salt`                |
-| `salt_len`        |                                                          |
-| `brainkey_len`    |                                                          |
-| `master_key_len`  | `salt_len + brainkey_len`                                |
-| `num_shares`      | The number of shamir shares to generate                  |
-|                   | from the `master_key`.                                   |
-| `is_segwit`       | Determines the electrum seed type                        |
-| `threshold`       |                                                          |
-| `wallet_name`     |                                                          |
-| `prime`           | the prime number for GF(p). This is an index             |
-|                   | into an array of predefined primes. The appropriate      |
-|                   | prime is chosen based on the length of the `master_key`. |
-| `kdf`             | Key Derivation Function. The algorithm used is           |
-|                   | [Argon2](#key_derivation_using_argon2).                  |
-| `kdf_parallelism` |                                                          |
-| `kdf_mem_cost`    |                                                          |
-| `kdf_time_cost`   |                                                          |
-| `version`         |                                                          |
+|   Term/Notation   |                                            Meaning                                            |
+|-------------------|-----------------------------------------------------------------------------------------------|
+| `version`         | Version number to support iteration of the data format.                                       |
+| `flags`           | A bitfield for options (eg. segwit)                                                           |
+| `brainkey_len`    | Length of the `brainkey` in bytes. min: 2, max: 32, default: 8                                |
+| `threshold`       | Minimum number of shares required for recovery. min: 1, max: 16, default: 3                   |
+| KDF               | Key Derivation Function. The algorithm used by SBK is [Argon2](#key_derivation_using_argon2). |
+| `kdf_mem_cost`    | Amount of memory in MiB filled by Argon2.                                                     |
+| `kdf_time_cost`   | Number of passes over the memory.                                                             |
+| `kdf_parallelism` | The degree parallelism/number of threads.                                                     |
+| `parameters`      | 4 byte encoding of the above 7 parameters.                                                    |
+| &vert;&vert;      | Concatenation operator: `"abc"` &vert;&vert; `"def"` -> `"abcdef"`                            |
+| `raw_salt`        | 12 bytes of random data. Main source of entropy.                                              |
+| `salt`            | `salt` = `parameters` &vert;&vert; `raw_salt`                                                 |
+| `brainkey`        | Random data memorized by the owner of the wallet.                                             |
+| `master_key`      | `master_key` = `salt` &vert;&vert; `brainkey`                                                 |
+| `wallet_name`     | Identifier to generate multiple wallets from a single `master_key`.                           |
+| `kdf_input`       | `kdf_input` = `master_key` &vert;&vert; `wallet_name`                                         |
+| `num_shares`      | The number of shamir shares to generate from the `master_key`.                                |
+| `raw_share`       | The common `x-coordinate` and `y-coordinates` of points in `GF(2**8)`.                        |
+| `share`           | `share` = `parameters` &vert;&vert; `raw_share`                                               |
+| `is_segwit`       | Determines the electrum seed type (default: `true`)                                           |
 
 
-### Parameter Data
+### Parameters
 
-The parameters are encoded as the first 4 bytes of the salt and of every share. This means the user has one less thing to keep track of. The salt is always required, the parameters are always required, might as well keep them together.
-
-In a previous iteration of SBK, the length of the salt could be chosen. This meant that the salt could not one extra thing to keep track of. Instead, the `salt` could not be entered before the `salt` and `brainkey` could be entered. To simplify things, a reasonable default was chosen and the parameters are now encoded as part of the salt.
-
-
-|        Field        |  Size  |                          Info                           |
-| ------------------- | ------ | ------------------------------------------------------- |
-| `f_version`         | 4 bit  | ...                                                     |
-| `f_flags`           | 4 bit  | (reserved, reserved, reserved, is_segwit)               |
-| `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 2 .. 32 bytes                    |
-| `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
-|                     |        | max value = 1 .. 2**4 = 1 .. 16                         |
-| `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
-| `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
-| `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
-
+The parameters are included as a prefix of the `salt` and of every `share`. Since they must be entered manually, they are kept as compact as possible, using only 4 bytes. 
 
 ```
-   0 1 2 3 4 5 6 7 8 9 A B C D E F
- 0 [ver] [ flags ] [bkey ] [thres]
-16 [kdf_p] [ kdf_mem ] [kdf_time ]
+0     3 4     7 8    11 12   15 16   19 20       25 26       31
+[ ver ] [flags] [bkey ] [thres] [kdf_p] [ kdf_mem ] [kdf_time ]
+ 4bit    4bit    4bit    4bit    4bit      6bit        6bit
 ```
 
-Before a `brainkey` or `salt` can be entered, their size must be known. Before a wallet can be loaded, the parameters used for key derivation must be known. These parameters must be entered first, whenever a wallet is loaded or recovered. The parameter data is encoded in 6 words and consists of the following parameters: 
+The bean counters among you may have notice that 4 bytes is not enough to encode the complete range of valid parameters which the KDF would accept. For example, the `kdf_time_cost`, which corresponds to the "Number of iterations *t*" in [section 3.1 Input of the Argon 2 Spec][href_github_phc_winner_argon2] with a valid range of `1..2**32 − 1` would by itself already require 32 bits and not 6. 
 
-|        Field        |  Size  |                          Info                           |
-| ------------------- | ------ | ------------------------------------------------------- |
-| `f_version`         | 4 bit  | ...                                                     |
-| `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
-|                     |        | max value = 1 .. 2**4 = 1 .. 16                         |
-| `f_salt_len`        | 4 bit  | max length: 4 * 2**4 = 4 .. 64 bytes                    |
-| `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 2 .. 32 bytes                    |
-| `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
-| `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
-| `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
-
-```
-   0 1 2 3 4 5 6 7 8 9 A B C D E F
- 0 [ ver ] [thres] [salt ] [bkey ]
-16 [kdf_p] [ kdf_mem ] [kdf_time ]
-```
+Since the distinction between 1000 iterations and 1001 iterations is not critical, the values for `kdf_time_cost` and `kdf_mem_cost` are not encoded exactly, but using a logarithmic scale with base 1.25. In the case of 1000 the value `floor(1.25**25 * 4 - 3) == 1055` would be encoded. The next lower value would be `floor(1.25**24 * 4 - 3) == 844`. In other words, the encoding can only represent 64 different values, from 1 to `floor(1.25**63 * 4 - 3) == 5097891`. The choice of 1.25 as the log base is more or less arbitrary, it allows reasonably fine conrol of the KDF difficulty parameters (increments of 1.25x) while still being able to represent values that are sufficiently large (maximum `kdf_mem_cost` of ca. 5 Terabyte per thread and maximum `kdf_time_cost` of ca. 5 Million iterations). 
 
 
-> Asside: While the `threshold` is encoded, the number of `shares` is not. It is not
-> needed for recovery and is only used when `shares` are first being created.
+|      Field Name     |  Size |              Value               |      Range (inclusive)      |
+|---------------------|-------|----------------------------------|-----------------------------|
+| `f_version`         | 4 bit | Hardcoded to `0`.                |                             |
+| `f_flags`           | 4 bit | (-, -, -, `is_segwit`)           |                             |
+| `f_brainkey_len`    | 4 bit | `brainkey_len // 2 - 1`          | 2, 4, 6..32                 |
+| `f_threshold`       | 4 bit | `threshold - 1`                  | 1..16                       |
+| `f_kdf_parallelism` | 4 bit | `log2(kdf_parallelism)`          | 1, 2, 4, 8..32768           |
+| `f_kdf_mem_cost`    | 6 bit | `log(kdf_mem_cost) / log(1.25)`  | 1, 2, 3, 4, 6, 9, 12, 16... |
+| `f_kdf_time_cost`   | 6 bit | `log(kdf_time_cost) / log(1.25)` | 1, 2, 3, 4, 6, 9, 12, 16... |
 
-> Asside: The `brainkey` must have a length which is a multiple of 2 and the `salt`
-> must have a length which is a multiple of 4. This allows us to use 4 bits for
-> each and have `brainkey` of length 32 and `salt` of length 64.
 
-The parameters should be included with every `share` and also with the `salt`. 
+> Aside: The `salt_len` is not a parameter and is hardcoded to 12 bytes (96 bits). Entropy paranoia can be
+> aleviated by choosing a larger value for `--brainkey-len`.
+
+> Aside: While the `threshold` is encoded, the number of `shares` is not. It is only used when 
+> `shares` are first being created and it is not needed for recovery.
 
 
 ### Share Data
 
-Shares are generated based on the `master_key`, which is a concatenation of the
-`brainkey` and the `salt`. The `master_key` represents the y coordinate at x=255. The x-coordinate for shares only has 4 bits available, so it will always be the case that `0 <= x < 128`. This prevents the [forced secret attack as described in point 3 of the "Design Rational" of SLIP-0039][href_slip0039_forced_secret].
+<p align="center">
+<img alt="Data layout for Shares" src="https://mbarkhau.keybase.pub/sbk/raw_share_diagram.svg" height="320" />
+<p>
 
-| Field | Size  | Info |
-| ----- | ----- | ---- |
-| `x`   | 7bits |      |
-| `y`   | 4bits |      |
+Shares are generated from the `master_key`. The split algorithm is applied to each byte of the `master_key` separately and the points of each `raw_share` all have the same x-coordinate. In the preceeding diagram for example, the first raw share would be 8 bytes represented here as `FAYUKTEM` and in order to recover the byte at `offset=7` of the `master_key`, we would use the join algorithm with the points `P(x=1, y=M)`, `P(x=2, y=W)` and `P(x=3, y=Z)`, to produce `P(x=0, y=H)`, where `H` represents the last byte of the `master_key`.
 
+<p align="center">
+<img alt="Data layout for Shares" src="https://mbarkhau.keybase.pub/sbk/share_diagram.svg" height="80" />
+<p>
+
+The "full" `share` also includes the serialized parameters as a prefix in the first four bytes, and it also includes ECC data of the same length as the `raw_share`. The ECC code used is a Reed-Solomon code.
+
+> Aside: When parsing a share it is critical to verify that `x != 0` to prevent a [forced secret attack, as described in point 3 of the "Design Rational" of SLIP-0039][href_slip0039_forced_secret].
 
 [href_slip0039_forced_secret]: https://github.com/satoshilabs/slips/blob/master/slip-0039.md#design-rationale
 
@@ -370,10 +363,10 @@ While we're on the topic of [plausible deniability][href_wiki_plausible_deniabil
 
 This is a powerful feature, but it can also put you at a great risk of loss. Since the `wallet-name` is effectively a passphrase, it suffers from the same problem as all passphrases: they can be forgotten. One of the main purposes of SBK is to protect you from loss. If you introduce a single point of failure, then you have negated much of this protection. A `wallet-name` that is only known to you can be forgotten. A secret written on a single piece of paper might be destroyed.
 
-If you use a `wallet-name`, I reccomend to not make it too complicated: Simple words, all in lower case, no punctuation. Everybody who might be involved in the recovery process, should either 
+If you use a `wallet-name`, I reccomend to not make it too complicated: Simple words, all in lower case, no punctuation or whitespace. Everybody who might be involved in the recovery process, should either 
 
- 1. Have access to the wallet names
- 2. Have a guaranteed to work way to gain access to the wallet names at the appropriate time.
+ 1. Have access to the wallet names.
+ 2. Have foolproof way to gain access to the wallet names at the appropriate time.
 
 You might satisfy 1. for example by writing all wallet names down on each `share` or by sending them to those who will be responsible for your estate.
 
@@ -382,7 +375,11 @@ You might satisfy 1. for example by writing all wallet names down on each `share
 
 ## Encoding Secrets: Mnemonics and Intcodes
 
-> Aside: The work done in this section preceeded the release of Trezor Shamir Backup, which has many similarities to it. Shamir Backup uses [Reed Solomon Codes][href_wiki_rscodes] to generate a checksum for error detection. SBK uses more simple [Luby Transform Codes][href_wiki_ltcodes] to implement forward error correction. The wordlists of both are composed with similar considerations for length, edit distance and phonetic distinctness.
+> Aside: The work done in this section preceeded the release of Trezor Shamir Backup, which has many
+> similarities to it. Shamir Backup uses [Reed Solomon Codes][href_wiki_rscodes] to generate a checksum for
+> error detection. SBK uses more simple [Luby Transform Codes][href_wiki_ltcodes] to implement forward error
+> correction. The wordlists of both are composed with similar considerations for length, edit distance and
+> phonetic distinctness.
 
 The main reasons to introduce a new encoding are:
 
@@ -475,107 +472,12 @@ The eagle-eyed may observe that `2 ** 20 == 1048576`, which is slightly larger t
 Since recovery involves the input of multiple `shares` and the key derivation takes time, a lack of protection against intput errors would make it time consuming to discover which `share` was entered incorrectly. To mitigate such issues, each incode encodes it's position to protect against words being skipped or entered in the wrong order. The maximum index is 13 which is adequate to check for skipped inputs even before the ECC data has been endered.
 
 
-### FEC: Luby Transform Codes
+### FEC: Forward Error Correction using Reed-Solomon Codes
 
-> Aside: 
-
-
-As `shares` may be stored for long periods and could deteriorate or be partially destroyed through bad handling, adding forward error correction provodes some protection and gives a better chance of recovery.
-
-TODO: implementation details
-
-## High Level Pseudocode
-
-> [..] Show me your [datastructures],
->   and I won’t usually need your flowcharts;
->   they’ll be obvious. 
->   
->   — Fred Brooks
-
-To conclude the technical overview, here is some pseudocode with more details of the data layout.
-
-```python
-class Params:
-    """Parameters required for key derivation and recovery."""
-
-    version         : int   # 3 bits
-    shamir_threshold: int   # 5 bits (32 shares)
-    # Key length in bytes must be a multiple of 4. It is
-    # used to 
-    key_len_num     : int   # 4 bits
-    kdf_index       : int   # 
-
-    # Derived fields: These can be derived from the above,
-    # using pre-defined constants in SBK.
-    key_length_bytes: int
-    shamir_prime    : int   # Based on the key length
-    memory_cost     : int   # Argon2 memory_cost
-    time_cost       : int   # Argon2 time_cost
-
-    def encode(self) -> bytes:
-        """Returns 2 byte representation of params."""
-        ...
-        return struct.pack('BB', field0, field1)
-
-    @staticmethod
-    def decode(self, params_data: bytes) -> Params:
-        """Returns 2 byte representation of params."""
-        field0, field1 = struct.unpack('BB', params_data)
-        ...
-        return Params(...)
+`Shares` may be stored for long periods and could deteriorate, they may be partially destroyed through neglect, or they may be partially unreadable by anybody but the author. An FEC code is used to have a better chance to recover such `shares` and also so that users can verify the correctness of what they have entered.
 
 
-def kdf(secret: bytes, salt: bytes, params: Params) -> bytes:
-    """"Key Derivation Function using argon2."""
-    return argon2(
-        secret=brainkey,
-        salt=salt,
-        memory_cost=params.memory_cost,
-        time_cost=params.time_cost,
-        hash_len=params.key_length,
-    )
 
-# 8 bytes/64 bits
-#
-# This should be small enough to memorize, and
-# given the use of Argon2 with a large seed, is
-# large enough to be safe from brute force.
-KEY_LEN_BYTES = 8
-SALT_LEN_BYTES = 24
-
-brainkey = os.urandom(KEY_LEN_BYTES)
-brainkey_mnemonic = mnemonic_encode(brainkey)
-
-print(f"Memorize brainkey: {brainkey_mnemonic}")
-
-params = Params(...)
-param_data: bytes = params.encode()
-
-# The salt is actually both the salt as well
-# as the serialized parameters.
-raw_salt = os.urandom(SALT_LEN_BYTES)
-salt = param_data + raw_salt
-
-salt_text = mnemonic_encode(salt)
-print(f"Write down salt: {salt_text}")
-
-# derive the master key
-master_seed = kdf(brainkey, salt, params)
-
-sbk_shares = shamir_split(
-    master_seed,
-    params.threshold,
-    params.num_shares,
-    params.shamir_prime,
-)
-for i, share in enumerate(sbk_shares):
-    share_text = mnemonic_encode(share)
-    print(f"Write down share {i + 1}: {share_text}")
-
-# /run/user/$UID is a "tmpfs" directory provided by pam_systemd,
-uid = subprocess.check_output(["id", "-u"])
-f"/run/user/{uid}/sbk_electrum_wallet_01234"
-```
 
 
 ## Platform Security
@@ -611,14 +513,14 @@ Beyond concerns that all of this software is free from malicious code, there is 
 
 ### SLIP0039
 
-Notwithstanding the reasons for custom implementation choices for SSS, it is worth following parts of SLIP0039. Particularly from the perspective of code review, an implementation that is not bespoke to SBK will probably receive more review and may have a better chance of being correct. Contributions are most welcome (and given the existing work done in the context SLIP0039 such contributions should be relatively simple).
+SLIP0039 does not cover some of my design goals for SBK and covers others that I do not consider to be important. This notwithstanding, it is worth following parts of SLIP0039, in particular so that it is easier to validate different but comparable implementations. The less that is bespoke about SBK, the higher the probability that issues are found and that it is safe to use. Contributions are most welcome (and given the existing reference implementation for SLIP0039, such contributions may be straightforward).
 
-I consider some aspects of SLIP0039 to be overly complicated for the purposes of SBK, these include:
+Some aspects of SLIP0039 are out of scope of SBK:
 
- - Groups: Groups can be used to generate shares with different levels of trust. More shares would be required for groups that are trusted less. For the sake of simplicity, this feature is not implemented with SBK. To the extent that SLIP0039 is followed, the group parameters are chosen to correspond to single group splitting at the second level, i.e. GT = 1, G = 1, T₁ = T and N₁ = N.
+ - Checksums: Shares can be quite tedious to copy and enter. Given that humans are prone to error when performing the tedious task of writing, reading and entering random data, SBK uses extra data for Forward Error Correction. In other words, rather than dedicate data to a checksum which can only tell when something is wrong, it dedicates data to an FEC code which can correct invalid inputs.
+ - Groups: Groups can be used to generate shares with different levels of trust. More shares would be required for groups that are trusted less. For the sake of simplicity, this feature is not implemented with SBK. To the extent that SLIP0039 is followed, the group parameters are chosen to correspond to single group splitting at the second level, i.e. GT = 1, G = 1, T₁ = T and N₁ = N. If you trust some people more than others, you can choose a higher threshold, generate more shares and give multiple shares to those you trust more.
  - Master Secret Encryption: SBK does not support migrating BIP-32 wallets so there is no need to implement a mechannism to split a user chosen master secret. 
- - Encoding: Since SLIP0039 does not use a `salt+brainkey` but rather it splits a master secret, it encodes parameters as part of each share.
- - Checksums: Shares are tedious enough to copy and enter as it is, so if a user is going to copy redundent data, it is preferable that this data be used for forward error correction rather than mere error detection.
+ - Encoding: Since SLIP0039 does not use a `salt+brainkey` but rather it splits a master_secret, it encodes parameters as part of each share. SBK
 
 [href_pointsoftware_ssssbs]: http://www.pointsoftware.ch/en/secret-sharing-step-by-step/
 

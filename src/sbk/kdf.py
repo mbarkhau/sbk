@@ -3,7 +3,8 @@
 #
 # Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
-"""Logic related to KDF derivation."""
+"""KDF parameter encoding and key derivation."""
+
 import enum
 import math
 import time
@@ -33,6 +34,62 @@ MebiBytes  = int
 Iterations = int
 
 
+# We are looking for an equation of the form
+#
+#   f(n) = ⌊o + s * b ** n⌋
+#
+# such that f(0) = 1 and f(1) = 2 for any given b
+#
+# n: [0..63]  (int)
+# b: base   (chosen)
+# s: scale  (unknown)
+# o: offset (1 - s)
+#
+# Knowing that we can chose o = (1 - s), so that
+# f(0) = 1. We can work with g(n) = s * b ** n,
+# where for n = 0 it must hold that
+#
+#   g(0) + 1 = g(1)         # lem 1
+#
+# Given that
+#
+#  g(0) = s * b ** 0
+#  g(0) = s * 1
+#  g(0) = s                 # lem 2
+#
+#  g(1) = s * b ** 1
+#  g(1) = s * b
+#
+#  g(0) + 1 = s + 1         # +1 to lem 2
+#  s + 1 = s * b            # substitute g(1) given lem 1
+#
+# try to isolate s
+#
+#       s + 1 = s * b
+#           1 = s * b - s             # - s
+#           1 = s * (b - 1)           # factor out s
+# 1 / (b - 1) = s                     # / (b - 1)
+#
+# if we chose b = 2   , then s = 1 and o = 0
+# if we chose b = 1.25, then s = 4 and o = -3
+
+
+def _exp(field_val: int, base: float) -> int:
+    s = 1 / (base - 1)
+    o = 1 - s
+    return math.floor(o + s * base ** field_val)
+
+
+def _log(raw_val: int, base: float) -> int:
+    s = 1 / (base - 1)
+    o = 1 - s
+    return round(math.log((raw_val - o) / s) / math.log(base))
+
+
+def _clamp(val: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, val))
+
+
 class KDFParams(typ.NamedTuple):
 
     p_raw: NumThreads
@@ -42,9 +99,9 @@ class KDFParams(typ.NamedTuple):
 
     @property
     def _field_values(self,) -> typ.Tuple[int, int, int]:
-        f_p = max(0, min(2 ** 4 - 1, round(math.log(self.p_raw) / math.log(2  ))))
-        f_m = max(0, min(2 ** 6 - 1, round(math.log(self.m_raw) / math.log(1.5))))
-        f_t = max(0, min(2 ** 6 - 1, round(math.log(self.t_raw) / math.log(1.5))))
+        f_p = _clamp(val=_log(self.p_raw, base=2   ), lo=0, hi=2 ** 4 - 1)
+        f_m = _clamp(val=_log(self.m_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
+        f_t = _clamp(val=_log(self.t_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
 
         assert 0 <= f_p < 2 ** 4
         assert 0 <= f_m < 2 ** 6
@@ -73,9 +130,9 @@ class KDFParams(typ.NamedTuple):
         f_m = (fields >>  6) & 0x3F
         f_t = (fields >>  0) & 0x3F
 
-        p = round(2   ** f_p)
-        m = round(1.5 ** f_m)
-        t = round(1.5 ** f_t)
+        p = _exp(f_p, base=2)
+        m = _exp(f_m, base=1.25)
+        t = _exp(f_t, base=1.25)
         h = HashAlgo.ARGON2_V19_ID.value
         return KDFParams(p, m, t, h)
 
@@ -170,18 +227,22 @@ Increment = float
 ProgressCallback = typ.Callable[[Increment], None]
 
 
+DIGEST_STEPS = 20
+
+MEASUREMENT_SIGNIFICANCE_THRESHOLD = 2
+
+
 def digest(
     data       : bytes,
     kdf_params : KDFParams,
     hash_len   : int,
     progress_cb: typ.Optional[ProgressCallback] = None,
 ) -> bytes:
-    time_cost = max(1, kdf_params.t // 100)
-    num_steps = int(kdf_params.t / time_cost)
-    step_size = 100 / num_steps
+    time_cost = max(1, kdf_params.t // DIGEST_STEPS)
+    step_size = 100 / DIGEST_STEPS
 
     current_result = data
-    for _ in range(num_steps):
+    for _ in range(DIGEST_STEPS):
         current_result = _hash(data, kdf_params._replace_any(t=time_cost))
         if progress_cb:
             progress_cb(step_size)
@@ -192,35 +253,29 @@ def digest(
     return current_result[:hash_len]
 
 
-DURATION_SIGNIFICANCE_THRESHOLD = 0.5
-ITER_SIGNIFICANCE_THRESHOLD     = 10
-
-
 def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:
-    data       = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-    kdf_params = baseline_kdf_params._replace_any(t=1)
+    test_kdf_params = baseline_kdf_params._replace_any(t=1)
+
+    tgt_step_duration = target_duration / DIGEST_STEPS
+    total_time        = 0.0
 
     while True:
         tzero = time.time()
-        _hash(data, kdf_params)
+        _hash(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00", test_kdf_params)
         duration = time.time() - tzero
+        total_time += duration
 
-        iters_per_sec = kdf_params.t / duration
-        tgt_iters     = target_duration * iters_per_sec
-        # There are two cases where we want to bail out
-        #   1. The duration is high enough that we don't even want to measure
-        #      anymore, ie. so much memory is used that few iterations are
-        #      already very expensive.
-        #   2. The number of iterations is high enough for any overhead to
-        #      have been amortized.
+        iters_per_sec = test_kdf_params.t / duration
+        step_iters    = tgt_step_duration * iters_per_sec * 1.25
 
-        is_duration_significant = duration > DURATION_SIGNIFICANCE_THRESHOLD
-        is_iters_significant    = kdf_params.t >= ITER_SIGNIFICANCE_THRESHOLD
-        if is_duration_significant or is_iters_significant:
-            return kdf_params._replace_any(t=math.ceil(tgt_iters * 1.25))
+        # print("<", round(duration, 3), "i/s =", iters_per_sec, "tgt =", step_iters)
+        is_tgt_exceeded            = duration   > tgt_step_duration
+        is_enough_already          = total_time > 5
+        is_measurement_significant = duration   > MEASUREMENT_SIGNIFICANCE_THRESHOLD
+        if is_tgt_exceeded or is_measurement_significant or is_enough_already:
+            return test_kdf_params._replace_any(t=round(step_iters * DIGEST_STEPS))
 
         # min_iters is used to make sure we're always measuring with a higher value for t
-        min_iters         = math.ceil(kdf_params.t  * 1.5)
-        significant_iters = math.ceil(iters_per_sec * 2 * DURATION_SIGNIFICANCE_THRESHOLD)
-        new_t             = max(min_iters, min(ITER_SIGNIFICANCE_THRESHOLD, significant_iters))
-        kdf_params        = kdf_params._replace_any(t=new_t)
+        min_iters       = math.ceil(test_kdf_params.t * 1.25)
+        new_t           = max(min_iters, round(1.25 * MEASUREMENT_SIGNIFICANCE_THRESHOLD * iters_per_sec))
+        test_kdf_params = test_kdf_params._replace_any(t=new_t)

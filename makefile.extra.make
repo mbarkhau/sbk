@@ -21,6 +21,8 @@ svgbob_images: \
 		doc/sbk_dataflow_diagram.svg \
 		doc/sss_diagram_1.svg \
 		doc/sss_diagram_2.svg \
-		doc/sss_diagram_3.svg
+		doc/sss_diagram_3.svg \
+		doc/raw_share_diagram.svg \
+		doc/share_diagram.svg
 	cp doc/*.svg $(KBFS_DIR)
 	cp logo* $(KBFS_DIR)

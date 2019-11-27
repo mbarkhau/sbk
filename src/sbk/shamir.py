@@ -111,15 +111,15 @@ def split(
     num_shares     = param_cfg.num_shares
 
     if use_gf_p:
-        raw_share_datas = _split_data_gf_p(master_key, threshold, num_shares, param_cfg.prime)
+        raw_shares = _split_data_gf_p(master_key, threshold, num_shares, param_cfg.prime)
     else:
-        raw_share_datas = _split_data_gf_256(master_key, threshold, num_shares)
+        raw_shares = _split_data_gf_256(master_key, threshold, num_shares)
 
-    for raw_share_data in raw_share_datas:
-        share_data = param_cfg_data + raw_share_data
+    for raw_share in raw_shares:
+        share_data = param_cfg_data + raw_share
 
-        errmsg = f"{len(raw_share_data)} != {param_cfg.master_key_len + 1}"
-        assert len(raw_share_data) == param_cfg.master_key_len + 1, errmsg
+        errmsg = f"{len(raw_share)} != {param_cfg.master_key_len + 1}"
+        assert len(raw_share) == param_cfg.master_key_len + 1, errmsg
         errmsg = f"{len(share_data)} != {param_cfg.share_len}"
         assert len(share_data) == param_cfg.share_len, errmsg
 

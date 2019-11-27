@@ -56,45 +56,6 @@ class ParamConfig(typ.NamedTuple):
         return self.flags & FLAG_IS_SEGWIT == 1
 
 
-def bytes2param_cfg(data: bytes) -> ParamConfig:
-    """Deserialize ParamConfig.
-
-    |        Field        |  Size  |                          Info                           |
-    | ------------------- | ------ | ------------------------------------------------------- |
-    | `f_version`         | 4 bit  | ...                                                     |
-    | `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 32 bytes                         |
-    | `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
-    |                     |        | max: 1..2**4 = 1..16                                    |
-    | `f_flags`           | 4 bit  | (reserved, reserved, reserved, is_segwit)               |
-    | `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
-    | `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
-    | `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
-
-       0 1 2 3 4 5 6 7 8 9 A B C D E F
-     0 [ ver ] [salt ] [bkey ] [thres]
-    16 [kdf_p] [ kdf_mem ] [kdf_time ]
-    """
-    assert len(data) >= 4
-    fields_01, fields_23, fields_456 = struct.unpack("!BBH", data[:4])
-
-    version        = (fields_01 >> 4) & 0xF
-    flags          = (fields_01 >> 0) & 0xF
-    f_brainkey_len = (fields_23 >> 4) & 0xF
-    f_threshold    = (fields_23 >> 0) & 0xF
-    assert version == 0, version
-
-    brainkey_len = (f_brainkey_len + 1) * 2
-    threshold    = f_threshold + 1
-
-    # The param_cfg encoding doesn't include num_shares as it's
-    # only required when originally generating the shares. The
-    # minimum value is threshold, so that is what we set it to.
-    num_shares = threshold
-
-    kdf_params = kdf.KDFParams.decode(fields_456)
-    return ParamConfig(version, flags, brainkey_len, threshold, num_shares, kdf_params)
-
-
 def init_param_config(
     brainkey_len: int,
     kdf_params  : kdf.KDFParams,
@@ -135,6 +96,49 @@ def init_param_config(
     )
 
     return param_cfg
+
+
+"""
+Data layout for reference.
+
+|        Field        |  Size  |                          Info                           |
+| ------------------- | ------ | ------------------------------------------------------- |
+| `f_version`         | 4 bit  | ...                                                     |
+| `f_flags`           | 4 bit  | (reserved, reserved, reserved, is_segwit)               |
+| `f_brainkey_len`    | 4 bit  | max length: 2 * 2**4 = 32 bytes                         |
+| `f_threshold`       | 4 bit  | minimum shares required for recovery                    |
+|                     |        | max: 1..2**4 = 1..16                                    |
+| `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)   = kdf_parallelism` in number of threads |
+| `f_kdf_mem_cost`    | 6 bit  | `ceil(1.5 ** n) = kdf_mem_cost` in MiB                  |
+| `f_kdf_time_cost`   | 6 bit  | `ceil(1.5 ** n) = kdf_time_cost` in iterations          |
+
+0     3 4     7 8    11 12   15 16   19 20       25 26       31
+[ ver ] [flags] [bkey ] [thres] [kdf_p] [ kdf_mem ] [kdf_time ]
+ 4bit    4bit    4bit    4bit    4bit      6bit        6bit
+"""
+
+
+def bytes2param_cfg(data: bytes) -> ParamConfig:
+    """Deserialize ParamConfig."""
+    assert len(data) >= 4
+    fields_01, fields_23, fields_456 = struct.unpack("!BBH", data[:4])
+
+    version        = (fields_01 >> 4) & 0xF
+    flags          = (fields_01 >> 0) & 0xF
+    f_brainkey_len = (fields_23 >> 4) & 0xF
+    f_threshold    = (fields_23 >> 0) & 0xF
+    assert version == 0, version
+
+    brainkey_len = (f_brainkey_len + 1) * 2
+    threshold    = f_threshold + 1
+
+    # The param_cfg encoding doesn't include num_shares as it's
+    # only required when originally generating the shares. The
+    # minimum value is threshold, so that is what we set it to.
+    num_shares = threshold
+
+    kdf_params = kdf.KDFParams.decode(fields_456)
+    return ParamConfig(version, flags, brainkey_len, threshold, num_shares, kdf_params)
 
 
 def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:

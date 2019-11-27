@@ -7,7 +7,6 @@
 """Wordlists for SBK."""
 
 import os
-import re
 import struct
 import typing as typ
 
@@ -51,9 +50,19 @@ watanabe   webcam     whisky     wizard     xerox      yoghurt    yokohama   zim
 """
 
 
-WORDLIST = list(sorted(re.findall(r"[a-z]+", WORDLIST_STR)))
+WORDLIST = WORDLIST_STR.split()
+WORDSET  = set(WORDLIST)
 
-WORDSET = set(WORDLIST)
+assert len(WORDLIST) == 256
+assert len(WORDSET ) == 256
+assert sorted(WORDLIST) == WORDLIST
+
+WORD_INDEXES   = {w: i for i, w in enumerate(WORDLIST)}
+wordlist_index = WORD_INDEXES.__getitem__
+
+assert wordlist_index("abraham" ) == 0
+assert wordlist_index("zimbabwe") == 255
+assert wordlist_index(WORDLIST[127]) == 127
 
 
 PhraseStr = str
@@ -84,35 +93,30 @@ def bytes2phrase(data: bytes) -> PhraseStr:
 
 
 def _fuzzy_match(word: str) -> str:
-    def dist_fn(corpus_word: str) -> int:
-        return pylev.damerau_levenshtein(word, corpus_word)
+    def dist_fn(wl_word: str) -> int:
+        return pylev.damerau_levenshtein(word, wl_word)
 
-    dist, corpus_word = min((dist_fn(corpus_word), corpus_word) for corpus_word in WORDLIST)
+    dist, wl_word = min((dist_fn(wl_word), wl_word) for wl_word in WORDLIST)
     if dist >= 4:
         errmsg = f"Unknown word: {word}"
         raise ValueError(errmsg, word)
 
-    return corpus_word
+    return wl_word
 
 
-def _phrase2words(words: typ.List[str]) -> typ.Iterable[str]:
-    for word in words:
+def phrase2words(phrase: PhraseStr) -> typ.Iterable[str]:
+    for word in phrase.split():
         word = word.strip().lower()
         if word not in WORDSET:
             word = _fuzzy_match(word)
         yield word
 
 
-def phrase2words(phrase: PhraseStr) -> typ.Iterable[str]:
-    return _phrase2words(phrase.split())
-
-
 def phrase2bytes(phrase: PhraseStr) -> bytes:
     """Decode human readable phrases to bytes."""
     data: typ.List[bytes] = []
     for word in phrase2words(phrase):
-        word_idx = WORDLIST.index(word)
-        data.append(struct.pack("B", word_idx))
+        data.append(struct.pack("B", wordlist_index(word)))
 
     return b"".join(data)
 

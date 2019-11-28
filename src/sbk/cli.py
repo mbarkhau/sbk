@@ -29,8 +29,8 @@ from . import params
 from . import shamir
 from . import cli_util
 from . import enc_util
+from . import sys_info
 from . import electrum_mnemonic
-from .sys_info import load_sys_info
 
 # To enable pretty tracebacks:
 #   echo "export ENABLE_BACKTRACE=1;" >> ~/.bashrc
@@ -366,9 +366,9 @@ def _parse_kdf_params(
     memory_cost    : typ.Optional[kdf.MebiBytes],
     time_cost      : typ.Optional[kdf.Iterations],
 ) -> kdf.KDFParams:
-    sys_info   = load_sys_info()
+    nfo        = sys_info.load_sys_info()
     kdf_params = kdf.init_kdf_params(
-        p=parallelism or sys_info.initial_p, m=memory_cost or sys_info.initial_m, t=time_cost or 1
+        p=parallelism or nfo.initial_p, m=memory_cost or nfo.initial_m, t=time_cost or 1
     )
 
     if time_cost is None:

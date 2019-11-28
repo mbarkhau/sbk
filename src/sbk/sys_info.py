@@ -86,7 +86,7 @@ class Measurement(typ.NamedTuple):
     duration: Seconds
 
 
-def measure(kdf_params: kdf.KDFParams) -> Measurement:
+def _measure(kdf_params: kdf.KDFParams) -> Measurement:
     tzero = time.time()
     kdf.digest(b"saltsaltsaltsaltbrainkey", kdf_params, hash_len=16)
     duration = round(time.time() - tzero, 5)
@@ -147,7 +147,7 @@ def _init_sys_info() -> SystemInfo:
             initial_p  = kdf_params.p
             initial_m  = kdf_params.m
             log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
-            measure(kdf_params)
+            _measure(kdf_params)
             log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
             break  # success
         except argon2.exceptions.HashingError as err:

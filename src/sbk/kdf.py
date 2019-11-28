@@ -238,19 +238,26 @@ def digest(
     hash_len   : int,
     progress_cb: typ.Optional[ProgressCallback] = None,
 ) -> bytes:
-    time_cost = max(1, kdf_params.t // DIGEST_STEPS)
-    step_size = 100 / DIGEST_STEPS
+    total_t     = kdf_params.t
+    remaining_t = total_t
 
-    current_result = data
-    for _ in range(DIGEST_STEPS):
-        current_result = _hash(data, kdf_params._replace_any(t=time_cost))
+    tgt_step_t = max(1, 1 + total_t // DIGEST_STEPS)
+    # progress_cb expects a total of 100 increments
+    progress_factor = 100 / total_t
+
+    result = data
+    while remaining_t > 0:
+        step_t = min(remaining_t, tgt_step_t)
+        result = _hash(data, kdf_params._replace_any(t=step_t))
         if progress_cb:
-            progress_cb(step_size)
+            progress_cb(step_t * progress_factor)
+
+        remaining_t -= step_t
 
     if progress_cb:
-        progress_cb(step_size)
+        progress_cb(tgt_step_t * progress_factor)
 
-    return current_result[:hash_len]
+    return result[:hash_len]
 
 
 def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:

@@ -5,13 +5,48 @@ import pytest
 from sbk import kdf
 
 
-def test_digest():
+def test_digest_len():
     kdf_params = kdf.init_kdf_params(p=1, m=8, t=1)
 
-    secret_data = b"\x01\x23\x45\x67" * 4
+    secret_data = b"\x01\x23\x45\x67\x89\xab\xcd\xef"
     for hash_len in range(4, 50):
         res = kdf.digest(secret_data, kdf_params, hash_len)
         assert len(res) == hash_len
+
+
+def test_digest_inputs():
+    kdf_params = kdf.init_kdf_params(p=1, m=random.randint(1, 4) * 8, t=random.randint(1, 20))
+
+    kdf_inputs = [
+        b"\x00\x00\x00\x00\x00\x00\x00\x00",
+        b"\x11\x11\x11\x11\x11\x11\x11\x11",
+        b"\x22\x22\x22\x22\x22\x22\x22\x22",
+        b"\x33\x33\x33\x33\x33\x33\x33\x33",
+    ]
+
+    digests = set()
+    for kdf_input in kdf_inputs:
+        res = kdf.digest(kdf_input, kdf_params, hash_len=32)
+        digests.add(res)
+
+    # digests should be unique for unique inputs
+    assert len(digests) == len(kdf_inputs)
+
+
+def test_digest_iters():
+    all_kdf_params = set()
+    while len(all_kdf_params) < 8:
+        kdf_params = kdf.init_kdf_params(p=1, m=random.randint(1, 4) * 8, t=random.randint(1, 20))
+        all_kdf_params.add(kdf_params)
+
+    kdf_input = b"\x01\x23\x45\x67" * 4
+    digests   = set()
+    for kdf_params in all_kdf_params:
+        res = kdf.digest(kdf_input, kdf_params, hash_len=32)
+        digests.add(res)
+
+    # digests should be unique for unique kdf_params
+    assert len(digests) == len(all_kdf_params)
 
 
 KDF_PARAMS_CASES = [

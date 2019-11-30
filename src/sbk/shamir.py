@@ -102,18 +102,18 @@ def split(
     errmsg = f"{len(raw_salt)} != {params.RAW_SALT_LEN}"
     assert len(raw_salt) == params.RAW_SALT_LEN, errmsg
 
-    master_key = raw_salt + brainkey
-    errmsg     = f"{len(master_key)} != {param_cfg.master_key_len}"
-    assert len(master_key) == param_cfg.master_key_len, errmsg
+    shares_input = raw_salt + brainkey
+    errmsg       = f"{len(shares_input)} != {param_cfg.master_key_len}"
+    assert len(shares_input) == param_cfg.master_key_len, errmsg
 
     param_cfg_data = params.param_cfg2bytes(param_cfg)
     threshold      = param_cfg.threshold
     num_shares     = param_cfg.num_shares
 
     if use_gf_p:
-        raw_shares = _split_data_gf_p(master_key, threshold, num_shares, param_cfg.prime)
+        raw_shares = _split_data_gf_p(shares_input, threshold, num_shares, param_cfg.prime)
     else:
-        raw_shares = _split_data_gf_256(master_key, threshold, num_shares)
+        raw_shares = _split_data_gf_256(shares_input, threshold, num_shares)
 
     for raw_share in raw_shares:
         share_data = param_cfg_data + raw_share

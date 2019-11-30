@@ -162,6 +162,18 @@ class KDFParams(typ.NamedTuple):
         self._verify_encoding()
         return self.t_raw
 
+    @property
+    def argon2_type(self) -> int:
+        if self.h == HashAlgo.ARGON2_V19_D.value:
+            return argon2.low_level.Type.D
+        if self.h == HashAlgo.ARGON2_V19_I.value:
+            return argon2.low_level.Type.I
+        if self.h == HashAlgo.ARGON2_V19_ID.value:
+            return argon2.low_level.Type.ID
+
+        err_msg = f"Unknown hash_algo={self.h}"
+        raise ValueError(err_msg)
+
     def _replace_any(
         self, p: typ.Optional[int] = None, m: typ.Optional[int] = None, t: typ.Optional[int] = None
     ) -> 'KDFParams':
@@ -191,32 +203,19 @@ def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
     return KDFParams.decode(tmp.encode())
 
 
-def parse_argon2_version(h: HashAlgoVal) -> int:
-    return 19
+def _hash(data: bytes, p: int, m: int, t: int, h: int = HashAlgo.ARGON2_V19_ID.value) -> bytes:
+    version = argon2.low_level.ARGON2_VERSION
+    assert version == 19, version
 
-
-def parse_argon2_type(h: HashAlgoVal) -> int:
-    if h == HashAlgo.ARGON2_V19_D.value:
-        return argon2.low_level.Type.D
-    if h == HashAlgo.ARGON2_V19_I.value:
-        return argon2.low_level.Type.I
-    if h == HashAlgo.ARGON2_V19_ID.value:
-        return argon2.low_level.Type.ID
-
-    err_msg = f"Unknown hash_algo={h}"
-    raise ValueError(err_msg)
-
-
-def _hash(data: bytes, kdf_params: KDFParams) -> bytes:
     return argon2.low_level.hash_secret_raw(
         secret=data,
         salt=data,
         hash_len=1024,
-        type=parse_argon2_type(kdf_params.h),
-        memory_cost=kdf_params.m * 1024,
-        time_cost=kdf_params.t,
-        parallelism=kdf_params.p,
-        version=parse_argon2_version(kdf_params.h),
+        parallelism=p,
+        memory_cost=m * 1024,
+        time_cost=t,
+        type=h,
+        version=version,
     )
 
 
@@ -227,7 +226,7 @@ Increment = float
 ProgressCallback = typ.Callable[[Increment], None]
 
 
-DIGEST_STEPS = 20
+DIGEST_STEPS = 10
 
 MEASUREMENT_SIGNIFICANCE_THRESHOLD = 2
 
@@ -238,37 +237,48 @@ def digest(
     hash_len   : int,
     progress_cb: typ.Optional[ProgressCallback] = None,
 ) -> bytes:
-    total_t     = kdf_params.t
-    remaining_t = total_t
-
-    tgt_step_t = max(1, 1 + total_t // DIGEST_STEPS)
-    # progress_cb expects a total of 100 increments
-    progress_factor = 100 / total_t
-
+    constant_kwargs = {
+        'p': kdf_params.p,
+        'm': kdf_params.m,
+        'h': kdf_params.argon2_type,
+    }
     result = data
-    while remaining_t > 0:
-        step_t = min(remaining_t, tgt_step_t)
-        result = _hash(data, kdf_params._replace_any(t=step_t))
-        if progress_cb:
-            progress_cb(step_t * progress_factor)
 
-        remaining_t -= step_t
-
+    progress_per_iter = 100 / kdf_params.t
+    remaining_iters   = kdf_params.t
+    remaining_steps   = min(remaining_iters, DIGEST_STEPS)
     if progress_cb:
-        progress_cb(tgt_step_t * progress_factor)
+        progress_cb(0)
+
+    while remaining_iters > 0:
+        step_iters = max(1, round(remaining_iters / remaining_steps))
+        result     = _hash(result, t=step_iters, **constant_kwargs)
+        if progress_cb:
+            progress_cb(step_iters * progress_per_iter)
+
+        remaining_steps -= 1
+        remaining_iters -= step_iters
+
+    assert remaining_steps == 0, remaining_steps
+    assert remaining_iters == 0, remaining_iters
 
     return result[:hash_len]
 
 
 def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:
     test_kdf_params = baseline_kdf_params._replace_any(t=1)
+    constant_kwargs = {
+        'p': test_kdf_params.p,
+        'm': test_kdf_params.m,
+        'h': test_kdf_params.argon2_type,
+    }
 
     tgt_step_duration = target_duration / DIGEST_STEPS
     total_time        = 0.0
 
     while True:
         tzero = time.time()
-        _hash(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00", test_kdf_params)
+        _hash(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00", t=test_kdf_params.t, **constant_kwargs)
         duration = time.time() - tzero
         total_time += duration
 

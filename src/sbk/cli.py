@@ -467,7 +467,7 @@ def _validated_param_data(param_cfg: params.ParamConfig) -> bytes:
 
 
 def _validate_wallet_name(wallet_name: str) -> None:
-    invalid_char_match = re.search(r"[^a-z0-9\-_]", wallet_name)
+    invalid_char_match = re.search(r"[^a-z0-9\-]", wallet_name)
     if invalid_char_match is None:
         return
 

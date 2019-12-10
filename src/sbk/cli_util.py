@@ -157,14 +157,13 @@ def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
 
     for i, line in enumerate(text.splitlines()):
         line = line.strip().lower()
-        if not line:
+        if not line or line.startswith("data"):
             continue
-
-        line_no = i + 1
 
         match = FORMATTED_LINE_RE.match(line.strip())
         if match is None:
             if strict:
+                line_no = i + 1
                 err_msg = f"Invalid input at line {line_no}: {repr(line)}"
                 raise ValueError(err_msg)
             else:

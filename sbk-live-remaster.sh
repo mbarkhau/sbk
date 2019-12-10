@@ -131,7 +131,7 @@ export live_os="debian";
 
     # NOTE: Uncomment this line if you want don't want to
     #   rebuild from scratch every time.
-    # rm "iso_extract_unsquash.ok"
+    rm "iso_extract_unsquash.ok"
 
     if ! [ -f "iso_extract_unsquash.ok" ]; then
 		rm -rf extracted;
@@ -249,7 +249,9 @@ export live_os="debian";
     fi
 	mount_fs
 
+    msg_out "installing electrum";
 	tar xzf $sbk_electrumpath
+    rm -rf edit/usr/local/electrum/;
 	mkdir -p edit/usr/local/electrum/;
 	mv "Electrum-${SBK_ELECTRUM_VERSION}"/* edit/usr/local/electrum/;
 	# ln edit/usr/local/electrum/run_electrum edit/bin/electrum
@@ -261,8 +263,7 @@ export live_os="debian";
 
  	$CHROOT apt-get install -y lxde-core libzbar-dev;
 
-    # TODO: all dependencies should be vendored
-    #   (for electrum that appears to be the case)
+    # TODO: validate dependencies and use hashes in requirements/pypi.txt
  	$CHROOT apt-get install -y \
  		python3-pip \
  		python3-pyqt5 \

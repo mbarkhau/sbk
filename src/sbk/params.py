@@ -18,7 +18,7 @@ FLAG_IS_SEGWIT = 0b0001
 RAW_SALT_LEN         = 12
 PARAM_CFG_LEN        = 4
 SALT_LEN             = PARAM_CFG_LEN + RAW_SALT_LEN
-DEFAULT_BRAINKEY_LEN = 8
+DEFAULT_BRAINKEY_LEN = 6
 SHARE_X_COORD_LEN    = 1
 DEFAULT_SHARE_LEN    = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + DEFAULT_BRAINKEY_LEN
 
@@ -70,7 +70,7 @@ def init_param_config(
         raise ValueError(err_msg)
 
     raw_salt_len = RAW_SALT_LEN
-    assert raw_salt_len % 4 == 0
+    assert raw_salt_len % 2 == 0
     assert 4 <= raw_salt_len <= 64, raw_salt_len
 
     assert brainkey_len % 2 == 0
@@ -148,7 +148,7 @@ def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
     to keep the serialized param_cfg small and leave
     more room for randomness, hence the bit twiddling.
     """
-    assert param_cfg.raw_salt_len % 4 == 0
+    assert param_cfg.raw_salt_len % 2 == 0
     assert param_cfg.brainkey_len % 2 == 0
 
     f_brainkey_len = (param_cfg.brainkey_len // 2) - 1

@@ -1,5 +1,5 @@
 # Changelog for https://gitlab.com/mbarkhau/sbk
 
-## v201909.0001-alpha
+## v201912.1001-alpha
 
  - Initial release

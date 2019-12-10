@@ -9,6 +9,7 @@ import enum
 import math
 import time
 import typing as typ
+import threading
 
 import argon2
 
@@ -228,7 +229,44 @@ ProgressCallback = typ.Callable[[Increment], None]
 
 DIGEST_STEPS = 10
 
-MEASUREMENT_SIGNIFICANCE_THRESHOLD = 2
+
+class ProgressSmoother:
+
+    increments: typ.List[float]
+
+    def __init__(self, progress_cb: ProgressCallback) -> None:
+        self.increments = [0]
+
+        def fake_progress() -> None:
+            tzero = time.time()
+            while True:
+                time.sleep(1)
+                if self.total_incr == 0:
+                    progress_cb(0.1)
+                elif self.total_incr >= 100:
+                    progress_cb(100)
+                    return
+                else:
+                    duration     = time.time() - tzero
+                    incr_per_sec = self.total_incr / duration
+                    progress_cb(incr_per_sec * 1)
+
+        self._thread = threading.Thread(target=fake_progress)
+        self._thread.start()
+
+    @property
+    def total_incr(self):
+        return sum(self.increments) + max(self.increments) * 0.55
+
+    def progress_cb(self, incr: Increment) -> None:
+        self.increments.append(incr)
+
+    def join(self) -> None:
+        self._thread.join()
+
+
+def _dummy_cb(incr: Increment) -> None:
+    pass
 
 
 def digest(
@@ -237,6 +275,12 @@ def digest(
     hash_len   : int,
     progress_cb: typ.Optional[ProgressCallback] = None,
 ) -> bytes:
+    _ps = ProgressSmoother(progress_cb or _dummy_cb)
+
+    remaining_iters   = kdf_params.t
+    remaining_steps   = min(remaining_iters, DIGEST_STEPS)
+    progress_per_iter = 100 / kdf_params.t
+
     constant_kwargs = {
         'p': kdf_params.p,
         'm': kdf_params.m,
@@ -244,25 +288,21 @@ def digest(
     }
     result = data
 
-    progress_per_iter = 100 / kdf_params.t
-    remaining_iters   = kdf_params.t
-    remaining_steps   = min(remaining_iters, DIGEST_STEPS)
-    if progress_cb:
-        progress_cb(0)
-
     while remaining_iters > 0:
         step_iters = max(1, round(remaining_iters / remaining_steps))
         result     = _hash(result, t=step_iters, **constant_kwargs)
-        if progress_cb:
-            progress_cb(step_iters * progress_per_iter)
-
-        remaining_steps -= 1
+        _ps.progress_cb(step_iters * progress_per_iter)
         remaining_iters -= step_iters
+        remaining_steps -= 1
 
-    assert remaining_steps == 0, remaining_steps
     assert remaining_iters == 0, remaining_iters
+    assert remaining_steps == 0, remaining_steps
+    _ps.join()
 
     return result[:hash_len]
+
+
+MEASUREMENT_SIGNIFICANCE_THRESHOLD = 2
 
 
 def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:
@@ -287,8 +327,8 @@ def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Sec
 
         # print("<", round(duration, 3), "i/s =", iters_per_sec, "tgt =", step_iters)
         is_tgt_exceeded            = duration   > tgt_step_duration
-        is_enough_already          = total_time > 5
         is_measurement_significant = duration   > MEASUREMENT_SIGNIFICANCE_THRESHOLD
+        is_enough_already          = total_time > 5
         if is_tgt_exceeded or is_measurement_significant or is_enough_already:
             return test_kdf_params._replace_any(t=round(step_iters * DIGEST_STEPS))
 

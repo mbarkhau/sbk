@@ -56,6 +56,8 @@ WORDSET  = set(WORDLIST)
 assert len(WORDLIST) == 256
 assert len(WORDSET ) == 256
 assert sorted(WORDLIST) == WORDLIST
+assert all(5 <= len(w) <= 8 for w in WORDLIST)
+assert len({w[:3] for w in WORDLIST}) == 256
 
 WORD_INDEXES   = {w: i for i, w in enumerate(WORDLIST)}
 wordlist_index = WORD_INDEXES.__getitem__

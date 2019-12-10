@@ -225,10 +225,23 @@ class PromptState:
 
     def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
         lines = self._formatted_lines()
-        out_lines: typ.List[str] = []
+
+        header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
+        if show_cursor:
+            header = "   " + header
+
+        out_lines: typ.List[str] = [header]
+
+        if len(lines) < 6:
+            newline_mod = 99
+        else:
+            newline_mod = 3
+            for n in range(3, 6):
+                if len(lines) % n == 0 or 0 < len(lines) % newline_mod < len(lines) % n:
+                    newline_mod = n
 
         for line_index, line in enumerate(lines):
-            if len(lines) > 4 and line_index == len(lines) // 2:
+            if line_index > 0 and line_index % newline_mod == 0:
                 out_lines.append("")
 
             prefix = "   "

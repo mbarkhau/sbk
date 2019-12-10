@@ -15,6 +15,9 @@ from . import gf_poly
 
 
 def char_at(data: bytes, i: int) -> int:
+    # While SBK is not compatible with python2, this is one of the biggest
+    # gochas if that were ever undertaken. I'd rather have it explicit.
+
     # for py2 compat
     return ord(data[i : i + 1])
 

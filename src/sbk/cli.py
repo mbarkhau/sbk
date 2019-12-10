@@ -201,7 +201,7 @@ If you don't yet feel confident in your memory:
 When you have copied your Brainkey, press enter to continue
 """
 
-DEFAULT_KDF_TARGET_DURATION = float(os.getenv('SBK_KDF_TARGET_DURATION', 120))
+DEFAULT_KDF_TARGET_DURATION = float(os.getenv('SBK_KDF_TARGET_DURATION', 90))
 
 KDF_TARGET_DURATION_HELP = (
     "Target duration for Argon2 KDF (unless --time-cost is specified explicitly)"
@@ -301,7 +301,7 @@ _show_seed_option = click.option(
 ONLINE_MODE_OPTION_HELP = "Start electrum gui in online mode (--offline is the default)"
 
 _online_mode_option = click.option(
-    "-o", '--online-mode', type=bool, is_flag=True, default=False, help=ONLINE_MODE_OPTION_HELP
+    '--online', type=bool, is_flag=True, default=False, help=ONLINE_MODE_OPTION_HELP
 )
 
 
@@ -314,7 +314,7 @@ SEED_DATA_LEN = 16
 
 
 def _derive_seed(
-    param_cfg  : params.ParamConfig,
+    kdf_params : kdf.KDFParams,
     salt       : Salt,
     brainkey   : BrainKey,
     label      : str,
@@ -325,7 +325,7 @@ def _derive_seed(
     kdf_input        = master_key + wallet_name_data
 
     digester_fn = ft.partial(
-        kdf.digest, data=kdf_input, kdf_params=param_cfg.kdf_params, hash_len=SEED_DATA_LEN,
+        kdf.digest, data=kdf_input, kdf_params=kdf_params, hash_len=SEED_DATA_LEN,
     )
     if os.getenv('SBK_PROGRESS_BAR', "1") == '1':
         with click.progressbar(label=label, length=100, show_eta=True) as bar:
@@ -374,8 +374,7 @@ def _parse_kdf_params(
     if time_cost is None:
         # time_cost estimated based on duration
         kdf_pfd_fn = ft.partial(kdf.kdf_params_for_duration, kdf_params, target_duration)
-        runner     = cli_util.ThreadRunner[kdf.KDFParams](kdf_pfd_fn)
-        return runner.start_and_join()
+        return cli_util.run_with_progress_bar(kdf_pfd_fn, eta_sec=5.5, label="KDF Calibration")
     else:
         return kdf_params
 
@@ -403,7 +402,7 @@ def kdf_test(
     dummy_brainkey = b"\x00" * param_cfg.brainkey_len
 
     tzero = time.time()
-    _derive_seed(param_cfg, dummy_salt, dummy_brainkey, label="kdf-test")
+    _derive_seed(param_cfg.kdf_params, dummy_salt, dummy_brainkey, label="kdf-test")
     duration = time.time() - tzero
     echo(f"Duration   : {round(duration):>4} sec")
 
@@ -584,8 +583,17 @@ def create(
     assert raw_salt_recovered == raw_salt
     assert brainkey_recovered == brainkey
 
-    # verify that derivation works before we show anything
-    _derive_seed(param_cfg, salt, brainkey, label="Validating KDF")
+    has_manual_kdf_p = parallelism is not None
+    has_manual_kdf_m = memory_cost is not None
+    if has_manual_kdf_p or has_manual_kdf_m:
+        # Verify that derivation works before we show anything. This is for manually chosen values
+        # of kdf_p and kdf_m, because they may exceed what the system is capable of. If we did not
+        # do this the user might get an OOM error later when they try to load the wallet.
+        validation_kdf_params = param_cfg.kdf_params._replace_any(t=min(1, param_cfg.kdf_params.t))
+        _derive_seed(validation_kdf_params, salt, brainkey, label="KDF Validation ")
+    else:
+        # valid values for kdf_m and kdf_p were already tested as part of "KDF Calibration"
+        pass
 
     _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
 
@@ -696,7 +704,7 @@ def _clean_wallet(wallet_fpath: pl.Path) -> None:
 def load_wallet(
     wallet_name: str  = DEFAULT_WALLET_NAME,
     show_seed  : bool = False,
-    online_mode: bool = False,
+    online     : bool = False,
     yes_all    : bool = False,
 ) -> None:
     """Open wallet using Salt+Brainkey."""
@@ -719,7 +727,7 @@ def load_wallet(
 
     yes_all or echo()
     seed_data = _derive_seed(
-        param_cfg, salt, brainkey, wallet_name=wallet_name, label="Deriving Wallet Seed"
+        param_cfg.kdf_params, salt, brainkey, wallet_name=wallet_name, label="Deriving Wallet Seed"
     )
 
     seed_type = 'segwit' if param_cfg.is_segwit else 'standard'
@@ -732,7 +740,7 @@ def load_wallet(
     restore_cmd = ["electrum", "restore", "--wallet", str(wallet_fpath), seed_phrase]
     load_cmd    = ["electrum", "gui"    , "--wallet", str(wallet_fpath)]
 
-    if not online_mode:
+    if not online:
         load_cmd.append("--offline")
 
     if show_seed:

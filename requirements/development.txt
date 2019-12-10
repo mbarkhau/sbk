@@ -48,3 +48,5 @@ graphviz
 # run failed tests first
 pytest-cache
 
+# to help maintain hashes in requirements/pypi.txt
+hashin

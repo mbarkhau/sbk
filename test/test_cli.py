@@ -122,7 +122,11 @@ def test_format_secret(data_len):
 @pytest.mark.parametrize("data_len", DATA_LENS)
 def test_partial_format_secret(data_len):
     data  = os.urandom(data_len)
-    lines = [l for l in sbk.cli_io.format_secret_lines('salt', data) if l.strip()]
+    lines = [
+        l
+        for l in sbk.cli_io.format_secret_lines('salt', data)
+        if l.strip() and not l.strip().lower().startswith("data")
+    ]
     assert len(lines) == data_len // 2
 
 
@@ -188,70 +192,79 @@ def test_threading():
 
 DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
-   01: 000-305   academy   colombia    14: 029-099
-   02: 065-536   abraham   abraham     15: 093-311
-   03: 131-522   academy   seattle     16: 175-934
-   04: 247-256   sheriff   theatre     17: 245-674
-   05: 316-374   taiwan    tequila     18: 288-548
-   06: 387-564   uruguay   veteran     19: 361-216
 
-   07: 452-602   umbrella  whisky      20: 423-606
-   08: 523-760   yoghurt   virginia    21: 495-679
-   09: 560-014   muffin    nagasaki    22: 533-390
-   10: 622-980   library   macbook     23: 594-610
-   11: 696-210   oxford    netflix     24: 683-300
-   12: 759-208   nintendo  plumber     25: 739-917
-   13: 828-213   pelican   crown       26: 793-747
+        Data          Mnemonic               ECC
+   01: 000-289   academy   boeing      13: 839-540
+   02: 065-536   abraham   abraham     14: 006-657
+   03: 131-522   academy   seattle     15: 107-612
+   04: 247-256   sheriff   theatre     16: 187-871
+
+   05: 316-374   taiwan    tequila     17: 248-045
+   06: 387-564   uruguay   veteran     18: 289-066
+   07: 452-602   umbrella  whisky      19: 388-700
+   08: 523-760   yoghurt   virginia    20: 437-022
+
+   09: 560-014   muffin    nagasaki    21: 508-272
+   10: 622-980   library   macbook     22: 558-874
+   11: 696-210   oxford    netflix     23: 647-162
+   12: 759-084   nintendo  champion    24: 692-246
 
                      Share 2/3
-   01: 000-305   academy   colombia    14: 062-350
-   02: 065-536   abraham   abraham     15: 090-673
-   03: 131-779   acrobat   server      16: 174-029
-   04: 249-335   squid     warrior     17: 230-023
-   05: 319-979   tsunami   vampire     18: 270-930
-   06: 365-983   nintendo  oxford      19: 337-680
 
-   07: 428-467   mosquito  queen       20: 425-294
-   08: 507-303   salmon    pilot       21: 474-437
-   09: 545-115   freddie   gotham      22: 573-486
-   10: 607-567   embassy   forest      23: 639-904
-   11: 686-435   kingdom   hendrix     24: 664-396
-   12: 748-823   italy     beehive     25: 726-929
-   13: 786-894   academy   stone       26: 796-789
+        Data          Mnemonic               ECC
+   01: 000-289   academy   boeing      13: 787-724
+   02: 065-536   abraham   abraham     14: 041-874
+   03: 131-779   acrobat   server      15: 067-805
+   04: 249-335   squid     warrior     16: 146-514
+
+   05: 319-979   tsunami   vampire     17: 201-071
+   06: 365-983   nintendo  oxford      18: 301-536
+   07: 428-467   mosquito  queen       19: 372-128
+   08: 507-303   salmon    pilot       20: 426-302
+
+   09: 545-115   freddie   gotham      21: 496-647
+   10: 607-567   embassy   forest      22: 574-163
+   11: 686-435   kingdom   hendrix     23: 649-798
+   12: 748-815   italy     atlantic    24: 662-138
 
                      Share 3/3
-   01: 000-305   academy   colombia    14: 036-196
-   02: 065-536   abraham   abraham     15: 102-667
-   03: 131-893   admiral   crown       16: 153-244
-   04: 211-995   diesel    berlin      17: 221-340
-   05: 263-689   albino    android     18: 321-673
-   06: 346-183   escort    engine      19: 373-481
 
-   07: 416-381   gorilla   lasagna     20: 429-551
-   08: 488-547   kangaroo  hendrix     21: 503-706
-   09: 585-441   vietnam   tsunami     22: 550-990
-   10: 651-519   virginia  zimbabwe    23: 625-838
-   11: 709-317   suzuki    sheriff     24: 661-917
-   12: 773-259   sparrow   muffin      25: 775-468
-   13: 824-942   norway    jakarta     26: 839-134
+        Data          Mnemonic               ECC
+   01: 000-289   academy   boeing      13: 803-620
+   02: 065-536   abraham   abraham     14: 015-843
+   03: 131-893   admiral   crown       15: 093-346
+   04: 211-995   diesel    berlin      16: 156-457
+
+   05: 263-689   albino    android     17: 241-425
+   06: 346-183   escort    engine      18: 313-766
+   07: 416-381   gorilla   lasagna     19: 353-780
+   08: 488-547   kangaroo  hendrix     20: 421-591
+
+   09: 585-441   vietnam   tsunami     21: 501-546
+   10: 651-519   virginia  zimbabwe    22: 526-484
+   11: 709-317   suzuki    sheriff     23: 653-787
+   12: 773-351   sparrow   umbrella    24: 693-598
 
 
                        Salt
-   01: 000-305   academy   colombia    09: 582-581
-   02: 065-536   abraham   abraham     10: 594-210
-   03: 144-436   cowboy    cowboy      11: 693-392
-   04: 209-972   cowboy    cowboy      12: 739-197
 
-   05: 275-508   cowboy    cowboy      13: 848-823
-   06: 341-044   cowboy    cowboy      14: 048-987
-   07: 406-580   cowboy    cowboy      15: 094-511
-   08: 472-116   cowboy    cowboy      16: 150-745
+        Data          Mnemonic               ECC
+   01: 000-289   academy   boeing      09: 585-354
+   02: 065-536   abraham   abraham     10: 604-186
+   03: 144-436   cowboy    cowboy      11: 697-429
+   04: 209-972   cowboy    cowboy      12: 739-428
+
+   05: 275-508   cowboy    cowboy      13: 845-213
+   06: 341-044   cowboy    cowboy      14: 026-334
+   07: 406-580   cowboy    cowboy      15: 103-947
+   08: 472-116   cowboy    cowboy      16: 178-527
 
                      Brainkey
-   01: 013-364   cowboy    cowboy      05: 275-508
-   02: 078-900   cowboy    cowboy      06: 341-044
-   03: 144-436   cowboy    cowboy      07: 406-580
-   04: 209-972   cowboy    cowboy      08: 472-116
+
+        Data          Mnemonic               ECC
+   01: 013-364   cowboy    cowboy      04: 209-972
+   02: 078-900   cowboy    cowboy      05: 275-508
+   03: 144-436   cowboy    cowboy      06: 341-044
 """
 
 
@@ -259,9 +272,8 @@ def _parse_output(output: str) -> typ.Dict[str, ParsedSecret]:
     secret_lines = collections.defaultdict(list)
     headline     = None
     for line in output.splitlines():
-        if not line.strip():
-            continue
-        if "_" in line:
+        line = line.strip().lower()
+        if not line or line.startswith("data") or "_" in line:
             continue
 
         match = FORMATTED_LINE_RE.search(line.strip())
@@ -344,8 +356,15 @@ def test_cli_create_basic():
         "--memory-cost=1",
         "--time-cost=1",
     ]
-    env    = {'SBK_PROGRESS_BAR': '0'}
+    env = {
+        'SBK_PROGRESS_BAR': '0',
+        # 'SBK_DEBUG_RANDOM': 'DANGER',
+    }
     result = _run(sbk.cli.create, argv, env=env, playbook=[])
+
+    # print("---------------------")
+    # print(result.output)
+    # print("---------------------")
 
     out_secrets = _parse_output(result.output)
     salt        = out_secrets['salt']
@@ -438,7 +457,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 582-581 <=") == 1
+    assert result.output.count("09: 585-354 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -459,7 +478,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 582-581 <=") == 1
+    assert result.output.count("09: 585-354 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):

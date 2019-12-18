@@ -245,6 +245,14 @@ def _miller_test_bases(n: int, k: int) -> typ.Iterable[int]:
     return bases
 
 
+def _is_composite(n: int, r: int, x: int) -> bool:
+    for _ in range(r - 1):
+        x = pow(x, 2, n)
+        if x == n - 1:
+            return False
+    return True
+
+
 def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
     """Miller-Rabin Primality Test.
 
@@ -272,14 +280,7 @@ def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
         if x == 1 or x == n - 1:
             continue
 
-        is_composite = True
-        for _ in range(r - 1):
-            x = pow(x, 2, n)
-            if x == n - 1:
-                is_composite = False
-                break
-
-        if is_composite:
+        if _is_composite(n, r, x):
             return False
 
     return True

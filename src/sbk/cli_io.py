@@ -120,6 +120,17 @@ def _parse_share_len(inputs: Inputs) -> int:
     )
 
 
+def _newline_mod(num_lines: int) -> int:
+    if num_lines < 6:
+        newline_mod = 99
+    else:
+        newline_mod = 3
+        for n in range(3, 6):
+            if num_lines % n == 0 or 0 < num_lines % newline_mod < num_lines % n:
+                newline_mod = n
+    return newline_mod
+
+
 class PromptState:
 
     data_type: InputType
@@ -223,26 +234,13 @@ class PromptState:
 
         return lines
 
-    def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
-        lines = self._formatted_lines()
-
-        header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
-        if show_cursor:
-            header = "   " + header
-
-        out_lines: typ.List[str] = [header]
-
-        if len(lines) < 6:
-            newline_mod = 99
-        else:
-            newline_mod = 3
-            for n in range(3, 6):
-                if len(lines) % n == 0 or 0 < len(lines) % newline_mod < len(lines) % n:
-                    newline_mod = n
+    def _iter_out_lines(self, show_cursor: bool) -> typ.Iterator[str]:
+        lines       = self._formatted_lines()
+        newline_mod = _newline_mod(len(lines))
 
         for line_index, line in enumerate(lines):
             if line_index > 0 and line_index % newline_mod == 0:
-                out_lines.append("")
+                yield ""
 
             prefix = "   "
             suffix = ""
@@ -253,9 +251,14 @@ class PromptState:
                 elif line_index == (self.cursor % len(lines)):
                     suffix = "<="
 
-            out_lines.append(prefix + line + suffix)
+            yield prefix + line + suffix
 
-        return out_lines
+    def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
+        header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
+        if show_cursor:
+            header = "   " + header
+
+        return [header] + list(self._iter_out_lines(show_cursor))
 
     def _copy(self, **overrides) -> 'PromptState':
         return PromptState(

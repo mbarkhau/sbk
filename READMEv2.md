@@ -1,5 +1,5 @@
 <p align="center">
-<img alt="SBK Logo" src="https://mbarkhau.keybase.pub/sbk/logo_128.png" height="128" />
+<a href="https://gitlab.com/mbarkhau/sbk"><img alt="SBK Logo" src="https://mbarkhau.keybase.pub/sbk/logo_128.png" height="128" /></a>
 </p>
 
 # SBK: Split Bitcoin Keys
@@ -41,7 +41,7 @@ Code Quality/CI:
     - [1. Key Generation](#1-key-generation)
     - [2. Key Recovery](#2-key-recovery)
     - [3. Loading Wallet](#3-loading-wallet)
-  - [Shamirs Secret Sharing](#shamirs-secret-sharing)
+  - [Shamir's Secret Sharing](#shamirs-secret-sharing)
     - [Prelude: Naive Key Splitting](#prelude-naive-key-splitting)
     - [SSS: Shamir's Secret Sharing](#sss-shamirs-secret-sharing)
     - [SSS: Choice of Galois Field ](#sss-choice-of-galois-field-)
@@ -49,10 +49,11 @@ Code Quality/CI:
     - [Terms and Notation](#terms-and-notation)
     - [Parameters](#parameters)
     - [Share Data](#share-data)
-  - [Wallet Name/Phassphrase](#wallet-namephassphrase)
+  - [Wallet Name/Passphrase](#wallet-namepassphrase)
     - [Decoy Wallets](#decoy-wallets)
   - [Key Derivation](#key-derivation)
     - [Brute Force Attack Hypothetical ](#brute-force-attack-hypothetical-)
+    - [Parameter Choices](#parameter-choices)
     - [KDF Implementation](#kdf-implementation)
   - [Encoding Secrets: Mnemonics and Intcodes](#encoding-secrets-mnemonics-and-intcodes)
     - [Prelude on Physical Deterioration](#prelude-on-physical-deterioration)
@@ -66,7 +67,7 @@ Code Quality/CI:
     - [Will SBK Remain Available?](#will-sbk-remain-available)
   - [Future Work](#future-work)
     - [SLIP0039](#slip0039)
-    - [Distruibution](#distruibution)
+    - [Distribution](#distribution)
 - [User Guide](#user-guide)
   - [Trustee Guide](#trustee-guide)
     - [Integrity and Seals](#integrity-and-seals)
@@ -94,9 +95,9 @@ With SBK you can create highly secure Bitcoin wallets. This means:
  - Your coins are safe, even if you trusted some people you shouldn't have (not too many though).
  - Your coins are safe, even if something happens to you (at least your family can still recover your coins).
 
-You can use SBK to securely generate keys that are completely under your control, even as a layperson. SBK enables you to live up to the mantra: [Your keys, your coins; not your keys, not your coins][href_yt_aantonop]. SBK may be a bit more tedious to use than other approaches (though not more difficult), but you can minimize this extra effort by using it only for its intended use-case: infrequently accessed cold storage wallets. You can then have a separate hot wallet for regular use, which is less secure, but only has a small amount that you can afford to lose.
+You can use SBK to generate bitcoin wallet keys that are completely under your control. The goal of SBK is to enable most people to live up to the security mantra of bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_aantonop].
 
-> Aside: SBK is quite similar to [warp wallet][href_warp_wallet], except that it has an additional backup using Shamir's Secret Sharing.
+> Aside: SBK is quite similar to [warp wallet][href_warp_wallet] with an additional backup using Shamir's Secret Sharing.
 
 [href_yt_aantonop]: https://www.youtube.com/watch?v=AcrEEnDLm58
 
@@ -106,10 +107,10 @@ You can use SBK to securely generate keys that are completely under your control
 ## How SBK Works
 
 <p align="center">
-<img alt="SBK Dataflow Diagram" src="https://mbarkhau.keybase.pub/sbk/sbk_overview.svg" height="256" />
+<img alt="SBK Data-flow Diagram" src="https://mbarkhau.keybase.pub/sbk/sbk_overview.svg" height="256" />
 </p>
 
-SBK has two ways to recover/load your wallet, one as a backup and the other for normal use:
+SBK has two ways for you to open your wallet, one as a backup and the other for normal use:
 
  1. `Shares`: A single `share` is one part of a backup of your wallet. When you combine enough `shares` together (e.g. 3 of 5 in total), you can recover your wallet. The [Shamir's Secret Sharing][href_wiki_sss] algorithm is used to generate the `shares`, which you can distribute in secure locations or give to people you trust. Each `share` is useless by itself, so you don't have to trust a person completely. Not every `share` is required for recovery, so even if a few of them are lost or destroyed, you can still recover your wallet.
  2. `Salt` + `Brainkey`: The `Salt` is a secret, very similar to a traditional 12-word wallet seed. It is written on a piece of paper and kept in a secure location, accessible only to you. By itself, the `salt` is not enough to load your wallet. To do that you must also know your `brainkey`. A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written on any piece of paper. In other words, the `brainkey` is only in your brain. 
@@ -126,15 +127,172 @@ SBK is not itself a wallet, it only creates and recovers your wallet seeds. SBK 
 
 > *DISCLAIMERS*
 >
->  - As of November 2019, SBK is still in the experimental, pre-alpha, evaluation only,
+>  - As of December 2019, SBK is still in the experimental, pre-alpha, evaluation only,
 >    developmental prototype phase (is that enough hedging for ya? :-P). It is not yet
 >    suitable for serious use! If you do use it, assume that all of your coins will be
 >    lost.
+>  - The authors of SBK (or any other wallet software licensed under the 
+>    [MIT License][href_mit_license]) have no responsibility to help you recover your 
+>    wallet and cannot be held liable if your funds are lost or stolen.
 >  - Do not use this software for any purpose other than to review, provide feedback or
 >    to make contributions.
->  - The SBK project is not associated with the Electrum Bitoin Wallet or
+>  - The SBK project is not associated with the Electrum Bitcoin Wallet or
 >    Electrum Technologies GmbH.
 >  - The SBK project is not associated with SatoshiLabs s.r.o.
+
+[href_mit_license]: https://choosealicense.com/licenses/mit/
+
+
+# User Guide
+
+The great thing about bitcoin is that *you have complete control* of your own money: you are your own bank. The terrible thing about bitcoin is that *you are responsibile* for your own money: you are your own bank. Unlike traditional financial systems, if your bitcoin is lost or stolen, you will have no recourse to any institution whatsoever. No government, no bank, no company, nor any programmer has any obligation or even any ability to help you if something goes wrong. The goal of SBK is to make it easier for you to bear this burden of responsibility and to minimize the chance that you lose control of your coins.
+
+Before we go over how to use SBK, it will be easier for you to understand the steps you will need to take, if you have a clear understanding of the risks involved, how SBK is designed to minimize them and what you can do to minimize them yourself.
+
+
+## Convenience vs Tedium
+
+SBK is not the most convenient way to create a bitcoin wallet: the price of the extra security provided by SBK is that it is a bit more tedious to use than other approaches. The indended use-case of an SBK wallet is for infrequently accessed funds in cold storage, for example a wallet that you use for long-term savings (i.e. a savings account). If you want to access some of your bitcoin more frequently, you may want to use a separate hot wallet with a lower balance. Such a wallet may be less secure, but is more convenient to use and it only has as much as you can afford to lose (ie. pocket change).
+
+
+## Safe, Secret and Secure
+
+ - Safe 
+ - Secret
+ - Secure
+
+
+## Weighing Risks
+
+ - Mistake (aka. User Error, aka. being human)
+ - Scam
+ - Disaster, Bug 
+
+
+The software required to load your wallet may no longer be available. SBK is hosted both on gitlab.com/mbarkhau/sbk and also on github.com/mbarkhau/sbk and you can download stand-alone versions of SBK that can be run from an USB-Stick.
+
+
+
+Whenever you use any any bitcoin wallet, you are exposed to various risks:
+
+ 1. You might make a mistake: You might forget a critical password, you might write down a secret phrase incorrectly, you might load your wallet on an insecure system etc.
+ 2. You can fall prey to a scam: This can happen if you download your wallet software from an untrustworthy source, ie. from the website of a malicious programmer or scammer, rather than from the website of the original author.
+ 3. The wallet software may have a bug: Your wallet may be generated in a way that it cannot be recovered or in a way that can be exploited by others to steal your funds. (As of this writing, such bugs may be the greatest risk when using SBK).
+
+For most people, the greatest risk is usually the first: Important but complicated steps are either skipped or not done with dilligence, so that your keys are lost or stolen. This is due to a combination of factors:
+
+You can lose your funds through a lack of diligence when using your wallet. This can happen if you do not keep your keys secret, for example by loading your wallet on an insecure system, you may lose your keys in an accident or you may simply forget a critical password.
+
+ - Complicated and tedious 
+ - Lack of justification 
+ - Steps are complicated and tedious. If the extra effort is not justified, and if the consequences of skipping them are Without an understanding of  Due to a lack of understanding of security practices, the consequences of which are either years in the future or appear to be , important steps are skipped . causes leads to the inability to dilligently first and it is the risk that SBK is primarilly designed to address. Far more funds are lost or stolen due to improper handling of keys, than are lost due to hacking or bugs. The goal of SBK is therefore to:
+
+SBK is by no means free from tedium. It can be a considerable effort to prepare a secure computer, to manually copy dozens and dozens of words and numbers with dilligence and to . The documentation of SBK is written to help you judge if this effort is justified for you.
+
+ - Minimize the risk of you losing your keys.
+ - Minimize the risk of your keys being exposed to vulnerable computer systems.
+ - Minimize the involvement of third parties who might steal your keys.
+ - Minimize the trust placed in any individual third party.
+
+For more information on how to minimize the risk of downloading a mallicious version of SBK, please review the section on [software verification](#software-verification).
+
+
+## Roles 
+
+There are different roles that you might play in connection with an SBK wallet:
+
+ - Owner: You have some funds that you want to protect from loss and theft. You generate the wallet keys, create the backup shares and make preparations so that your wallet can be recovered in the case of a disaster.
+ - Agent: The owner has entrusted you to act on their behalf, for example in case they have become infirm or incapacitated, or to carry out their final will.
+ - Trustee: The owner has entrusted you with a backup `share` that you should keep safe, secret and secure. If anything happens to your `share`, you should inform the owner as soon as possible.
+
+No matter your role, you should be aware that the security of a wallet depends on your dilligence. SBK may be built with redundancy to protect a wallet from being lost, but it would be foolish of you to rely on that protection. If enough trustees neglect their responsibilities, then the backup shares will be worthless.
+
+
+## Owner Guide
+
+Before you create a wallet, you should make some preparations. You should:
+
+ 1. Consider how to distribute your backup shares so that you minimise your vulnrability to bad actors.
+ 2. Prepare materials to create shares. Ideally a share should survive a fire and it should have a tamper-evident seal.
+
+We will start with the considerations wrt. bad actors. There are some risks that you will have to weigh, depending on your situtation.
+
+ - Risk of Extortion: A person who has a share can assume that you have at least some bitcoin. Even if they are trustworthy and would never try to threaten and extort you, they might be careless about this information. Giving somebody one of your shares can be the equivalent of painting a target on your back and somebody might knock down your door in the middle of the night. 
+ - Holdouts: A person who has a share might get the idea that you depend on them. This means that they could refuse to return the share to you unless you compensate them somehow.
+
+There are two ways to protect yourself from extortion:
+
+ - Only use the backup shares and make sure a share from at least one person or institution is required. If the only way for you to recover your wallet is by using the backup shares, then it is not enough for extorionist to threaten you. They must also threaten the additional person or institution, which puts them at a much greater risk of being apprehended. To maintain the plausability of this, it is best if you do 
+
+ 
+ - In your safe at home.
+ - In safety deposit boxes.
+ - In secret and inaccessible locations.
+ - With trusted family or friends.
+
+There are a two main considerations when you choose where/with whom to leave your backup shares.
+
+ - You want to ensure that 
+ - 
+
+Presumably you will only give a share to a person whom you can trust, so the following two issues of collusion and extortion should hopefully not be an issue. To preempt such issues however, you should make the following clear to any trustee:
+
+ - You have plenty of other backup shares to resort to. If they do not return their share to you upon request, there are others you can access and there is no point in them attempting to extort you.
+ - It is pointless for them to collude and gather shares. You have not given enough shares to people with whom they could collude, so any such attempt would be fruitless.
+ - If they do attempt to collude, it is enough for even just one trustee to warn you (the owner), so that you can create a new wallet and move all your funds away from the wallet they are trying to steal from.
+
+You should not give your friends and family enough shares so that they could collude to steal from you. You should make it clear to them that such collusion will be fruitless so that they are not even tempted.
+
+Ideally you will have access to enough backup shares so that you. This
+
+
+### Creating Shares
+
+It may appear strange that the supposed money of the future requires you to write dozens and dozens of words onto paper. Don't we have printers to save us from this kind of tedious and error prone work?
+
+If you still trust printer manufacturers to create products that perform even the most rudimentary of their advertised functions, namely creating faithful physical copies, then you may find it enlightening to review [some of the work](https://www.youtube.com/watch?v=c0O6UXrOZJo) of [David Kriesel's][href_dkriesel_xerox_fail]. If printer manufacturers cannot even do this job right, how much confidence should we place in their ability to create devices that cannot be exploited while being connected to a network. 
+
+Suffice it to say, I recommend you do not trust your printer farther than you can throw it. SBK provides templates in [A4 format][href_sbk_template_a4] and [US-Letter format][href_sbk_template_us_letter] for you to print, but these do not contain any secret information and are only to make it easier for you to create shares. You will have to manually write down all of the data for your `salt` and `shares`.
+
+
+[href_dkriesel_xerox_fail]: http://www.dkriesel.com/en/blog/2013/0802_xerox-workcentres_are_switching_written_numbers_when_scanning
+
+[href_sbk_template_a4]: https://mbarkhau.keybase.pub/sbk/template_a4.pdf
+
+[href_sbk_template_us_letter]: https://mbarkhau.keybase.pub/sbk/template_us_letter.pdf
+
+
+
+### Decoy Wallets
+
+One of the legitimate uses for a `--wallet-name` is to enable [plausible deniability][href_wiki_plausible_deniability] against an attacker who is in a position to extort you. If the attacker has access to the `salt` and if they can coerce you to reveal your `brainkey`, then they may be satisfied when they load a wallet and find some coins. If you have set this up in advance, the wallet they load may in fact only be a decoy. Your main wallet would use a custom `--wallet-name`, which they do not know about and which you can plausibly deny the existence of.
+
+[href_wiki_plausible_deniability]: https://en.wikipedia.org/wiki/Plausible_deniability
+
+While we're on the topic of plausible deniability; another approach you can take is to simply discard your `salt` and `brainkey` and to rely only the backup `shares`. If an attacker knows for certain that you have an SBK wallet, but they cannot find the `salt`, then you can plausibly claim, that you have thrown it away and that you never intended to access the wallet for years to come, so the backup `shares` were perfectly adequate. This is a plausible scenario if for example you were leaving the wallet as an inheritance, with your will containing the people and locations where shares can be found. The attacker would then have to extend their attack to recovering the shares, possibly involving more people, more time and more risk for them. The downside of actually throwing away your `salt` and `brainkey` is that you may now require the cooperation of the trustees and you may be faced with a holdout.
+
+
+## Agent Guide
+
+> Aside: If you recover your own wallet and you collect the `shares` personally, it *may* be safe to continue to use the wallet and to not generate new keys. If you are *not* the owner however, and the recovery process involves the cooperation of some trustees, then there is a higher risk that some of them will collude to gain access to more `shares` than just their own. In this case it is best to prepare a new wallet in advance and move all coins to it as soon as possible. For more information, see the [Recovery Protocol](#recovery_protocol)
+
+
+## Trustee Guide
+
+TODO
+
+
+## Checklist
+
+ - ☐ Print templates for N shares and 1 salt
+ - ☐ Install Electrum Wallet on your phone
+
+
+
+## Software Verification
+
+TODO
+
 
 # Implementation Overview
 
@@ -151,10 +309,10 @@ For the time being, the documentation is mainly for contributors rather than use
 ## High Level Overview: Generating, Splitting and Joining Keys
 
 <p align="center">
-<img alt="SBK Dataflow Diagram" src="https://mbarkhau.keybase.pub/sbk/sbk_dataflow_diagram.svg" height="650" />
+<img alt="SBK Data-flow Diagram" src="https://mbarkhau.keybase.pub/sbk/sbk_dataflow_diagram.svg" height="650" />
 </p>
 
-This diagram can only tell so much of course (some of the boxes might as well be labled with "magic"). The next few sections explain in a little more detail how each step works.
+This diagram can only tell so much of course (some of the boxes might as well be labeled with "magic"). The next few sections explain in a little more detail how each step works.
 
 
 ### 1. Key Generation
@@ -180,12 +338,10 @@ Let's assume that you've already forgotten your `brainkey`, or that your handwri
 
 Note that the wallet is not loaded directly, instead the recovery produces the `salt` and `brainkey`. Loading the wallet is a separate step.
 
-> Aside: If you recover your own wallet and you collect the `shares` personally, it *may* be safe to continue to use the wallet and to not generate new keys. If you are *not* the owner however, and the recovery process involves the cooperation of some trustees, then there is a higher risk that some of them will collude to gain access to more `shares` than just their own. In this case it is best to prepare a new wallet in advance and move all coins to it as soon as possible. For more information, see the [Recovery Protocol](#recovery_protocol)
-
 
 ### 3. Loading Wallet
 
-You can load the wallet if you have the `salt` and `brainkey`, either directly as the owner, or after they have been recovered them from the backup `shares`. 
+You can load the wallet if you have the `salt` and `brainkey`, either directly as the owner, or after you have recovered them from the backup `shares`. 
 
  1. Invoke the `sbk load-wallet` command.
  2. Optionally specify a `--wallet-name`. 
@@ -199,14 +355,14 @@ You can load the wallet if you have the `salt` and `brainkey`, either directly a
 [href_wiki_data_remanence]: https://en.wikipedia.org/wiki/Data_remanence
 
 
-## Shamirs Secret Sharing
+## Shamir's Secret Sharing
 
 This section describes how the `shares` are generated.
 
 
 ### Prelude: Naive Key Splitting
 
-It's fairly obvoius why you might want to split a secret key into multiple parts: Anybody who finds or steals the full key will have access to your wallet. To reduce the risk if being robbed, you can split the key into multiple parts. If somebody finds such a fragment, it will not be enough to access your wallet.
+It's fairly obvious why you might want to split a secret key into multiple parts: Anybody who finds or steals the full key will have access to your wallet. To reduce the risk if being robbed, you can split the key into multiple parts. If somebody finds such a fragment, it will not be enough to access your wallet.
 
 If for example you have a wallet seed of 12 bytes `"abcd efgh ijkl"` (with 96 bits of entropy), you could split it into fragments: `"1: abcd"`, `"2: efgh"`, `"3: ijkl"`. This way each fragment (by itself) is not enough to recover your wallet. The downside is that you increase the risk of losing your wallet: If you lose even one fragment, you also lose the wallet.
 
@@ -227,17 +383,17 @@ With SSS, a key can be split into `shares` such that each `share` is completely 
  1. Any two `shares` can be lost and the remaining three are enough to recover the original key.
  2. Any individual `share` (or subset of `shares` below the `threshold`) is useless. This means that access to fewer than three `shares` does not provide an attacker with any advantage if they attempt to brute-force a wallet seed.
 
-To get an intuition of how SSS works, it is enough to recall some high-school calculus.
+To get an intuition of how SSS works and why it is secure, it is enough to recall some high-school calculus.
 
-Consider a point `S(x=0, y=s)` on the cartesian plane, where the coordinate `y=s` is your secret encoded as a number:
+Consider a point `S(x=0, y=s)` on the Cartesian plane, where the coordinate `y=s` is your secret encoded as a number:
 
 <img alt="Cartesian plane with single point S" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_1.svg" height="220" />
 
-Now consider `y = jx + k`, a polinomial of degree 1 (aka. a linear equation, aka. a line equation) which goes through point `S` and further points `A(x=1, y=a)` and `B(x=2, y=b)`.
+Now consider `y = jx + k`, a polynomial of degree 1 (aka. a linear equation, aka. a line equation) which goes through point `S` and further points `A(x=1, y=a)` and `B(x=2, y=b)`.
 
 <img alt="Cartesian plane with line sloping down through points S, A and B" src="https://mbarkhau.keybase.pub/sbk/sss_diagram_2.svg" height="220" />
 
-Note that the parameter `j` is generated randomly and `k` is our secret `s`, so that if `x=0` then `y=s`. Recall that a polynomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you know `A` and `B`, you can derive the parameters `j` and `k` of the equation `y = jx + k` and solve for `x=0` to recover `y=s`. If on the other hand, you have *only* `A` or *only* `B`, then there are an infinite number of lines which go through either. In other words, it is impossible to derive `S` from `A` individually or from `B` individually. To complete the picture, we could generate a further point `C`, so that we only require any two of `A`, `B` and `C` in order to recover `S`. This allows us to create a `2of3` scheme.
+Note that the parameter `j` is generated randomly and `k` is our secret `s`, so that if `x=0` then `y=s`. Recall that a polynomial of degree 1 is fully specified if you have any two distinct points through which it goes. In other words, if you know `A` and `B`, you can derive the parameters `j` and `k` of the equation `y = jx + k` and solve for `x=0` to recover `y=s`. If on the other hand, you have *only* `A` or *only* `B`, then there are an infinite number of lines which go through either. In other words, it is impossible to derive `S` from `A` alone or from `B` alone. To complete the picture, we could generate a further point `C`, so that we only require any two of `A`, `B` and `C` in order to recover `S`. This allows us to create a `2of3` scheme.
 
 Similarly we can create a `3ofN` scheme with a polynomial of degree 2 (aka. a quadratic equation, aka. a parabola), a `4ofN` scheme with a polynomial of degree 3 (aka. a cubic equation) and so on.
 
@@ -258,9 +414,9 @@ The degree of the polynomial allows us control of the minimum number (aka. the `
 
 ### SSS: Choice of Galois Field 
 
-There is more to the story of course. My understanding is that the preceding scheme (which uses the traditional cartesian plane) does not offer complete information security. Some information about the secret is leaked with each `share` and while an attacker who knows fewer points than the `threshold` may not be able to instantly determine the secret, they could at least derive some information to reduce their search space. I'm taking the cryptographer/mathematicians by their word that the solution is to use [finite field arithmetic][href_wiki_galois_field].
+There is more to the story of course. My understanding is that the preceding scheme (which uses the traditional Cartesian plane) does not offer complete information security. Some information about the secret is leaked with each `share` and while an attacker who knows fewer points than the `threshold` may not be able to instantly determine the secret, they could at least derive some information to reduce their search space. I'm taking the cryptographer/mathematicians by their word that the solution is to use [finite field arithmetic][href_wiki_galois_field].
 
-Rather than calculating inside the cartesian plane, we use either `GF(p)` (`p` being a prime number) or `GF(p**n)` (`p**n` being a power of a prime number, typically `GF(2**8) == GF(256)`. In a previous iteration of SBK, `GF(p)` was used, with a value for `p` (chosen from [oeis.org/A014234][href_oeis_a014234]) that corresponds to the level of entropy of the `brainkey`. For the default secret length of 20 byte/160 bit this would have been `GF(2**160 - 47) == GF(1461501637330902918203684832716283019655932542929)`. As you can see, this is a very large number, which is why this approach typically isn't used. 
+Rather than calculating inside the Cartesian plane, we use either `GF(p)` (`p` being a prime number) or `GF(p**n)` (`p**n` being a power of a prime number, typically `GF(2**8) == GF(256)`. In a previous iteration of SBK, `GF(p)` was used, with a value for `p` (chosen from [oeis.org/A014234][href_oeis_a014234]) that corresponds to the level of entropy of the `brainkey`. For the default secret length of 20 byte/160 bit this would have been `GF(2**160 - 47) == GF(1461501637330902918203684832716283019655932542929)`. As you can see, this is a very large number, which is why this approach typically isn't used. 
 
 In principle it would have been fine[^fnote_gfp_bignum] for SBK to use `GF(p)`, but since other implementations typically use `GF(256)` and innovation in cryptography is usually not a good thing, this is what SBK now also uses. The specific field used by SBK has been broadly studied already, which should make validation easier, even though the requirement for polynomial division makes arithmetic a bit harder to follow. The specific field uses the Rijndael irreducible polynomial `x**8 + x**4 + x**3 + x + 1`, which is the same as [SLIP0039][href_wiki_slip0039_sss] and (perhaps more importantly) [AES/Rijndael][href_doi_org_rijndael][^fnote_gf_rijndeal_validation]. 
 
@@ -275,7 +431,7 @@ In principle it would have been fine[^fnote_gfp_bignum] for SBK to use `GF(p)`, 
 <!-- 
 TODO: better footnotes
 
-[^fnote_gfp_bignum]: Resons it may have been fine to use `GF(p)`
+[^fnote_gfp_bignum]: Reasons it may have been fine to use `GF(p)`
  1. A common reason to use `GF(256)` is to be compatible with low-end systems. Since SBK uses a computationally and memory intensive KDF, systems with constrained CPU and RAM defeat the purpose of SBK and are not a target. Such systems would either take a long time to derive a hardened `wallet-seed` or these seeds would be cracked more easily by machines that are much more powerful and easily obtained.
  2. `GF(256)` uses arithmetic that is natively supported by practically every programming language and hardware platform. Depending on the size of `p`, a `GF(p)` field requires support for big integers. Python has native support for big integers, so arithmetic with large values is not an issue for SBK. Since SBK uses Electrum (which is implemented with python), it is not an extra dependency for SBK to require a python interpreter.
  3. Implementing finite field arithmetic for `GF(p)` is slightly easier to understand and should be easier to review.
@@ -291,7 +447,7 @@ TODO: better footnotes
 |   Term/Notation   |                                            Meaning                                            |
 |-------------------|-----------------------------------------------------------------------------------------------|
 | `version`         | Version number to support iteration of the data format.                                       |
-| `flags`           | A bitfield for options (eg. segwit)                                                           |
+| `flags`           | A bit-field for options (eg. segwit)                                                          |
 | `brainkey_len`    | Length of the `brainkey` in bytes. min: 2, max: 32, default: 8                                |
 | `threshold`       | Minimum number of shares required for recovery. min: 1, max: 16, default: 3                   |
 | `num_shares`      | The number of shamir shares to generate from the `master_key`.                                |
@@ -318,14 +474,14 @@ For those keeping track, by default the total entropy used to generate the walle
 
 ### Parameters
 
-Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hardcoded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hardcoded. Instead they are encoded as a prefix of the `salt` and also of every `share`. The downside of this is that there is more data you have to copy and enter manually. This is why the encoding is kept as compact as possible (4 bytes == 4words == 2 x 6 digits).
+Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hard-coded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hard-coded. Instead they are encoded as a prefix of the `salt` and also of every `share`. The downside of this is that there is more data you have to copy and enter manually. This is why the encoding is kept as compact as possible (4 bytes == 4words == 2 x 6 digits).
 
 ```
-offset  0           4           8           12          16          20                26              31
-        [ version  ][  flags   ][ bkey_len ][ threshld ][ kdf_para ][   kdf_memory   ][   kdf_time     ]
+offset  0       4       8       12      16      20          26        31
+        [ ver  ][flags ][bk_len][thresh][kdf_p ][ kdf_mem  ][ kdf_time ]
 ```
 
-> Aside: The `salt_len` is not an encoded parameter. Instead it is hardcoded to 12 bytes (96 bits). You can alleviate entropy paranoia by choosing a larger value for `--brainkey-len`.
+> Aside: The `salt_len` is not an encoded parameter. Instead it is hard-coded to 12 bytes (96 bits). You can alleviate entropy paranoia by choosing a larger value for `--brainkey-len`.
 
 > Aside: While the `threshold` is encoded, `num_shares` is not, as it is only used once when the `shares` are first created. It is not needed for recovery, so it is not encoded in the `parameters`.
 
@@ -336,7 +492,7 @@ Since the distinction between 1000 iterations and 1001 iterations is not critica
 
 |      Field Name     |  Size |              Value               |      Range (inclusive)      |
 |---------------------|-------|----------------------------------|-----------------------------|
-| `f_version`         | 4 bit | Hardcoded to `0`.                |                             |
+| `f_version`         | 4 bit | Hard-coded to `0`.                |                             |
 | `f_flags`           | 4 bit | (-, -, -, `is_segwit`)           |                             |
 | `f_brainkey_len`    | 4 bit | `brainkey_len // 2 - 1`          | 2, 4, 6..32                 |
 | `f_threshold`       | 4 bit | `threshold - 1`                  | 1..16                       |
@@ -351,7 +507,7 @@ Since the distinction between 1000 iterations and 1001 iterations is not critica
 <img alt="Data layout for Shares" src="https://mbarkhau.keybase.pub/sbk/raw_share_diagram.svg" height="320" />
 <p>
 
-Shares are generated from the `shares_input` (`raw_salt || brainkey`). The split algorithm is applied to each byte separately and the points that make up each `raw_share` all share a common x-coordinate. In the preceeding diagram for example, the first raw share would be 8 bytes represented here as `FAYUKTEM`, each letter representing the encoded y-coordinate for a byte. In order to recover the byte at `offset=7` of the `master_key`, we would use the join algorithm with the points `P(x=1, y=M)`, `P(x=2, y=W)` and `P(x=3, y=Z)`, to produce `P(x=0, y=H)`, where `H` represents the last byte of the `master_key`.
+Shares are generated from the `shares_input` (`raw_salt || brainkey`). The split algorithm is applied to each byte separately and the points that make up each `raw_share` all share a common x-coordinate. In the preceding diagram for example, the first raw share would be 8 bytes represented here as `FAYUKTEM`, each letter representing the encoded y-coordinate for a byte. In order to recover the byte at `offset=7` of the `master_key`, we would use the join algorithm with the points `P(x=1, y=M)`, `P(x=2, y=W)` and `P(x=3, y=Z)`, to produce `P(x=0, y=H)`, where `H` represents the last byte of the `master_key`.
 
 <p align="center">
 <img alt="Data layout for Shares" src="https://mbarkhau.keybase.pub/sbk/share_diagram.svg" height="80" />
@@ -364,26 +520,27 @@ The "full" `share` also includes the serialized parameters as a prefix in the fi
 [href_slip0039_forced_secret]: https://github.com/satoshilabs/slips/blob/master/slip-0039.md#design-rationale
 
 
-## Wallet Name/Phassphrase
+## Wallet Name/Passphrase
 
-A `--wallet-name` is effectively a passphrase, so it suffers from the same problem as all passphrases: they can be forgotten. One of the main purposes of SBK is to protect you from losing your wallet by avoiding any single point of failure: If you lose the `salt`, you have a backup; if you forget your `brainkey` you have a backup; if a `share` is partially unreadable, there is redundancy in the form of error correction data; if a `share` is destroyed completely, there is redundency in the form of other shares. The use of a `--wallet-name` can nullify all of these measures and inadvertantly introduce a single point of failure. If you forget the `--wallet-name` and you're the only person who ever knew it, then your wallet will be lost. If you write it down on a single piece of paper, without any form of backup, then your wallet will be lost.
+A `--wallet-name` is effectively a passphrase, so it suffers from the same problem as all passphrases: they can be forgotten. One of the main purposes of SBK is to protect your wallet from being lost through any single point of failure: 
 
-To avoid such a single point of failure, the default value for `--wallet-name` is hardcoded to `disabled` (literally). There are legitimate reasons to use a `--wallet-name`, but you should write it down in clear handwriting and make sure it is available when your wallet has to be recovered, for example by writing the wallet name(s) on some or all of the shares. 
+ - If you lose the `salt`, you have a backup.
+ - If you forget your `brainkey` you have a backup.
+ - If a `share` is partially unreadable, the error correction data provides redundancy.
+ - If a `share` is destroyed completely, there is redundancy in the form of other shares.
+
+Please remember that you are at a much greater risk of loosing your bitcoin through a user error than you are from hacking or theft. The use of a `--wallet-name` can make all of SBK's protections null and void, if you use it to inadvertently introduce a single point of failure:
+
+ - If you forget the `--wallet-name` and you're the only person who ever knew it, then your wallet will be lost.
+ - If you write it down on a single piece of paper, and that piece of paper is destroyed, then your wallet will be lost.
+
+To avoid such a single point of failure, the default value for `--wallet-name` is hard-coded to `disabled` (literally). There are some legitimate reasons to use a `--wallet-name`, but if you do use it, do not treat it as a password. Instead, write it down in clear handwriting and make sure it is available when your wallet has to be recovered, for example by writing the wallet name(s) on some or all of the shares. 
 
 Since the `--wallet-name` is chosen by you and since it is not encoded using a mnemonic or ECC data, there is a greater risk that it may not be possible to decipher your handwriting. To reduce this risk, the set of valid characters is restricted. Valid characters are lower-case letters `"a-z"`, digits `"0-9"` and the dash `"-"` character. In other words, the `--wallet-name` must match the following regular expression: [`^[a-z0-9\-]+$`](https://regex101.com/r/v9eqiM/2).
 
-For more information on the risks and responsible use of a wallet passphrase, [the trezor blog has a a good entry][href_trezor_phassphrase] for the equivalent passphrase feature of their wallet.
+For more information on the risks and responsible use of a wallet passphrase, [the trezor blog has a a good entry][href_trezor_passphrase] for the equivalent passphrase feature of their wallet.
 
-[href_trezor_phassphrase]: https://blog.trezor.io/passphrase-the-ultimate-protection-for-your-accounts-3a311990925b
-
-
-### Decoy Wallets
-
-One of the legitimate uses for a `--wallet-name` is to enable [plausible deniability][href_wiki_plausible_deniability] against an attacker who is in a position to extort you. If the attacker has access to the `salt` and if they can coerce you to reveal your `brainkey`, then they may be satisfied when they load a wallet and find some coins. If you have set this up in advance, the wallet they load may in fact only be a decoy. Your main wallet would use a custom `--wallet-name`, which they do not know about and which you can plausibly deny the existence of.
-
-[href_wiki_plausible_deniability]: https://en.wikipedia.org/wiki/Plausible_deniability
-
-While we're on the topic of plausible deniability; another approach you can take is to simply discard your `salt` and `brainkey` and to rely only the backup `shares`. If an attacker knows for certain that you have an SBK wallet, but they cannot find the `salt`, then you can plausibly claim, that you have thrown it away and that you never intended to access the wallet for years to come, so the backup `shares` were perfectly adequate. This is a plausible scenario if for example you were leaving the wallet as an inheritance, with your will containing the people and locations where shares can be found. The attacker would then have to extend their attack to recovering the shares, possibly involving more people, more time and more risk for them. The downside of actually throwing away your `salt` and `brainkey` is that you may now require the cooperation of some trustees who are then in a position to blackmail you.
+[href_trezor_passphrase]: https://blog.trezor.io/passphrase-the-ultimate-protection-for-your-accounts-3a311990925b
 
 
 ## Key Derivation
@@ -399,17 +556,24 @@ The KDF used by SBK is [Argon2][href_github_phc_winner_argon2], which is designe
 
 ### Brute Force Attack Hypothetical 
 
-Some back of the envelope calculations to illustrate the diffuculty of a brute-force attack: If we assume the attacker has gained access to your `salt`, then they will have a 50% chance of loading your wallet if they can calculate 2^47 hashes. Let's assume you used an average computer from 2012 as your air-gapped computer and the Argon2 parameters which SBK chose were `-p=2`, `-m=539` and `-t=26`. This might take 1-2 minutes to calculate on the old machine, but on a more modern system it may take only 10 seconds. For easy math and to be conservative, let's assume that an attacker has access to future hardware that can calculate one of these hashes in 1 second, further assume that they have unlimited access to 1000 systems of this caliber (and more money to spend on electricity than they could ever get from your wallet). After `2**47 / (1000 * 86400 * 365) = 4500` years they would have 50:50 chance to have cracked your wallet. It would be cheaper for them to find you and persuade you to talk. Beware of shorter keys lengths though: if you use `--brainkey-len=4` (32 bits), the same attacker would need only `2**31 / (1000 * 86400) = 25` days.
+Some back of the envelope calculations to illustrate the difficulty of a brute-force attack: If we assume the attacker has gained access to your `salt`, then they will have a 50% chance of loading your wallet if they can calculate 2^47 hashes. Let's assume you used an average computer from 2012 as your air-gapped computer and the Argon2 parameters which SBK chose were `-p=2`, `-m=539` and `-t=26`. This might take 1-2 minutes to calculate on the old machine, but on a more modern system it may take only 10 seconds. For easy math and to be conservative, let's assume that an attacker has access to future hardware that can calculate one of these hashes in 1 second, further assume that they have unlimited access to 1000 systems of this caliber (and more money to spend on electricity than they could ever get from your wallet). After `2**47 / (1000 * 86400 * 365) = 4500` years they would have 50:50 chance to have cracked your wallet. It would be cheaper for them to find you and persuade you to talk. Beware of shorter keys lengths though: if you use `--brainkey-len=4` (32 bits), the same attacker would need only `2**31 / (1000 * 86400) = 25` days.
 
-All of this is assuming of course, that the attacker has somehow gained access to your `salt`. It may be ok for you to use a value lower than `--brainkey-len=8`, as long as you can satisfy one of the following conditions: 
+All of this is assuming of course, that the attacker has somehow gained access to your `salt`. It may be OK for you to use a value lower than `--brainkey-len=8`, as long as you can satisfy one of the following conditions: 
  - You are confident that your `salt` will *never* be found by an attacker.
  - If your `salt` is found, then you have some way to know that this happened, so that you will at least have enough time to move your coins to a new wallet. 
- - You regularly generate a new wallet and move all your coins, so every `salt` becomes obsolete before an attacker has a chance to succeed.
+ - You regularly generate a new wallet and move all your coins, so every `salt` becomes obsolete before any brute-force attack has enough time to succeed.
+
+
+### Parameter Choices
+
+There is no correct choice when it comes to picking parameters, there are only trade-offs. To a certain extent you can trade-off entropy with KDF difficulty: If you are willing/able to memorize a longer brainkey (with more entropy), you could reduce the KDF difficulty and thereby reduce your your hardware requirements and/or time to wait loading your wallet. If you are very confident that your salt will never be found, you could have a very short `brainkey`.
+
+The default KDF difficulty and key lengths used by SBK are chosen based on the following reasoning: The main constraint is the ability of a human to memorize words. The brainkey length is chosen to be as short as possible, while still being able to offer some protection against a brute-force attack. Since the risk of you forgetting your brainkey is probably much higher than your risk of being subject to a brute-force attack, it is more important to mitigate the former risk than the latter. If your situation is different, and you are worried about the risk of a brute-force attack, then you could choose `--brainkey-len=8` to increase the entropy of your `brainkey` and/or choose `--target-duration=600` to increase the KDF difficulty.
 
 
 ### KDF Implementation
 
-Waiting 1-2 minutes for the key derivation is somewhat inconvenient, but it would be an even worse experience if you had no progress indicator and your machine appeared to be locked up. As a consession to usability, SBK has a wrapper function called `digest` that is used to implement a meaningful progress bar:
+Waiting 1-2 minutes for the key derivation is somewhat inconvenient, but it would be an even worse experience if you didn't even have a progress indicator and your machine appeared to be locked up while the KDF calculation was in progress. As a concession to usability, SBK has a wrapper function called `digest`, the main purpose of which is to implement a meaningful progress bar:
 
 ```python
 import argon2     # pip install argon2-cffi
@@ -442,7 +606,7 @@ def digest(data: bytes, p: int, m: int, t: int) -> bytes:
     return result
 ```
 
-Invokation with `t=1` produces the same result as using argon2 directly:
+Invocation with `t=1` produces the same result as using argon2 directly:
 
 ```python
 >>> digest_data = digest(b"test1234", p=1, m=1, t=1)
@@ -460,7 +624,7 @@ Encoded: $argon2d$v=19$m=1024,t=1,p=1$dGVzdDEyMzQ$O2GpxMquN/amTCVwe5GHPJr89BvBVn
 Hash: f874b69ca85a76f373a203e7d55a2974c3dc50d94886383b8502aaeebaaf362d
 ```
 
-Invokation with `t>1` will split the iterations up to a maximum of 10 steps.
+Invocation with `t>1` will split the iterations up to a maximum of 10 steps.
 
 ```
 >>> digest_data = digest(b"test1234", p=1, m=1, t=87)
@@ -478,20 +642,19 @@ remaining:   9 of 87  -  next: 9
 b'6cf1a22113182d8c66c8972e693b1cc3bb1d931a691265bad75e935b1254fccd'
 ```
 
-I would [greatly appreciate feedback](https://gitlab.com/mbarkhau/sbk/issues/1) on the effect this approach has on the strength of the KDF and if there is a better approach. My assesmet so far is that using `t >= 20` has a comparable cost to plain argon2, with the wrapper adding very minimal overhead. The worst case is for `t=10` where the overhead of the wrapper ranges from 50-60%. This is plausible if we assume that the overhead is amortized the more iterations we do within argon2. I assume that low overhead compared to plain argon2 also means that there is very little room for an attacker to optimize and therefore that this approach is safe. 
+This implementation is an unfortunate compromise. A better implementation would require an adjustment to the Argon2 library, which would be more effort. I would [greatly appreciate feedback](https://gitlab.com/mbarkhau/sbk/issues/1) on the effect this approach has on the strength of the KDF and if there is a better approach. My assessment so far is that using `t >= 20` has a comparable cost to plain argon2, with the wrapper adding very minimal overhead. The worst case is for `t=10` where the overhead of the wrapper ranges from 50-60%. This is plausible if we assume that the overhead is amortized the more iterations we do within argon2. I assume that low overhead compared to plain argon2 also means that there is very little room for an attacker to optimize and therefore that this approach is safe.
 
 
 ## Encoding Secrets: Mnemonics and Intcodes
 
-> Aside: The work done in this section preceeded the release of Trezor Shamir Backup, which has many
+> Aside: The work done in this section preceded the release of Trezor Shamir Backup/SLIP0039, which has many
 > similarities to it. The wordlists of both are composed with similar considerations for length, edit distance and
-> phonetic distinctness. The most significant difference is the greter redundancy in the mnemonic encoding of SBK as
-> compared with SLIP0039. 
+> phonetic distinctness.
 
 
 ### Prelude on Physical Deterioration
 
-The most diligently implemented software cannot protect your secrets from physical deterioration and distruction. There are books, scrolls and tablets that have been preserved for centuries, provided they were protected from weather, fluctuations in humidity, exposure to light, from insects and if they used materials that did not break down in chemical reactions.
+The most diligently implemented software cannot protect your secrets from physical deterioration and destruction. There are books, scrolls and tablets that have been preserved for centuries, provided they were protected from weather, fluctuations in humidity, exposure to light, from insects and if they used materials that did not break down in chemical reactions.
 
 If you want your shares to survive until they are needed, there are simple ways to protect them from deterioration. Here are some inexpensive suggestions, ordered by increasing level of paranoia:
 
@@ -499,30 +662,24 @@ If you want your shares to survive until they are needed, there are simple ways 
  - Use a pen with archival ink. Ideally, such ink is inert, dries quickly and does not smear.
  - Use [acid-free paper][href_wiki_acid_free_paper].
  - Use a [pouch laminator][href_wiki_puche_laminator] to create protective seal against the elements.
- - Use a number punch set to stamp the share data onto an aluminium plate. Such a plate is safe from rust and if kept at ground level, should survive a house fire.
- - Use products from [billfodl](https://billfodl.com/] or [cryptosteel](https://cryptosteel.com) which can survive hotter fires (no affiliation).
-
-The first item may be confusing to you. Couldn't the whole issue of readable handwriting be sidestepped by simply printing the shares? Wouldn't printing the shares also be much more convinient? If you still trust printer manufactururs to create products that perform even the most rudimentary of their advertised functions, namely creating faithful physical copies, then you may find it enlightning to review [some of the work](https://www.youtube.com/watch?v=c0O6UXrOZJo) of [David Kriesel's][href_dkriesel_xerox_fail]. If printer manufacturers cannot even do this job right, how much confidence should we place in their ability to create devices that cannot be exploited while being connected to a network. 
-
-Suffice it to say, I reccomend you do not trust your printer farther than you can throw it. SBK provides templates in [A4 format][href_sbk_template_a4] and [US-Letter format][href_sbk_template_us_letter] for you to print, but these do not contain any secret information and are only to make it easier for you to create shares. You will have to manually write down all of the data for your `salt` and `shares`.
-
+ - Use a number punch set to [punch the share data onto a metal plate][href_yt_metal_stamp]. Such a plate can survive a house fire much better than paper. Even with the better heat resistance, it is best to store such plates as close to the ground as possible, where the heat from a fire is much lower.
+ - Use a hole punch in a to mark the share data into a metal plate. This is can be slightly harder to read but it is easier to punch a hole in metal than to stamp a pattern, so you can use metals that are harder and more resistant to high temperatures.
+ - Use [various metal seed storage products][href_loppnet_metal_seed_storage], which can survive hotter fires (no affiliation).
 
 [href_wiki_acid_free_paper]: https://en.wikipedia.org/wiki/Acid-free_paper
 
 [href_wiki_puche_laminator]: https://en.wikipedia.org/wiki/Pouch_laminator
 
-[href_dkriesel_xerox_fail]: http://www.dkriesel.com/en/blog/2013/0802_xerox-workcentres_are_switching_written_numbers_when_scanning
+[href_yt_metal_stamp]: https://www.youtube.com/watch?v=TrB62cPPNxc
 
-[href_sbk_template_a4]: https://mbarkhau.keybase.pub/sbk/template_a4.pdf
-
-[href_sbk_template_us_letter]: https://mbarkhau.keybase.pub/sbk/template_us_letter.pdf
+[href_loppnet_metal_seed_storage]: https://blog.lopp.net/metal-bitcoin-seed-storage-stress-test-round-iii/
 
 
 ### Mnemonic for Memory
 
 From personal experience I know that it is possible to remember phone numbers, mathematical constants, poems or an old ICQ number even after multiple decades. In light of this, a `brainkey` can be a reasonable choice to generate a wallet, provided you are diligent and regularly practice recall of the `brainkey`, so you build up a habit.
 
-SBK uses a mnemonic encoding that is designed to help with memorization of the `brainkey`, but the same encoding is also used for `shares` and the `salt`. The format is designed with the following in mind:
+SBK uses a mnemonic encoding that is designed to help with memorization of the `brainkey`. The format is designed with the following in mind:
 
  - Human memory can remember concrete objects, people and places more easily than abstract words.
  - Human memory fills in gaps (often incorrectly) so ambiguous words must be avoided. 
@@ -537,7 +694,7 @@ The technical criteria for the wordlist are:
 
 The wordlist is composed only of commonly used concrete nouns such as animals, creatures, famous people, characters, physical objects, materials, substances and well known places/organizations. The wordlist does not contain any abstract words, adjectives, adverbs. Consider that the very first word humans ever spoke may have been have been the equivalent of "mother" or "snake", rather than words for abstract concepts such as "agency" or "ambition".
 
-> Aside: Some words on the wordlist may be provocotive/obscene, such as "viagra" and "saddam", but they are used partially for that reason: provocative words are more memorable than plain and boring words, as I'm sure many parents with potty-mouthed children can attest.
+> Aside: Some words on the wordlist may be provocative/obscene, such as "viagra" and "saddam", but they are used partially for that reason: provocative words are more memorable than plain and boring words, as I'm sure many parents with potty-mouthed children can attest.
 
 Using such words makes it easier to use the [Method of Loci][href_wiki_method_of_loki] or to construct a story as a memory aid. As an example, given the following brainkey:
 
@@ -552,12 +709,14 @@ I hope this illustrates of ability of humans to remember what has been very impo
 
 [href_wiki_method_of_loki]: https://en.wikipedia.org/wiki/Method_of_loci
 
-> Caveat: The choices for the current wordlist are probably not optimal as I have only done minimal tests. It may be for example, that it is easier to memorize fewer words from a larger wordlist. The price for this is that a larger wordlists comes at the price of smaller edit/levenshtein distances between words, longer word lengths, less phonetic distinctiveness and the larger burdon on non-native speakers of English. Improving the wordlist is a rabit hole that involves tradeoffs and diminishing returns, so I'm leaving it as is for now, but it is subject to change before final release, so your `brainkey` may become invalid!
+> Caveat: The choices for the current wordlist are probably not optimal as I have not done exhaustive tests. It may be for example, that it is easier to memorize fewer words from a larger wordlist. The price for this is that a larger wordlist leads to smaller levenshtein/edit distances between words, to longer word lengths, to less phonetic distinctiveness and the to a larger burden on non-native speakers of English (because less frequently used words must be used to fill out the wordlist).
+>
+> Improving the wordlist is a rabbit hole that involves trade-offs and diminishing returns, so I'm leaving it as is for now, but it is subject to change before final release, so your `brainkey` may become invalid!
 
 
 ### Integer Codes
 
-In addition to the mnemonic encoding, SBK uses a numeric encoding, consisting of two tripplets of decimal digits: `053-404`. These have some benefits compared to the mnemonic encoding:
+In addition to the mnemonic encoding, SBK uses a numeric encoding, consisting of two triplets of decimal digits: `053-404`. These have some benefits compared to the mnemonic encoding:
 
  - They encode their position in the secret to protect against transposition errors during input.
  - They can be used to detect input errors as they are a redundant encoding.
@@ -565,36 +724,35 @@ In addition to the mnemonic encoding, SBK uses a numeric encoding, consisting of
  - They can be entered with one hand on a keypad while reading off a piece of paper.
  - They are better suited for use with a punch/stamping set (which may consist only of decimal digits).
 
-The primary purpose of this encoding is to give protection against incorrectly entered `shares`. Since the recovery process requires you to enter multiple `shares` and since the key derivation can take quite some, it is important to detect such input errors early. Without such protection, you could only detect an incorrect input when you realises that you have loaded a fresh and empty wallet rather than your own. To make matters worse, this would be long after the input error happend and you would have no indication as to which of the secrets was entered incorrectly.
+The primary purpose of this encoding is to give protection against incorrectly entered `shares`. Since the recovery process requires you to enter multiple `shares` and since the key derivation can take quite some, it is important to detect such input errors early. Without such protection, you could only detect an incorrect input when you see that you have loaded the wrong (ie. an empty) wallet. To make matters worse, this would be long after the input error happened and you would have no indication as to which of the secrets was entered incorrectly.
 
 This is how the full `brainkey` is displayed by SBK.
 
 ```
-      Data             Mnemonic                 ECC                   
- 01: 053-404      sunlight  origami       05: 315-842
- 02: 098-139      leibniz   gotham        06: 349-942
- 03: 152-596      geisha    barbeque      07: 446-554
- 04: 236-529      ontario   vivaldi       08: 483-610
+     Data          Mnemonic               ECC
+01: 021-729   geisha    tsunami     04: 258-287
+02: 066-639   airport   forest      05: 308-329
+03: 187-708   toronto   diesel      06: 361-894
 ```
 
-The "Data" and "Mnemonic" sections both encode the same raw data: `b"\x6f\x56\x7f\x5b"`. The `intcodes` under the "ECC" label encode data for [forward error correction][href_wiki_fec]. To recover your wallet, it is enough to enter either the "Mnemonic", the "Data" or at least half of any of the `intcodes` (either from the "Data" and "ECC" sections). If enough has been entered, SBK will fill in the missing values and you compare what has been filled in to your physical copy. If what has been filled in does not exactly match your copy, then you have made an input error somewhere.
+The "Data" and "Mnemonic" sections both encode the same raw data: `b"\x6f\x56\x7f\x5b"`. The `intcodes` under the "ECC" label encode data for [forward error correction][href_wiki_fec]. To recover your wallet, it is enough to enter either the "Mnemonic", the "Data" or at least half of any of the `intcodes` (either from the "Data" and/or "ECC" sections). If enough has been entered, SBK will fill in the missing values and you can compare what has been filled in with your physical copy. If what has been filled in does not exactly match your copy, then you have made an input error somewhere.
 
 The data portion of each `intcode` can be obtained by parsing it as a decimal integer and masking with `& 0xFFFF`. 
 
 ```python
-intcode = int("117-502".replace("-", ""))
-assert intcode == 117502
-assert intcode == 0x1CAFE
-assert intcode & 0xFFFF == 0xCAFE
+intcode = int("187-708".replace("-", ""))
+assert intcode == 187708
+assert intcode == 0x2DD3C
+assert intcode & 0xFFFF == 0xDD3C
 ```
 
 The position/index of each code can be obtained by bit shifting with `>> 16`.
 
 ```python
-assert 53404 >> 16 == 0
-assert 98139 >> 16 == 1
-assert 152596 >> 16 == 2
-assert 483610 >> 16 == 7
+assert  21_729 >> 16 == 0
+assert  66_639 >> 16 == 1
+assert 187_708 >> 16 == 2
+assert 361_894 >> 16 == 5
 ```
 
 You may observe that a larger position/index would require more than 6 digits to represent. To ensure the decimal representation never uses more than 6 digits, the position index is limited using `% 13`:
@@ -624,11 +782,11 @@ WXYZ
 
 |    Term    |       Value        |                        Description                         |
 |------------|--------------------|------------------------------------------------------------|
-| `message`  | `WXYZ`/`5758595a`  | Ascii and hex representation of the input message          |
+| `message`  | `WXYZ`/`5758595a`  | ASCII and hex representation of the input message          |
 | `ecc_data` | `fbdc95be`         | Redundant Error Correction Data, derived from the message. |
 | `block`    | `5758595afbdc95be` | Hex representation of `message` &vert;&vert; `block`       |
 
-As you can see, the `ecc_data` is a suffix added to the original message. My understanding is that this is called a [systematic form encoding][href_wiki_rs_systematic]. This RS implementation used by SBK uses a variable length polynomial with coeeficients derived from the input message. In our example, using the message `5758595a`, the polynomial is be defined using four data points and four additional error correction points:
+As you can see, the `ecc_data` is a suffix added to the original message. My understanding is that this is called a [systematic form encoding][href_wiki_rs_systematic]. This RS implementation used by SBK uses a variable length polynomial with coefficients derived from the input message. In our example, using the message `5758595a`, the polynomial is be defined using four data points and four additional error correction points:
 
 ```
         Data                   ECC
@@ -638,7 +796,7 @@ Point(x=2, y=0x59)    Point(x=6, y=0x95)
 Point(x=3, y=0x5a)    Point(x=7, y=0xbe)
 ```
 
-Each byte of the input message is interpreted as the y-coordinate of a point which lies on the polynomial, with the x-coordiante being the position in the block. Arithmetic is done using `GF(256)`, just as for the shamir's secret sharing, which allows for much of the implementation of `sbk/gf.py` and `sbk/gf_poly.py` to be reused. 
+Each byte of the input message is interpreted as the y-coordinate of a point which lies on the polynomial, with the x-coordinate being the position in the block. Arithmetic is done using `GF(256)`, just as for the Shamir's secret sharing, which allows for much of the implementation of `sbk/gf.py` and `sbk/gf_poly.py` to be reused. 
 
 With this approach, we can recover the original message even if only half of the block is available:
 
@@ -666,216 +824,6 @@ WXYZ
 
 [href_wiki_rs_systematic]: https://en.wikipedia.org/wiki/Reed%E2%80%93Solomon_error_correction#Systematic_encoding_procedure:_The_message_as_an_initial_sequence_of_values
 
-
-### Implementation Postscript
-
-This concludes the overview of the implementation so far.
-
-
-## Security
-
-A broad set of software is required to run SBK. This starts with the browser you use to download software, goes on to the PGP software you use to verify your downloads and includes further:
-
- - The Electrum wallet
- - The libraries bundled with SBK
- - The Operating System (eg. Debian 10 used for the iso image)
-
-The security of the software you use can be thought of in these terms:
-
- 1. Trustworthy: The software (the whole stack!) was created without malicious intent by maintainers who know what they are doing.
- 2. Authentic: The files you downloaded are the same ones that were created by the people you trust to not have malicious intent (as opposed to by a phishing scammer that tricked you by being the first link on google).
- 3. Available: If the software you use to create your wallet is gone, then your coins might be gone too.
-
-### Is SBK Trustworthy?
-
-The main way to judge if software is trustworthy is to look at how widely it is used and how old it is. The more people who use it and the longer they have been using it, the more people who have looked at it who would have found issues if there were any. In essence, you're trusting an open source process, rather than any particular person.
-
-### Is Your SBK Download Authentic?
-
-### Will SBK Remain Available?
-
-Just because your humble author is trustworthy today, doesn't mean they will be trustworthy tomorrow. They might be put under duress, they might aquire an expensive hobby etc. One thing you can do to reduce this concern is to keep a copy of the original software that is available today, for example by distributing it on USB Sticks with each share that you create. If the downloads are no longer available,  
-
-Beyond concerns that all of this software is free from malicious code, there is also the concern that one part of these will no longer be available in the future or that security issues are discovered but no developers are willing to fix them in a timely manner. 
-
-
-## Future Work
-
-### SLIP0039
-
-SLIP0039 does not cover some of my design goals for SBK and covers others that I do not consider to be important. This notwithstanding, it is worth following parts of SLIP0039, in particular so that it is easier to validate different but comparable implementations. The less that is bespoke about SBK, the higher the probability that issues are found and that it is safe to use. Contributions are most welcome (and given the existing reference implementation for SLIP0039, such contributions may be straightforward).
-
-Some aspects of SLIP0039 are out of scope of SBK:
-
- - Checksums: Shares can be quite tedious to copy and enter. Given that humans are prone to error when performing the tedious task of writing, reading and entering random data, SBK uses extra data for Forward Error Correction. In other words, rather than dedicate data to a checksum which can only tell when something is wrong, it dedicates data to an FEC code which can correct invalid inputs.
- - Groups: Groups can be used to generate shares with different levels of trust. More shares would be required for groups that are trusted less. For the sake of simplicity, this feature is not implemented with SBK. To the extent that SLIP0039 is followed, the group parameters are chosen to correspond to single group splitting at the second level, i.e. GT = 1, G = 1, T₁ = T and N₁ = N. If you trust some people more than others, you can choose a higher threshold, generate more shares and give multiple shares to those you trust more.
- - Master Secret Encryption: SBK does not support migrating BIP-32 wallets so there is no need to implement a mechannism to split a user chosen master secret. 
- - Encoding: Since SLIP0039 does not use a `salt+brainkey` but rather it splits a master_secret, it encodes parameters as part of each share. SBK
-
-[href_pointsoftware_ssssbs]: http://www.pointsoftware.ch/en/secret-sharing-step-by-step/
-
-### Distruibution
-
- - Signatures
-
-
-# User Guide
-
-> Always remember: Your keys, your coins; not your keys, not your coins.
-> 
-> The security of your wallet begins and ends with you. There are no banks to take care
-> of your security, there are no institutions to run to if something goes wrong.
->
->  - If you are a trustee, don't trust anybody who asks you to hand them your
->    `share`.
->  - If you are the owners agent, familiarize yourself with and adhere to the recovery
->    protocol.
->  - If you are the owner, trust as few people as possible and only trust people who you
->    regard as not only in terms of how righteous but also competent.
-
-While we started with the technical aspects of SBK, compared with the human aspects of security, they are almost ancilarry. When talking about security for this kind of system, the most difficult are all the parts that humans can mess up. This starts with simple things like prevending transcription and input errors and ends with more philosophical questions like "who can you trust?".
-
-Throughout this guide, I will assume the most paranoid position I can imagine. This may seem over the top for your situation, . 
-
-Further Reading: [Social Key Recovery][href_github_skr]
-
-[href_github_skr]: https://github.com/WebOfTrustInfo/rwot8-barcelona/blob/master/topics-and-advance-readings/social-key-recovery.md
-
-
-## Trustee Guide
-
-### Integrity and Seals
-
-Imagine for example the owners agent is attempting to collect your `share` without you noticing.
-
-
-## Agent Guide
-
-The agent acts on behalf of the owner if they cannot act themselves. This may be the case if the owner has died or has been incapacited in some way. The agent of the owner is responsible to act on their behalf according to their will (if provided) or in their best interests.
-
-The primary responsibility of an agent is to recover the wallets of the owner without compromising their security. The agent is the person who is most likely to be in a position to steal the owners coins and so their actions deserve special scruitiny. Trustees should be especially weary of an agent who asks them to simply hand over their `share`. A trustee should be the only person to unsealing and input their `share` on 
-
-The trustees should be watching and scruitinizing you. Provide them with any information they ask for, do not ask them for any information whatsoever. 
-
- - There should be a mutual understanding among all participants what will happen to the coins. If wallet balances are already known, you should prepare a payment request for each transaction that is to occur. 
- - 
-
-
-## Owner Guide
-
-
-### Paper Backup
-
-Justification of
- - Ceremony
- - Format
-
-### Air Gap Computer
-
- - Hardware Choices
- - Iso Image
- - Verify Signatures
- - Networking
-
-
-   If your computer has a network cable, unplug it. If your computer
-   has WiFi, turn it off/use flight mode. Some kinds of
-   attack depend on a network connection. If you are using insecure
-   software (despite precautions), disconnecting from any networks
-   (aka. air-gap) can sometimes prevent your keys from being leaked.
-
-
-   If your computer has a network cable, unplug it. If your computer
-   has WiFi, turn it off/use flight mode. Some kinds of
-   attack depend on a network connection. If you are using insecure
-   software (despite precautions), disconnecting from any networks
-   (aka. air-gap) can sometimes prevent your keys from being leaked.
-
-
-   If your computer has a network cable, unplug it. If your computer
-   has WiFi, turn it off/use flight mode. Some kinds of
-   attack depend on a network connection. If you are using insecure
-   software (despite precautions), disconnecting from any networks
-   (aka. air-gap) can sometimes prevent your keys from being leaked.
-
-https://www.schneier.com/blog/archives/2013/10/air_gaps.html
-
- http://viccuad.me/blog/Revisited-secure-yourself-part-1-airgapped-computer-and-gpg-smartcards
-    https://tiny.cc/eo0bcz-
-
-## Recovery Protocol
-
-### Recovery from Shares: Risks
-
-
-### Recovery from Shares: Guide
-
-There are three areas of risk to be aware of:
-
- - Lost of Secrets
- - Game theoretical risks
-    - Holdouts
-    - Decoy `shares`
-    - Insecure hardware
- - Compromised Software
-
-> Aside: SBK exists in part to provide documentation to the owners trustees and agents, who may be laypeople wrt. cryptocurrency.
-
-
-
-
-# Unsorted
-
-## misc 
-
- 1. Specify `--scheme=TofN` parameter (the default is `--scheme=3of5`). The maximum value for `T` (the `threshold`) is 16 and the maximum value for `N` (the total number of shares) is 250. 
- 2. Optionally specify `kdf-parameters` appropriate the current system and/or level of paranoia. The default parameters for the [Argon2][href_github_phc_winner_argon2] [key derivation function](#key-derivation) are determined automatically based on the available memory and processor. The automatically chosen parameters target a runtime of about 1-2 minutes for the wallet seed to be calculated.
- 3. The `raw_salt` is generated randomly. The previously specified `parameters` are encoded in the first few bytes to form the `salt`, which is written down and kept in a safe and secure location. The `salt` should be treated similarly to a typical 12-word wallet seed. 
- 4. The `brainkey` is generated randomly. It should be committed to memory by practicing regular [active recall][href_wiki_active_recall] over the course of a few days and every few weeks from there on forward.
- 5. The `shares` are generated by concatenating the `raw_salt` and `brainkey`, which is then split using Shamir's Secret Sharing. The `parameters` are also encoded in the first few bytes of every share. Shares should be copied onto paper (using the provided templates) and sealed so that [tampering can be detected][href_wiki_tampering]. Shares should be kept in physically distributed locations and they should be accessible only to the owner or to people trusted by the owner.
-
-[href_wiki_active_recall]: https://en.wikipedia.org/wiki/Active_recall
-
-[href_wiki_tampering]: https://en.wikipedia.org/wiki/Tamper-evident_technology
-
-
-## Related Work and Alternatives
-
- - Why not Multisig?
-
-Considering that SBK is not yet ready to be used, here are some other related projects that may serve your purposes better for the time being.
-
-### Warp Wallet
-
-Warp [href_keybase_warp]
-
-[href_keybase_warp]: https://keybase.io/warp/
-
-### Trezor Shamir Backup
-
-A project with similar functionality was recently released by SatoshiLabs: [Shamir Backup][href_satoshilabs_sharmirbackup_overview]. The standardization efforts by SatoshiLabs are great I hope future versions SBK can implemenet them.
-
-The main reasons to consider SBK are:
-
- - SBK does not require a hardware wallet
- - SBK wallets can be restored with a `brainkey`
-
-If neither of these are an issue for you, I highly reccomend you buy a [Trezor Model T][href_trezor_modelt] and use it to [create a Shamir Backup][href_satoshilabs_sharmirbackup_wiki].
-
-
-[href_satoshilabs_sharmirbackup_overview]: https://blog.trezor.io/shamir-backup-a-new-security-standard-3aa42a6ebb5f
-
-[href_trezor_modelt]: https://shop.trezor.io/product/trezor-model-t?offer_id=15&aff_id=3376
-
-[href_satoshilabs_sharmirbackup_wiki]: https://wiki.trezor.io/User_manual-Creating_a_wallet_with_Shamir_Backup
-
-
-
-
-[href_pai_ssss]: http://point-at-infinity.org/ssss/)
-[href_ssss_js]: https://github.com/gburca/ssss-js
-
-[repo_ref]: https://gitlab.com/mbarkhau/sbk
 
 [build_img]: https://gitlab.com/mbarkhau/sbk/badges/master/pipeline.svg
 [build_ref]: https://gitlab.com/mbarkhau/sbk/pipelines

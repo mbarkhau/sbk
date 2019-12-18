@@ -442,13 +442,16 @@ def test_cli_create_validation():
 
 
 def test_cli_recover_salt_from_words():
-    secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+    secrets = _parse_output(DEBUG_NONRANDOM_OUTPUT)
+
+    words1 = " ".join(secrets['salt'].words[:4])
+    words3 = " ".join(secrets['salt'].words[4:8])
+    words5 = " ".join(secrets['salt'].words[8:])
+
     playbook = [
-        interaction(expect=r".*Enter code/words at 01: ", send=" ".join(secrets['salt'].words[:4])),
-        interaction(
-            expect=r".*Enter code/words at 03: ", send=" ".join(secrets['salt'].words[4:8])
-        ),
-        interaction(expect=r".*Enter code/words at 05: ", send=" ".join(secrets['salt'].words[8:])),
+        interaction(expect=r".*Enter code/words at 01: ", send=words1),
+        interaction(expect=r".*Enter code/words at 03: ", send=words3),
+        interaction(expect=r".*Enter code/words at 05: ", send=words5),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)

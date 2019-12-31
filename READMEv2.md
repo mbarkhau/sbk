@@ -359,6 +359,7 @@ You can load the wallet if you have the `salt` and `brainkey`, either directly a
 
 This section describes how the `shares` are generated.
 
+> Aside: Since the writing of this section, a nice introduction to secret sharing was published by [standupmaths](https://www.youtube.com/watch?v=K54ildEW9-Q)
 
 ### Prelude: Naive Key Splitting
 

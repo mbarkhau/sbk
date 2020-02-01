@@ -33,3 +33,7 @@ pycalver
 
 # needed for mypy coverage report
 lxml
+
+# for pdf_templates
+qrcode
+weasyprint

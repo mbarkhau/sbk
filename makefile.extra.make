@@ -9,12 +9,17 @@ mdtoc:
 	$(DEV_ENV)/bin/md_toc --in-place READMEv2.md gitlab
 
 
+pdf_templates/%.pdf: pdf_templates/template.html pdf_templates/gen_pdf.py
+	$(DEV_ENV_PY) pdf_templates/gen_pdf.py
+
+
 doc/%.svg : doc/%.bob
 	svgbob --output $@ $<
 
 ## Regen doc/*.bob -> doc/*.svg
 .PHONY: static_files
 static_files: \
+		pdf_templates/a4_24.pdf \
 		doc/sbk_overview.svg \
 		doc/sbk_dataflow_diagram.svg \
 		doc/sbk_dataflow_diagram_v2.svg \
@@ -23,8 +28,8 @@ static_files: \
 		doc/sss_diagram_3.svg \
 		doc/raw_share_diagram.svg \
 		doc/share_diagram.svg
+	cp pdf_templates/*.pdf $(KBFS_DIR)
 	cp doc/*.svg $(KBFS_DIR)
-	cp doc/*.pdf $(KBFS_DIR)
 	cp logo* $(KBFS_DIR)
 
 

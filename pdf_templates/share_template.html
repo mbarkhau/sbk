@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <style>
 
   @page {
-    /* A4 */
     padding: 0;
     margin: 0;
     size: {{w}}mm {{h}}mm;
@@ -23,9 +22,9 @@
   }
   .logo {
     top: 18mm;
-    left: 18mm;
   }
   .logo {
+    left: 22mm;
     width: 35mm;
   }
   .logo .logotext {
@@ -53,7 +52,7 @@
     font-size: 11pt;
     line-height: 1.4em;
     position: absolute;
-    top: 18mm;
+    top: 15mm;
     left: {{ w // 2 - 2 }}mm;
     width: {{ w // 2 }}mm;
   }
@@ -73,8 +72,8 @@
   }
 
   .infotext {
-    font-size: 9.5pt;
-    line-height: 1.5em;
+    font-size: 9pt;
+    line-height: 1.4em;
     width: {{ w }}mm;
   }
   .infotext .left,
@@ -84,16 +83,13 @@
   }
   .infotext .left {
     left: 18mm;
-    line-height: 1.4em;
+    line-height: 1.3em;
   }
   .infotext .right {
     right: 15mm;
   }
-  .a4 .infotext {
-    top: 44mm;
-  }
-  .usletter .infotext {
-    top: 42mm;
+  .infotext {
+    top: 38mm;
   }
   .infotext p {
     margin: 0.7em 0 0 0;
@@ -104,7 +100,7 @@
     margin-left: -2.0em;
   }
   .infotext li {
-    margin: 0;
+    margin: 0.25em 0;
     padding: 0;
   }
 
@@ -115,20 +111,28 @@
   }
   .fold-marks div {
     position: absolute;
-    height: 1px;
-    width: 15mm;
-    background: #AAA;
+    background: #BBB;
   }
-  .fold-marks div.fold-m {
+  .fold-h {width: 10mm; height: 1px;}
+  .fold-v {width: 1px; height: 10mm;}
+  .fold-marks div.fold-m.fold-v {
     display: none;
+    top: 0;
+    left: 50%;
     height: {{h}}mm;
-    width: 1px;
   }
-  .fold-l {left: 5mm;}
-  .fold-r {right: 5mm;}
-  .fold-m {left: 50%;}
-  .fold-33 {top: 33.33%;}
-  .fold-66 {top: 66.67%;}
+
+  .fold-m.fold-h.fold-33 {left: 50%; top: 33.33%; margin-left: -5mm;}
+
+  .fold-top.fold-l.fold-v {top: 5mm; left: 8mm;}
+  .fold-top.fold-l.fold-h {top: 8mm; left: 5mm;}
+  .fold-top.fold-r.fold-v {top: 5mm; right: 8mm;}
+  .fold-top.fold-r.fold-h {top: 8mm; right: 5mm;}
+
+  .fold-l.fold-v.fold-33 {left: 8mm; top: 33%; margin-top: -13mm;}
+  .fold-r.fold-v.fold-33 {right: 8mm; top: 33%; margin-top: -13mm;}
+  .fold-l.fold-h.fold-33 {left: 5mm; top: 33%; margin-top: -8mm;}
+  .fold-r.fold-h.fold-33 {right: 5mm; top: 33%; margin-top: -8mm;}
 
   .wordlist {
     font-size: 11pt;
@@ -139,7 +143,7 @@
   }
   .wordlist.left {
     left: 20mm;
-    width: {{ w - 50 }}mm;
+    width: {{ w - 48 }}mm;
   }
   .wordlist.right {
     right: 20mm;
@@ -150,8 +154,8 @@
     display: inline-block;
     vertical-align: baseline;
     white-space: pre;
-    height: {{ (h / 3 - 16) / (wordcount / 4) }}mm;
-    line-height: {{ (h / 3 - 16) / (wordcount / 4) }}mm;
+    height: {{ (h / 3 - 16) / (wc / 4) }}mm;
+    line-height: {{ (h / 3 - 16) / (wc / 4) }}mm;
     text-align: center;
     letter-spacing: 0.8mm;
   }
@@ -167,19 +171,27 @@
   .wordlist > code:after {
     content: " _ _ _ - _ _ _";
   }
-  .wordlist.left > code:nth-child( {{ (wordcount - 1) // 2 }} ),
-  .wordlist.right > code:nth-child( {{ (wordcount + 1) // 4 }} )  {
+  .wordlist.left > code:nth-child( {{ (wc - 1) // 2 }} ),
+  .wordlist.right > code:nth-child( {{ (wc + 1) // 4 }} )  {
     margin-bottom: 12mm;
   }
 </style>
+<title>SBK Share Template</title>
 </head>
 <body class="{{fmt}}">
 <div class="fold-marks">
-  <div class="fold-l fold-33"></div>
-  <div class="fold-r fold-33"></div>
-  <div class="fold-l fold-66"></div>
-  <div class="fold-r fold-66"></div>
-  <div class="fold-m"></div>
+  <div class="fold-l fold-h fold-top"></div>
+  <div class="fold-l fold-v fold-top"></div>
+  <div class="fold-r fold-h fold-top"></div>
+  <div class="fold-r fold-v fold-top"></div>
+
+  <div class="fold-l fold-v fold-33"></div>
+  <div class="fold-r fold-v fold-33"></div>
+  <div class="fold-l fold-h fold-33"></div>
+  <div class="fold-r fold-h fold-33"></div>
+
+  <div class="fold-m fold-h fold-33"></div>
+  <div class="fold-m fold-v"></div>
 </div>
 <div class="shareinfo">
   <div> <div>trustee: </div><div></div> </div>
@@ -189,27 +201,23 @@
 </div>
 <div class="logo">
     <img src="../logo_1024.png" />
-    <div class="logotext">
-      Split Bitcoin Keys
-    </div>
+    <div class="logotext"> Split Bitcoin Keys </div>
 </div>
 <div class="qrcode">
   <img src="{{qr_src}}" />
 </div>
 <div class="infotext">
   <div class="left">
-    <p>
-    This is one share of a Split Bitcoin Key.
-    </p>
+    <p> This is one share of a Split Bitcoin Key. </p>
     <ul>
       <li>Keep it safe, secret and secure.</li>
       <li>Leave it in its sealed condition.</li>
       <li>Return it to the owner if they request it.</li>
-      <li>Use it only to help the designated agent of the owner to recover the wallet, but only if
+      <li>Use it only to help an agent of the owner to recover the wallet, but only
         <ol>
-          <li>you are certain of the agents identity,</li>
-          <li>you are acting in the owners interest,</li>
-          <li>you are following the recovery instructions.</li>
+          <li>if you can verify the identity of the agent,</li>
+          <li>if you are acting in the owners interest,</li>
+          <li>if the recovery instructions are followed.</li>
         </ol>
       </li>
     </ul>
@@ -219,19 +227,19 @@
     This SBK Share is given to you (the above named trustee) to keep <b>safe</b> (protected from damage) <b>secret</b> (only the owner and you should know about it) and <b>secure</b> (you should be the only person who can access it).
     </p>
     <p>
-    Please contact the owner of this share if
+    Please contact the owner of this share,
     <ul>
-      <li>the seal has been opened or tampered with.</li>
-      <li>you are not the above named trustee.</li>
+      <li>if the seal has been opened or tampered with.</li>
+      <li>if you are not the above named trustee.</li>
     </ul>
     </p>
   </div>
 </div>
 <div class="wordlist left">
-  {% for i in range(0, wordcount // 2) %}<code>{{ "%02d" % (i + 1) }}: </code><span></span>{% endfor %}
+  {% for i in range(0, wc // 2) %}<code>{{ "%02d" % (i + 1) }}: </code><span></span>{% endfor %}
 </div>
 <div class="wordlist right">
-  {% for i in range(wordcount // 2, wordcount) %}<code>{{ "%02d" % (i + 1) }}: </code>{% endfor %}
+  {% for i in range(wc // 2, wc) %}<code>{{ "%02d" % (i + 1) }}: </code>{% endfor %}
 </div>
 </body>
 </html>

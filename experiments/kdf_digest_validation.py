@@ -8,14 +8,14 @@ from sbk import kdf
 VERIFY = 0
 
 if VERIFY:
-    HASH_LEN = 1024  # for comparison with sbk
+    DIGEST_LEN = 1024  # for comparison with sbk
 else:
-    HASH_LEN = 32  # for comparison with https://antelle.net/argon2-browser/
+    DIGEST_LEN = 32  # for comparison with https://antelle.net/argon2-browser/
 
 
-def digest(data: bytes, p: int, m: int, t: int) -> bytes:
+def digest(data: bytes, p: int, m: int, t: int, digest_len: int = DIGEST_LEN) -> bytes:
     constant_kwargs = {
-        'hash_len'   : HASH_LEN,
+        'hash_len'   : 1024,
         'memory_cost': m * 1024,
         'parallelism': p,
         'type'       : argon2.low_level.Type.ID,
@@ -31,12 +31,13 @@ def digest(data: bytes, p: int, m: int, t: int) -> bytes:
         result = argon2.low_level.hash_secret_raw(
             secret=result, salt=result, time_cost=step_iters, **constant_kwargs
         )
+        print("<<", len(result))
         remaining_steps -= 1
         remaining_iters -= step_iters
 
     assert remaining_steps == 0, remaining_steps
     assert remaining_iters == 0, remaining_iters
-    return result
+    return result[:digest_len]
 
 
 kdf_params  = kdf.init_kdf_params(p=1, m=1, t=1)

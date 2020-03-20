@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style>
+
+  @page {
+    padding: 0;
+    margin: 0;
+    size: {{w}}mm {{h}}mm;
+  }
+
+  body {
+    font-size: 9pt;
+    line-height: 1.3em;
+    font-family: Bitter, serif;
+    margin: 0;
+    padding: 0;
+  }
+
+  .logo, .qrcode {
+    position: absolute;
+    top: 18mm;
+  }
+  .logo {
+    width: 35mm;
+    left: 22mm;
+  }
+  .logo .logotext {
+    float: right;
+    width: 15mm;
+    font-size: 11pt;
+    line-height: 1.2em;
+    font-family: sans-serif;
+    font-style: italic;
+    font-weight: bold;
+  }
+  .logo img {
+    float: left;
+    height: 18mm;
+  }
+  .qrcode {
+    top: 18mm;
+    left: 75mm;
+  }
+  .qrcode img {
+    height: 18mm;
+  }
+
+  .infotext {
+    margin: 0 18mm;
+  }
+  .infotext > div {
+    hyphens: auto;
+    position: absolute;
+    width: {{ (w - 40) / 2 }}mm;
+  }
+  .infotext .left {
+    top: 38mm;
+    left: 15mm;
+  }
+  .infotext .right {
+    top: 20mm;
+    right: 15mm;
+  }
+  .infotext p, .infotext li {
+    hyphens: auto;
+    text-align: justify;
+  }
+  .agent-info {
+    font-size: 10pt;
+    line-height: 1.8em;
+  }
+  .agent-info > div.text > div {
+    display: inline-block;
+  }
+  .agent-info > div.text > div:nth-child(1) {
+    width: 15mm;
+    text-align: right;
+  }
+  .agent-info > div.text > div:nth-child(2) {
+    border-bottom: 1px dashed #888;
+    margin-bottom: -1mm;
+    margin-left: 1mm;
+    width: {{ (w - 78) / 2 }}mm;
+  }
+
+  .wrap {
+    /*outline: 1px solid red;*/
+    font-size: 10pt;
+    line-height: 1.4em;
+    position: absolute;
+    display: block;
+    margin: 1mm;
+    left: 20mm;
+    top: 120mm;
+    width: {{ w - 40 }}mm;
+  }
+  .wave {
+    position: absolute;
+    top: 118mm;
+    left: 50mm;
+    width: 5mm;
+    background-color: white;
+    background-image: url(wave.svg);
+    background-size: 5mm;
+    height: {{h - 120}}mm;
+  }
+  .token-mark {
+    position: absolute;
+    border-bottom: 1px dashed #999;
+    height: 0;
+    width: 50mm;
+    left: -70mm;
+    top: -2mm;
+  }
+
+  .wave:before,
+  .token-mark:before {
+    content: "✂";
+    position: absolute;
+    line-height: 6mm;
+    font-size: 6mm;
+    vertical-align: middle;
+  }
+  .wave:before {
+    transform: rotate(-90deg);
+    bottom: 20mm;
+    left: 0mm;
+  }
+  .token-mark:before {
+    top: -3mm;
+    left: 15mm;
+  }
+  .infotext:before {
+    top: 52mm;
+    left: 15mm;
+  }
+
+  .infotext ul,
+  .infotext ol {
+    margin: 0;
+    margin-left: -2.0em;
+  }
+  .infotext li {
+    margin: 0.25em;
+    padding: 0;
+  }
+
+  .share-num > div {
+    font-size: 12pt;
+    font-weight: bold;
+    position: absolute;
+    width: 25mm;
+    text-align: center;
+  }
+  .share-num .left {left: -53mm; top: 6mm;}
+  .share-num .right {left: -22mm; top: 12mm; transform: rotate(90deg);}
+
+  .share-info {
+    /*outline: 1px solid blue;*/
+    position: relative;
+    margin-left: 50mm;
+    height: {{ (h - 140) / 5 }}mm;
+  }
+  .share-info > div.text > div {
+    display: inline-block;
+    line-height: 1.8em;
+  }
+  .share-info > div.text > div:nth-child(1) {
+    width: 20mm;
+    text-align: right;
+  }
+  .share-info > div.text > div:nth-child(2) {
+    width: 90mm;
+    margin-left: 1mm;
+    border-bottom: 1px dashed #888;
+    margin-bottom: -1mm;
+  }
+
+</style>
+<title>SBK Authentication Chirograph</title>
+</head>
+<body class="{{fmt}}">
+<div class="logo">
+    <img src="../logo_1024.png" />
+    <div class="logotext"> Split Bitcoin Keys </div>
+</div>
+<div class="qrcode">
+  <img src="{{qr_src}}" />
+</div>
+<div class="infotext">
+    <div class="left">
+        <h3>SBK Authentication Chirograph</h3>
+        <div class="agent-info">
+            <div class="text"> <div>Agent: </div><div></div> </div>
+            <div class="text"> <div>Email: </div><div></div> </div>
+            <div class="text"> <div>Phone: </div><div></div> </div>
+        </div>
+        <p>This document is intended for the above named agent, who should act on behalf of and in the interest of the SBK wallet owner who created this chirograph. There are two purposes to this document:</p>
+        <ol>
+            <li>To enable trustees with an SBK share to verify that the person named above is a legitimate agent.</li>
+            <li>To document for the agent where SBK shares are located/to whom SBK shares were given.</li>
+        </ol>
+    </div>
+    <div class="right">
+        <p> Usage instructions for wallet owner: </p>
+        <ol>
+            <li>Mark the waved chirograph line. The markings should produce a unique pattern that covers boths sizes of the waved line and touches each verification token.</li>
+            <li>Cut roughly along the waved chirograph line.</li>
+            <li>Cut out each token.</li>
+            <li>Include a verification token with each share that you give to a trustee.</li>
+            <li>Fill in the name and contact information of your agent.</li>
+            <li>For each share given to a trustee, fill in their name and contact information.</li>
+            <li>For each share that is stored in a safe, safety deposit box or other secure location, create documentation wrt. their location and keep it together with this chirograph.</li>
+        </ol>
+    </div>
+</div>
+<div class="wave"> </div>
+<div class="wrap">
+    {% for i in range(1, 6) %}
+    <div class="share-info">
+        <div class="token-mark"></div>
+        <div class="share-num">
+            <div class="left">SBK Agent Verification Token #{{ i }}</div>
+            <div class="right">Token #{{ i }}</div>
+        </div>
+        <div class="text"> <div>Trustee: </div><div></div> </div>
+        <div class="text"> <div>Email: </div><div></div> </div>
+        <div class="text"> <div>Phone: </div><div></div> </div>
+        <div class="text"> <div>Location: </div><div></div> </div>
+    </div>
+    {% endfor %}
+</div>
+</body>
+</html>

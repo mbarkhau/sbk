@@ -413,13 +413,13 @@ fmt:
 		--recursive \
 		--line-width=$(MAX_LINE_LEN) \
 		--project $(PKG_NAME) \
-		src/ test/ experiments/;
+		src/ test/ experiments/ pdf_templates/;
 
 	@$(DEV_ENV)/bin/sjfmt \
 		--target-version py36 \
 		--skip-string-normalization \
 		--line-length=$(MAX_LINE_LEN) \
-		src/ test/ experiments/;
+		src/ test/ experiments/ pdf_templates/;
 
 
 

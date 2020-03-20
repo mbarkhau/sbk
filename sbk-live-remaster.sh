@@ -39,7 +39,7 @@ SBK_ELECTRUM_FILE="Electrum-${SBK_ELECTRUM_VERSION}.tar.gz";
 sbk_electrumpath="${sbk_workdir}/$SBK_ELECTRUM_FILE";
 sbk_electrumurl="https://download.electrum.org/${SBK_ELECTRUM_VERSION}/$SBK_ELECTRUM_FILE";
 
-sbk_whl_file="sbk-201906.1a0-py37-none-any.whl";
+sbk_whl_file=$(cd dist;ls -t sbk*none-any.whl | head -n 1);
 
 function su {
 	sudo -u $SUDO_USER $@;
@@ -125,13 +125,13 @@ export live_os="debian";
 
 	cd "$livedir";
 
-    if [ -f sbklive.iso ]; then
-		mv sbklive.iso sbklive_old.iso;
+    if [ -f sbklive_x64.iso ]; then
+		mv sbklive_x64.iso sbklive_x64_$(ls -1 sbklive*.iso | wc -l).iso;
 	fi
 
     # NOTE: Uncomment this line if you want don't want to
     #   rebuild from scratch every time.
-    rm "iso_extract_unsquash.ok"
+    rm -f "iso_extract_unsquash.ok"
 
     if ! [ -f "iso_extract_unsquash.ok" ]; then
 		rm -rf extracted;

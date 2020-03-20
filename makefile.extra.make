@@ -9,7 +9,11 @@ mdtoc:
 	$(DEV_ENV)/bin/md_toc --in-place READMEv2.md gitlab
 
 
-pdf_templates/%.pdf: pdf_templates/template.html pdf_templates/gen_pdf.py
+pdf_templates/%.pdf: \
+		pdf_templates/share_template.html \
+		pdf_templates/auth_template.html \
+		pdf_templates/grid_template.html \
+		pdf_templates/gen_pdf.py
 	$(DEV_ENV_PY) pdf_templates/gen_pdf.py
 
 
@@ -19,7 +23,8 @@ doc/%.svg : doc/%.bob
 ## Regen doc/*.bob -> doc/*.svg
 .PHONY: static_files
 static_files: \
-		pdf_templates/a4_24.pdf \
+		pdf_templates/share_a4.pdf \
+		pdf_templates/auth_a4.pdf \
 		doc/sbk_overview.svg \
 		doc/sbk_dataflow_diagram.svg \
 		doc/sbk_dataflow_diagram_v2.svg \
@@ -33,12 +38,11 @@ static_files: \
 	cp logo* $(KBFS_DIR)
 
 
-.PHONY: sbk-live-workdir/sbklive.iso
-sbk-live-workdir/sbklive.iso:
-	rm -f sbk-live-workdir/iso_extract_unsquash.ok
+.PHONY: sbk-live-workdir/sbklive_x64.iso
+sbk-live-workdir/sbklive_x64.iso:
 	bash sbk-live-remaster.sh
 
-	# dd status=progress if=sbk-live-workdir/sbklive.iso of=/dev/sdx
+	# dd status=progress if=sbk-live-workdir/sbklive_x64.iso of=/dev/sdx
 
 
 ## Create release iso
@@ -73,4 +77,3 @@ signoff-deps:
 .PHONY: aspell
 aspell:
 	aspell -l en-uk -c READMEv2.md
-

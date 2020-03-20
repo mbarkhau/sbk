@@ -20,6 +20,7 @@ https://research.swtch.com/field
 import os
 import random
 import typing as typ
+import warnings
 import itertools
 
 from . import gf
@@ -38,12 +39,17 @@ class DebugRandom:
         return self._state % stop
 
 
+DEBUG_WARN_MSG = (
+    "Warning, SBK using debug random! This should only happen when debugging or testing."
+)
+
 _debug_rand = DebugRandom()
 _rand       = random.SystemRandom()
 
 
 def randrange(stop: int) -> int:
     if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
+        warnings.warn(DEBUG_WARN_MSG)
         return _debug_rand.randrange(stop)
     else:
         return _rand.randrange(stop)
@@ -197,7 +203,8 @@ def _split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int
     coeffs: Coefficients = [field[secret]]
 
     while len(coeffs) < threshold:
-        coeffs.append(field[randrange(field.order)])
+        raw_coeff = randrange(field.order)
+        coeffs.append(field[raw_coeff])
 
     eval_at = poly_eval_fn(field, coeffs)
 

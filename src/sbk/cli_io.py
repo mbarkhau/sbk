@@ -124,10 +124,11 @@ def _newline_mod(num_lines: int) -> int:
     if num_lines < 6:
         newline_mod = 99
     else:
-        newline_mod = 3
-        for n in range(3, 6):
-            if num_lines % n == 0 or 0 < num_lines % newline_mod < num_lines % n:
-                newline_mod = n
+        newline_mod = (num_lines + 1) // 2
+        # newline_mod = 3
+        # for n in range(3, 6):
+        #     if num_lines % n == 0 or 0 < num_lines % newline_mod < num_lines % n:
+        #         newline_mod = n
     return newline_mod
 
 

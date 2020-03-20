@@ -88,9 +88,9 @@ def anykey_confirm(message: str) -> bool:
 SECURITY_WARNING_TEXT = """
 Security Warning
 
-I am not your mother, but please ensure the following:
+Please ensure the following:
 
- - Only you can currently view your screen.
+ - You are the only person who can currently view your screen.
  - Your computer is not connected to any network.
  - Your computer is booted using a trusted installation of Linux.
 
@@ -348,7 +348,7 @@ def _show_secret(label: str, data: bytes, data_type: str) -> None:
     echo("\n".join(output_lines) + "\n\n")
 
 
-@click.group()
+@click.group(context_settings={'help_option_names': ["-h", "--help"]})
 def cli() -> None:
     """CLI for SBK v201906.0001-alpha."""
 
@@ -537,6 +537,14 @@ def _show_created_data(
     yes_all or anykey_confirm(BRAINKEY_LAST_CHANCE_WARNING_TEXT)
 
 
+def _get_entropy_pool_size() -> int:
+    path_linux = pl.Path("/proc/sys/kernel/random/entropy_avail")
+    if path_linux.exists():
+        with path_linux.open() as fobj:
+            return int(fobj.read().strip())
+    return -1
+
+
 @cli.command()
 @_scheme_option
 @_non_segwit_option
@@ -557,6 +565,16 @@ def create(
     time_cost      : typ.Optional[kdf.Iterations] = None,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
+
+    # Considering that SBK may be run as the only software on a
+    # on a linux live system, there may be an added risk that the
+    # system has collected so little entropy directly after booting,
+    # that the raw_salt and brainkey would be predicatble.
+    entropy_available = _get_entropy_pool_size()
+    if entropy_available > 0:
+        # TODO
+        pass
+
     threshold, num_shares = cli_util.parse_scheme(scheme)
     _validate_brainkey_len(brainkey_len)
     is_segwit = not non_segwit

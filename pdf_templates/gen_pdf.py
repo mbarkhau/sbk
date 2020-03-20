@@ -1,28 +1,21 @@
 import io
 import sys
 import base64
-import random
 import pathlib as pl
 
-import qrcode
-import qrcode.image.svg
 import jinja2
+import qrcode
 import weasyprint
-
+import qrcode.image.svg
 
 STATIC_DIR = pl.Path(__file__).parent
 
-QR_TEXT = "http://youtu.be/aaaaaaaaa"
 
-
-def qr_img_b64() -> str:
+def qr_img_b64(url) -> str:
     qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=8,
-        border=0,
+        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=8, border=0,
     )
-    qr.add_data(QR_TEXT)
+    qr.add_data(url)
     qr.make(fit=True)
     img = qr.make_image(image_factory=qrcode.image.svg.SvgImage)
     buf = io.BytesIO()
@@ -31,8 +24,8 @@ def qr_img_b64() -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def read_html(**kwargs) -> str:
-    fpath = STATIC_DIR / "template.html"
+def read_html(tmpl, **kwargs) -> str:
+    fpath = STATIC_DIR / f"{tmpl}_template.html"
     with fpath.open(mode="r", encoding="utf-8") as fobj:
         html_tmpl = fobj.read()
 
@@ -40,32 +33,40 @@ def read_html(**kwargs) -> str:
     return tmpl_obj.render(**kwargs)
 
 
+SHARE_QR_SRC = "data:image/svg+xml;base64," + qr_img_b64("http://youtu.be/aaaaaaaaa")
+AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("http://youtu.be/bbbbbbbbb")
+SHARE_QR_SRC = "data:image/svg+xml;base64," + qr_img_b64("SBK: Split Bitcoin Keys")
+AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("SBK: Split Bitcoin Keys")
+
+
+CONTEXTS = [
+    # {'tmpl': "share", 'fmt': "a4", 'qr_src': SHARE_QR_SRC, 'w': 210, 'h': 297, 'wc': 24},
+    # {
+    #     'tmpl'  : "share",
+    #     'fmt'   : "usletter",
+    #     'qr_src': SHARE_QR_SRC,
+    #     'w'     : 8.5 * 25.4,
+    #     'h'     : 11  * 25.4,
+    #     'wc'    : 24,
+    # },
+    # {'tmpl': "auth", 'qr_src': AUTH_QR_SRC, 'w': 210, 'h': 297, 'fmt': "a4"},
+    # {'tmpl': "auth", 'qr_src': AUTH_QR_SRC, 'w': 8.5 * 25.4, 'h': 11 * 25.4, 'fmt': "usletter"},
+    {'tmpl': "grid", 'w': 210, 'h': 297, 'fmt': "a4"},
+    {'tmpl': "grid", 'w': 8.5 * 25.4, 'h': 11 * 25.4, 'fmt': "usletter"},
+]
+
+
 def main() -> int:
-    qr_src    = "data:image/svg+xml;base64," + qr_img_b64()
-    wordcount = random.randint(4, 8) * 4
-    wordcount = 24
-    print("...", wordcount)
-    contexts = [
-        {'wordcount': wordcount, 'qr_src': qr_src, 'w': 210, 'h': 297, 'fmt': "a4"},
-        {
-            'wordcount': wordcount,
-            'qr_src'   : qr_src,
-            'w'        : 8.5 * 25.4,
-            'h'        : 11  * 25.4,
-            'fmt'      : "usletter",
-        },
-    ]
-    for ctx in contexts:
+    for ctx in CONTEXTS:
         html_text = read_html(**ctx)
         wp_ctx    = weasyprint.HTML(string=html_text, base_url=str(STATIC_DIR))
 
-        out_path_html = STATIC_DIR / "{fmt}_{wordcount}.html".format(**ctx)
-        out_path_pdf  = STATIC_DIR / "{fmt}_{wordcount}.pdf".format(**ctx)
-
+        out_path_html = STATIC_DIR / "{tmpl}_{fmt}.html".format(**ctx)
         with out_path_html.open(mode="w", encoding="utf-8") as fobj:
             fobj.write(html_text)
         print("wrote", str(out_path_html.absolute()))
 
+        out_path_pdf = STATIC_DIR / "{tmpl}_{fmt}.pdf".format(**ctx)
         with out_path_pdf.open(mode="wb") as fobj:
             wp_ctx.write_pdf(fobj)
         print("wrote", str(out_path_pdf.absolute()))

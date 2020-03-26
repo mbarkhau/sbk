@@ -17,24 +17,25 @@ For the time being, the documentation is mainly for contributors rather than use
 <!-- TODO: alt="SBK Data-flow Diagram" -->
 
 ```bob
-           "1. Generate Keys"                   "3. Load Wallet"
+                    "1. Generate Keys"      "3. Load Wallet"
 
-.---------------------.                     .------------------.
-|  "System Randomness"O----------.          |   "Wallet Name"  |
-'---------------------'          |          '---------O--------'
-                         .-------+--------.           |
-                      .--O      Salt      O----+----. |
-+----------------+   /   +----------------+   /     | |
-|  "Shamir Split"|<-+----O    Brainkey    O--'      V V
-+--------+-------+       '-------+--------'    +------------+
-         |                       ^             +    KDF     |
-         V                       |             +-----+------+
-.-----------------.              |                   |
-|    "Share 1..n" +-.   +--------+--------+          V
-'-+---------------' O-->+  "Shamir Join"  |  .----------------.
-  '-----------------'   +-----------------+  |     Wallet     |
-                                             '----------------'
-            "2. Recover Keys"
+                     .---------------.    .---------------.
+                     |  "Random Data"|    |  "Wallet Name"|
+                     '-------o-------'    '-------o-------'
+                             |                    |
+                     .-------+-------.            |
+                  .--o      Salt     o--.         V
+  +---------+    /   +---------------+   \    +--------+
+  |  Split  |<--+----o    Brainkey   o----+-->+  KDF   |
+  +----*----+        '-------+-------'        +---*----+
+       |                     ^                    |
+       V                     |                    |
+.-------------.              |                    V
+|    Shares   +-.       +----*----+        .-------------.
+'-+-----------' o------>+   Join  |        |    Wallet   |
+  '-------------'       +---------+        '-------------'
+
+ "2. Recover Keys"
 ```
 
 This diagram can only tell so much of course (some of the boxes might as well be labeled with "magic"). The next few sections explain in a little more detail how each step works.
@@ -88,6 +89,7 @@ This section describes how the `shares` are generated.
 Secret Sharing Explained Visually
  by Art of the Problem](https://www.youtube.com/watch?v=iFY5SyY3IMQ) and another is [How to keep an open secret with mathematics.
  by Matt Parker/standupmaths](https://www.youtube.com/watch?v=K54ildEW9-Q).
+
 
 ### Prelude: Naive Key Splitting
 
@@ -632,8 +634,3 @@ WXYZ
 [href_wiki_rscodes]: https://en.wikipedia.org/wiki/Reed%E2%80%93Solomon_error_correction
 
 [href_wiki_rs_systematic]: https://en.wikipedia.org/wiki/Reed%E2%80%93Solomon_error_correction#Systematic_encoding_procedure:_The_message_as_an_initial_sequence_of_values
-
-
-### Future Work
-
- - It may very well be appropriate to implement SBK as a Plugin for Electrum

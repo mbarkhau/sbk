@@ -2,10 +2,10 @@
 
 
 !!! disclaimer "Disclaimers"
-    - I acknowledge the concerns expressed in [Shamir Secret Snakeoil][href_btcwiki_sss] and to that end have placed this disclaimer as the first thing for you to read. The primary alternative suggested in the wiki article is to use [n of m multisig transactions][href_btcwiki_multisig], which is a feature supported by many wallets, [including electrum][href_electrum_multisig]. Depending on your situation and preferences, you may indeed find that approach to have a preferable trade-off of usability, privacy and security.
+    - I acknowledge the concerns expressed in [Shamir Secret Snakeoil][href_btcwiki_sss] and to that end, I have placed this disclaimer as the first thing for you to read. The primary alternative suggested in the wiki article is to use [n of m multisig transactions][href_btcwiki_multisig], which is a feature supported by many wallets, [including electrum][href_electrum_multisig]. Depending on your situation, you may indeed find this to have a preferable trade-off of usability, privacy and security.
     - As of January 2020, SBK is still in the experimental, pre-alpha, evaluation only, developmental prototype phase (hedge, hedge, hedge). At this point the primary reason for the software to be publicly available is for security review.
     - For the moment not even the primary author of SBK is using it for any substantial amount of bitcoin. If you do use it, assume that all of your bitcoin will be lost.
-    - [The software is provided "as is", without warranty of any kind, express or implied…][href_sbk_license]. In particular, the author of SBK cannot be held liable for funds that are lost or stolen. The author of SBK has neither any responsibility an likely has no means to help you recover your wallet.
+    - [The software is provided under the MIT License, "as is", without warranty of any kind, express or implied…][href_sbk_license]. In particular, the author of SBK cannot be held liable for funds that are lost or stolen. The author of SBK has neither any responsibility, nor any means to help you recover your wallet.
 
 [href_btcwiki_sss]: https://en.bitcoin.it/wiki/Shamir_Secret_Snakeoil
 
@@ -18,7 +18,7 @@
 
 ## Introduction
 
-SBK is a program to generate and recover Bitcoin wallets. SBK is designed to keep your bitcoin safe and secure. This means:
+SBK is program that you can use to generate and recover a Bitcoin Wallet. The goal of SBK is to keep your Bitcoin safe and secure. This means:
 
  - Your wallet is safe, even if your house burns down in a fire and all of your documents and devices are destroyed.
  - Your wallet is safe, even if all your documents are stolen or a hacker copies all of your files.
@@ -96,10 +96,10 @@ SBK is designed to protect against and mitigate these risks as much as possible.
 
 SBK has two ways for you to open your wallet, one as a backup and the other for normal use:
 
- 1. `Shares`: A single `share` is one part of a backup of your wallet, written on a piece of paper or in some other physical form. When you combine enough `shares` together (e.g. 3 of 5 in total), you can recover your wallet. In such a scheme, any individual `share` is neither necessary nor sufficient to recover your wallet. This property is made possible by the [Shamir's Secret Sharing][href_wiki_sss] algorithm, which is used to generate the `shares`. You can distribute these in secure locations or give to people whom you trust. Each `share` is useless by itself, so you don't have to trust any location, institution or individual completely.
- 2. `Salt` + `Brainkey`: The `Salt` is a secret, very similar to a traditional 12-word wallet seed. It is written on a piece of paper and kept in a secure location, accessible only to you, the owner of the wallet. By itself, the `salt` is not enough to load your wallet. To do that you must also know your `brainkey`. A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written on any piece of paper. In other words, the `brainkey` is only in your brain.
+ 1. `Shares`: A single `share` is one part of a backup of your wallet, written on a piece of paper or in some other physical form. When you combine enough `shares` together (e.g. 3 of 5 in total), you can recover your wallet. In such a scheme, any individual `share` is neither necessary nor sufficient to recover your wallet. This property is made possible by the [Shamir's Secret Sharing][href_wiki_sss] algorithm, which is used to generate the `shares`. You can distribute these in secure locations or give to people whom you trust. Each `share` is useless by itself, so you don't have to place complete trust in any individual, location or institution. Not every `share` is required for recovery, so even if a few of them are lost or destroyed, you can still recover your wallet.
+ 2. `Salt` + `Brainkey`: The `Salt` is a secret, very similar to a traditional 12-word wallet seed. It is written on a piece of paper and kept in a secure location, accessible only to you (the owner of the wallet). By itself, the `salt` is not enough to load your wallet. To do that you must also know your `brainkey`. A `brainkey` is passphrase which *only you know* and which is not stored on any computer or written on any piece of paper. In other words, the `brainkey` is only in your brain.
 
-Using the `salt` and `brainkey`, you have direct access to your wallet, independent of any third party and without minimal risk due to theft. The greatest risk you are exposed to here is that somebody might steal your `salt` and then additionally coerce you to reveal your `brainkey` (i.e. a [$5 wrench attack][href_xkcd_538]). This is in contrast to a typical 12-word wallet seed written on a piece of paper, which represents a single point of failure: If such a seed is lost, stolen or destroyed, your wallet is gone with it. In contrast to this, if you either forget your `brainkey` or if your lose your `salt`, then you can still recover your wallet from your backup `shares`.
+Using the `salt` and `brainkey`, you have direct access to your wallet, independent of any third party and with minimal risk of theft. The greatest risk you are exposed to here is that somebody might steal your `salt` and then additionally coerce you to reveal your `brainkey` (i.e. a [$5 wrench attack][href_xkcd_538]). This is in contrast to a typical 12-word wallet seed written on a piece of paper, which represents a single point of failure: If such a seed is lost, stolen or destroyed, your wallet is gone with it. In contrast to this, if you either forget your `brainkey` or if your lose your `salt`, then you can still recover your wallet from your backup `shares`.
 
 Put differently, the regular way for you to access your wallet is secured by two factors: something you have (your `salt`) and something you know (your `brainkey`). To protect against loss of either one of these (as well as your untimely demise), you have a backup that is distributed in vaults, safes, safety deposit boxes and/or with family and friends.
 

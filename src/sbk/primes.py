@@ -31,152 +31,51 @@ SMALL_PRIMES += [263, 269, 271]
 # ]
 
 
-Pow2PrimeExp = int
+Pow2PrimeN = int
 Pow2PrimeK   = int
-
-
-class Pow2PrimeParam(typ.NamedTuple):
-    exp: Pow2PrimeExp
-    k  : Pow2PrimeK
-
-
-def pow2prime(exp: Pow2PrimeExp, k: Pow2PrimeK) -> int:
-    if exp % 8 == 0:
-        return 2 ** exp - k
-    else:
-        raise ValueError(f"Invalid exp={exp}, must be divisible by 8")
+Pow2PrimeItem = typ.Tuple[Pow2PrimeN, Pow2PrimeK]
 
 
 # Taken from https://oeis.org/A014234
 # Verified using https://primes.utm.edu/lists/2small/200bit.html
 # Verified using https://www.wolframalpha.com/input/?i=factors(2%5E256+-+189)
 
-POW2_PRIME_PARAMS: typ.List[Pow2PrimeParam] = [
-    Pow2PrimeParam(exp=8  , k=5),
-    Pow2PrimeParam(exp=16 , k=15),
-    Pow2PrimeParam(exp=24 , k=3),
-    Pow2PrimeParam(exp=32 , k=5),
-    Pow2PrimeParam(exp=40 , k=87),
-    Pow2PrimeParam(exp=48 , k=59),
-    Pow2PrimeParam(exp=56 , k=5),
-    Pow2PrimeParam(exp=64 , k=59),
-    Pow2PrimeParam(exp=72 , k=93),
-    Pow2PrimeParam(exp=80 , k=65),
-    Pow2PrimeParam(exp=88 , k=299),
-    Pow2PrimeParam(exp=96 , k=17),
-    Pow2PrimeParam(exp=104, k=17),
-    Pow2PrimeParam(exp=112, k=75),
-    Pow2PrimeParam(exp=120, k=119),
-    Pow2PrimeParam(exp=128, k=159),
-    Pow2PrimeParam(exp=136, k=113),
-    Pow2PrimeParam(exp=144, k=83),
-    Pow2PrimeParam(exp=152, k=17),
-    Pow2PrimeParam(exp=160, k=47),
-    Pow2PrimeParam(exp=168, k=257),
-    Pow2PrimeParam(exp=176, k=233),
-    Pow2PrimeParam(exp=184, k=33),
-    Pow2PrimeParam(exp=192, k=237),
-    Pow2PrimeParam(exp=200, k=75),
-    Pow2PrimeParam(exp=208, k=299),
-    Pow2PrimeParam(exp=216, k=377),
-    Pow2PrimeParam(exp=224, k=63),
-    Pow2PrimeParam(exp=232, k=567),
-    Pow2PrimeParam(exp=240, k=467),
-    Pow2PrimeParam(exp=248, k=237),
-    Pow2PrimeParam(exp=256, k=189),
-    Pow2PrimeParam(exp=264, k=275),
-    Pow2PrimeParam(exp=272, k=237),
-    Pow2PrimeParam(exp=280, k=47),
-    Pow2PrimeParam(exp=288, k=167),
-    Pow2PrimeParam(exp=296, k=285),
-    Pow2PrimeParam(exp=304, k=75),
-    Pow2PrimeParam(exp=312, k=203),
-    Pow2PrimeParam(exp=320, k=197),
-    Pow2PrimeParam(exp=328, k=155),
-    Pow2PrimeParam(exp=336, k=3),
-    Pow2PrimeParam(exp=344, k=119),
-    Pow2PrimeParam(exp=352, k=657),
-    Pow2PrimeParam(exp=360, k=719),
-    Pow2PrimeParam(exp=368, k=315),
-    Pow2PrimeParam(exp=376, k=57),
-    Pow2PrimeParam(exp=384, k=317),
-    Pow2PrimeParam(exp=392, k=107),
-    Pow2PrimeParam(exp=400, k=593),
-    Pow2PrimeParam(exp=408, k=1005),
-    Pow2PrimeParam(exp=416, k=435),
-    Pow2PrimeParam(exp=424, k=389),
-    Pow2PrimeParam(exp=432, k=299),
-    Pow2PrimeParam(exp=440, k=33),
-    Pow2PrimeParam(exp=448, k=203),
-    Pow2PrimeParam(exp=456, k=627),
-    Pow2PrimeParam(exp=464, k=437),
-    Pow2PrimeParam(exp=472, k=209),
-    Pow2PrimeParam(exp=480, k=47),
-    Pow2PrimeParam(exp=488, k=17),
-    Pow2PrimeParam(exp=496, k=257),
-    Pow2PrimeParam(exp=504, k=503),
-    Pow2PrimeParam(exp=512, k=569),
-    Pow2PrimeParam(exp=520, k=383),
-    Pow2PrimeParam(exp=528, k=65),
-    Pow2PrimeParam(exp=536, k=149),
-    Pow2PrimeParam(exp=544, k=759),
-    Pow2PrimeParam(exp=552, k=503),
-    Pow2PrimeParam(exp=560, k=717),
-    Pow2PrimeParam(exp=568, k=645),
-    Pow2PrimeParam(exp=576, k=789),
-    Pow2PrimeParam(exp=584, k=195),
-    Pow2PrimeParam(exp=592, k=935),
-    Pow2PrimeParam(exp=600, k=95),
-    Pow2PrimeParam(exp=608, k=527),
-    Pow2PrimeParam(exp=616, k=459),
-    Pow2PrimeParam(exp=624, k=117),
-    Pow2PrimeParam(exp=632, k=813),
-    Pow2PrimeParam(exp=640, k=305),
-    Pow2PrimeParam(exp=648, k=195),
-    Pow2PrimeParam(exp=656, k=143),
-    Pow2PrimeParam(exp=664, k=17),
-    Pow2PrimeParam(exp=672, k=399),
-    Pow2PrimeParam(exp=680, k=939),
-    Pow2PrimeParam(exp=688, k=759),
-    Pow2PrimeParam(exp=696, k=447),
-    Pow2PrimeParam(exp=704, k=245),
-    Pow2PrimeParam(exp=712, k=489),
-    Pow2PrimeParam(exp=720, k=395),
-    Pow2PrimeParam(exp=728, k=77),
-    Pow2PrimeParam(exp=736, k=509),
-    Pow2PrimeParam(exp=744, k=173),
-    Pow2PrimeParam(exp=752, k=875),
-    Pow2PrimeParam(exp=760, k=173),
-    Pow2PrimeParam(exp=768, k=825),
+POW2_PRIME_PARAMS: typ.Dict[Pow2PrimeN, Pow2PrimeK] = {
+      8:    5,  16:   15,  24:    3,  32:    5,  40:   87,
+     48:   59,  56:    5,  64:   59,  72:   93,  80:   65,
+     88:  299,  96:   17, 104:   17, 112:   75, 120:  119,
+    128:  159, 136:  113, 144:   83, 152:   17, 160:   47,
+    168:  257, 176:  233, 184:   33, 192:  237, 200:   75,
+    208:  299, 216:  377, 224:   63, 232:  567, 240:  467,
+    248:  237, 256:  189, 264:  275, 272:  237, 280:   47,
+    288:  167, 296:  285, 304:   75, 312:  203, 320:  197,
+    328:  155, 336:    3, 344:  119, 352:  657, 360:  719,
+    368:  315, 376:   57, 384:  317, 392:  107, 400:  593,
+    408: 1005, 416:  435, 424:  389, 432:  299, 440:   33,
+    448:  203, 456:  627, 464:  437, 472:  209, 480:   47,
+    488:   17, 496:  257, 504:  503, 512:  569, 520:  383,
+    528:   65, 536:  149, 544:  759, 552:  503, 560:  717,
+    568:  645, 576:  789, 584:  195, 592:  935, 600:   95,
+    608:  527, 616:  459, 624:  117, 632:  813, 640:  305,
+    648:  195, 656:  143, 664:   17, 672:  399, 680:  939,
+    688:  759, 696:  447, 704:  245, 712:  489, 720:  395,
+    728:   77, 736:  509, 744:  173, 752:  875, 760:  173,
+    768:  825,
+}
+
+
+def pow2prime(n: Pow2PrimeN, k: Pow2PrimeK) -> int:
+    if n % 8 != 0:
+        raise ValueError(f"Invalid n={n}, must be divisible by 8")
+
+    return 2 ** n - k
+
+
+POW2_PRIMES = [
+    pow2prime(n, k)
+    for n, k in sorted(POW2_PRIME_PARAMS.items())
 ]
 
-
-_V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
-
-
-def validate_pow2_prime_params() -> None:
-    """Make sure the parameters don't change inadvertantly.
-
-    Since the prime used for GF is encoded as an index of
-    POW2_PRIME_PARAMS, it is important that those indexes stay valid.
-    """
-    sha256 = hashlib.sha256()
-    for p2pp in POW2_PRIME_PARAMS:
-        sha256.update(str((p2pp.exp, p2pp.k)).encode('ascii'))
-
-    digest      = sha256.hexdigest()
-    has_changed = len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
-
-    if has_changed:
-        log.error(f"Current  hash: {digest}")
-        log.error(f"Expected hash: {_V1_PRIMES_VERIFICATION_SHA256}")
-        raise Exception("Integrity error: POW2_PRIMES changed!")
-
-
-validate_pow2_prime_params()
-
-
-POW2_PRIMES = [pow2prime(exp, k) for exp, k in POW2_PRIME_PARAMS]
 
 # NOTE: since the index into POW2_PRIMES is derived from the
 #   serialized parameters, the format of which is limited in
@@ -201,16 +100,43 @@ assert 6277101735386680763835789423207666416102355444464034512659 in POW2_PRIMES
 PRIMES = sorted(set(SMALL_PRIMES + POW2_PRIMES))
 
 
+_V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
+
+
+def validate_pow2_prime_params() -> None:
+    """Make sure the parameters don't change inadvertantly.
+
+    Since the prime used for GF is encoded as an index of
+    POW2_PRIME_PARAMS, it is important that those indexes stay valid.
+    """
+    sha256 = hashlib.sha256()
+    for n, k in sorted(POW2_PRIME_PARAMS.items()):
+        sha256.update(str((n, k)).encode('ascii'))
+
+    digest      = sha256.hexdigest()
+    has_changed = len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
+
+    if has_changed:
+        log.error(f"Current  hash: {digest}")
+        log.error(f"Expected hash: {_V1_PRIMES_VERIFICATION_SHA256}")
+        raise Exception("Integrity error: POW2_PRIMES changed!")
+
+
+validate_pow2_prime_params()
+
+
 def get_pow2prime_index(num_bits: int) -> int:
     if num_bits % 8 != 0:
-        raise ValueError(f"Invalid num_bits={num_bits}, must be divisible by 8")
+        err = f"Invalid num_bits={num_bits}, not a multiple of 8"
+        raise ValueError(err)
 
     target_exp = num_bits
     for p2pp_idx, param in enumerate(POW2_PRIME_PARAMS):
         if param.exp >= target_exp:
             return p2pp_idx
 
-    raise ValueError(f"Invalid num_bits={num_bits}, no known 2**n-k primes ")
+    err = f"Invalid num_bits={num_bits}, no known 2**n-k primes "
+    raise ValueError(err)
 
 
 def get_pow2prime(num_bits: int) -> int:
@@ -253,7 +179,7 @@ def _is_composite(n: int, r: int, x: int) -> bool:
     return True
 
 
-def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
+def is_probable_prime(n: int, k: int = 100) -> bool:
     """Miller-Rabin Primality Test.
 
     Based on
@@ -286,43 +212,56 @@ def is_miller_rabin_prp(n: int, k: int = 100) -> bool:
     return True
 
 
-def a014234_verify(a014234_content: str) -> typ.Iterable[Pow2PrimeParam]:
+# lp: primes.oeis_org_a014234_verify
+def a014234_verify(a014234_content: str) -> typ.Iterable[Pow2PrimeItem]:
     for line in a014234_content.splitlines():
         if not line.strip():
             continue
 
-        exp, prime = map(int, line.strip().split())
-        if exp % 8 != 0:
+        n, p = map(int, line.strip().split())
+        if n % 8 != 0:
             continue
 
-        k = (2 ** exp) - prime
-        assert pow2prime(exp, k) == prime
+        k = (2 ** n) - p
+        assert pow2prime(n, k) == p
 
-        p2p_param = Pow2PrimeParam(exp=exp, k=k)
+        if n <= 768:
+            assert POW2_PRIME_PARAMS[n] == k
 
-        if exp <= 768:
-            assert p2p_param in POW2_PRIME_PARAMS
-
-        yield p2p_param
+        yield (n, k)
 
 
-def main() -> None:
+# lp: primes.oeis_org_a014234_verify
+def read_oeis_org_a014234() -> str:
+    import time
+    import tempfile
+    import pathlib as pl
+    import urllib.request
+
+    cache_path = pl.Path(tempfile.gettempdir()) / "oeis_org_b014234.txt"
+    if cache_path.exists() and cache_path.stat().st_mtime > time.time() - 10000:
+        with cache_path.open(mode="r") as fobj:
+            content = fobj.read()
+    else:
+        with urllib.request.urlopen("https://oeis.org/A014234/b014234.txt") as fobj:
+            content = fobj.read()
+        with cache_path.open(mode="w") as fobj:
+            fobj.write(content)
+    return content
+
+
+# lp: primes.oeis_org_a014234_verify
+def download_oeis_org_a014234() -> None:
     """Helper script to verify local primes against https://oeis.org/A014234.
 
     $ source activate
     $ python -m sbk.primes
     """
-    import urllib.request
-
-    with urllib.request.urlopen("https://oeis.org/A014234/b014234.txt") as fobj:
-        content = fobj.read()
-
-    for p2p_param in a014234_verify(content):
-        exp              = p2p_param.exp
-        k                = p2p_param.k
+    content = read_oeis_org_a014234()
+    for exp, k in a014234_verify(content):
         verification_url = f"https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
-        print(str(p2p_param).ljust(35), verification_url)
+        print(f"2**{exp:<4} - {k:<4}", verification_url)
 
 
 if __name__ == '__main__':
-    main()
+    download_oeis_org_a014234()

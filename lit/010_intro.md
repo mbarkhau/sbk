@@ -76,22 +76,23 @@ SBK is designed to protect against and mitigate these risks as much as possible.
 ## How SBK Works
 
 ```bob
-                   "Recovery from 3 of 5 Backup Shares"
-  .---------------.        .
-  |   "Share 1/5" O---.    :                "Load Wallet (Regular Use)"
-  '---------------'    \   :                         :
-  .---------------.     \  :  .----------------.     :  .------------.
-  |   "Share 2/5" O------+--->|      Salt      O---+--->|   Wallet   |
-  '---------------'     /     +----------------+  /     '------------'
-  .---------------.    /      |    Brainkey    O-'
-  |   "Share 3/5" O---'       '----------------'
-  '---------------'                   :
-  .---------------.  :                :
-  |   "Share 4/5" +~~.           "Known only to Owner"
-  '---------------'  :
-  .---------------.  :  "Distributed at Secure Locations"
-  |   "Share 5/5" +~~~~~"and/or with Trusted People"
-  '---------------'
+                 "Recover from Backup"
+                        :                             "Load Wallet"
+.---------------.       :      "Owner has Salt"    .~~"(Regular Use)"
+|   "Share 1/5" O---.   :           :              :
+'---------------'    \  :   .-------+--------.     :  .------------.
+.---------------.     \ :.->|      Salt      O---+--->|   Wallet   |
+|   "Share 2/5" O------+-+  +----------------+  /     '------------'
+'---------------'     /  '->|    Brainkey    O-'
+.---------------.    /      '-------+--------'
+|   "Share 3/5" O---'               :
+'---------------'  :           "Owner knows"
+.---------------.  :             "Brainkey"
+|   "Share 4/5" +~~+
+'---------------'  :
+.---------------.  :~~"Distributed at Secure Locations"
+|   "Share 5/5" +~~'  "and/or with Trusted People"
+'---------------'
 ```
 
 SBK has two ways for you to open your wallet, one as a backup and the other for normal use:

@@ -1,31 +1,59 @@
 # Primes of Form $`2^n - k`$
 
-As mentioned in chapter 3, the Galois Field we use can either be of the form $` GF(p) `$ (where $`p`$ is a prime number) or $` GF(p^n) `$ (and a reducing polynomial). This chapter concerns the prime numbers needed for  $` GF(p) `$ .
+TODOs:
 
-While we don't use $` GF(p) `$ in practice, the arithmetic in $` GF(p) `$ is less complicated, so SBK includes a GF implementation for use with a prime number. In other words, this chapter is mainly for validation and didactic purposes, it is not a functional part of the implementation of SBK.
+- cross reference to chapter and section
 
+As mentioned in chapter 3, the Galois Field we use can either be of
+the form $` GF(p) `$ (where $`p`$ is a prime number) or $` GF(p^n) `$
+(and a reducing polynomial). This chapter concerns the prime numbers
+needed for  $` GF(p) `$ .
 
-## External API of `sbk.primes`
+While we don't use $` GF(p) `$ in practice, the arithmetic in $`
+GF(p) `$ is less complicated, so SBK includes a GF implementation for
+use with a prime number. In other words, this chapter is mainly for
+validation and didactic purposes, it is not a functional part of the
+implementation of SBK.
 
-The external API of this module has two functions.
+## API of `sbk.primes`
+
+The API of this module has two functions.
 
 ```python
 def get_pow2prime(num_bits: int) -> int:
+    ...
 ```
 
-`get_pow2prime` returns the largest prime number for which $` 2^n - k \le 2^{num\_bits} `$.
+`get_pow2prime` returns the largest prime number for which
+$` 2^n - k \le 2^{num\_bits} `$.
 
-When we create a $` GF(p) `$, we want to pick a prime that is appropriate for the amount of data we want to encode. If we want to encode a secret which has 128 bits, then we should pick a prime that is very close to $`2^{128}`$ . If we picked a larger prime, then the points we generate would be larger than needed, which would mean a longer mnemonic to write down, without any additional security (i.e. for no good reason). If we picked a smaller prime, then security would be compromised.
+When we create a $` GF(p) `$, we want to pick a prime that is
+appropriate for the amount of data we want to encode. If we want to
+encode a secret which has 128 bits, then we should pick a prime that
+is very close to $`2^{128}`$ . If we picked a larger prime, then the
+points we generate would be larger than needed, which would mean a
+longer mnemonic to write down, without any additional security (i.e.
+for no good reason). If we picked a smaller prime, then security
+would be compromised.
 
-If we don't want to deal with such large primes, we need to chunk the secret and encode points separately. This is what we do in practice anyway (Chapter 3 section "Share Data"), where each byte of a share represents a point in $` GF(2^8) `$, but again, that is an extra complication. The use of larger primes allows us to validate with a simplified implementation.
-
+If we don't want to deal with such large primes, we need to chunk the
+secret and encode points separately. This is what we do in practice
+anyway (Chapter 3 section "Share Data"), where each byte of a share
+represents a point in $` GF(2^8) `$, but again, that is an extra
+complication. The use of larger primes allows us to validate with a
+simplified implementation.
 
 ```python
 def is_prime(n: int) -> bool:
+    ...
 ```
 
-The main thing to know about `is_prime` is that it does not perform and exhaustive test of primality. It will return `True` or `False` if the primality of `n` can be determined with certainty, otherwise it will `raise NotImplementedError`. This function is only used for sanity checks, so it's fine that it only works with the subset of primes we're actually interested in.
-
+The main thing to know about `is_prime` is that it does not perform
+and exhaustive test of primality. It will return `True` or `False` if
+the primality of `n` can be determined with certainty, otherwise it
+will `raise NotImplementedError`. This function is only used for
+sanity checks, so it's fine that it only works with the subset of
+primes we're actually interested in.
 
 ## Implementation of `sbk.primes`
 
@@ -60,10 +88,11 @@ import pytest
 import sbk.primes
 ```
 
-
 ### Constants
 
-We start with a static/hardcoded definition of the primes we care about. We only care about exponents $`n`$ which are mutliples of 8 because we will only be encoding secrets with a length in bytes.
+We start with a static/hardcoded definition of the primes we care
+about. We only care about exponents $`n`$ which are mutliples of 8
+because we will only be encoding secrets with a length in bytes.
 
 ```math
 2^n - k
@@ -126,7 +155,6 @@ POW2_PRIMES = [
 ]
 ```
 
-
 ```python
 # lp: primes.get_pow2prime
 def get_pow2prime_index(num_bits: int) -> int:
@@ -147,10 +175,11 @@ def get_pow2prime(num_bits: int) -> int:
     return POW2_PRIMES[p2pp_idx]
 ```
 
-
 ### Basic Validation
 
-Our main concern here is that we define a constant that isn't actually a prime (presumably by accident), so let's start with some basic sanity/double checks.
+Our main concern here is that we define a constant that isn't
+actually a prime (presumably by accident), so let's start with some
+basic sanity/double checks.
 
 ```python
 # lp: primes.validation
@@ -167,14 +196,19 @@ assert 1461501637330902918203684832716283019655932542929          in POW2_PRIMES
 assert 6277101735386680763835789423207666416102355444464034512659 in POW2_PRIMES
 ```
 
-If we *do* ever want to serialize a share that uses $` GF(p) `$, then we will somehow have to encode which prime is used. That would be done most easilly as an index of `POW2_PRIMES` using only one byte.
+If we *do* ever want to serialize a share that uses $` GF(p) `$, then
+we will somehow have to encode which prime is used. That would be
+done most easilly as an index of `POW2_PRIMES` using only one byte.
 
 ```python
 # lp: primes.validation
 assert len(POW2_PRIMES) < 256
 ```
 
-We use the small primes for the `basic_prime_test` and as bases for the Miller-Rabin test. I'm not actually sure that prime bases are any better for the MR test than random numbers, it's just a visible pattern from the [wikipedia article][href_wiki_mrtest_bases].
+We use the small primes for the `basic_prime_test` and as bases for
+the Miller-Rabin test. I'm not actually sure that prime bases are any
+better for the MR test than random numbers, it's just a visible
+pattern from the [wikipedia article][href_wiki_mrtest_bases].
 
 Primes [oeis.org/A000040](https://oeis.org/A000040/list)
 
@@ -195,7 +229,6 @@ PRIMES = sorted(set(SMALL_PRIMES + POW2_PRIMES))
 
 [href_wiki_mrtest_bases]: https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Testing_against_small_sets_of_bases
 
-
 ```python
 # lp: primes.test_primelist_validation
 def test_primelist_validation():
@@ -211,11 +244,12 @@ def test_primelist_validation():
         sbk.primes.POW2_PRIME_PARAMS = original
 ```
 
-
 ### Primality Testing
 
-All the primes we actually use are constants and are well known. The primality testing code here is for verification and as a safety net against accidental changes. We start with the most basic test if `n` is a prime.
-
+All the primes we actually use are constants and are well known. The
+primality testing code here is for verification and as a safety net
+against accidental changes. We start with the most basic test if `n`
+is a prime.
 
 ```python
 # lp: primes.is_prime
@@ -236,12 +270,14 @@ def is_prime(n: int) -> bool:
     return True
 ```
 
-The MR test is only used for validation of the constants declared in `POW2_PRIMES`. The implementation was developed using the following resources:
+The MR test is only used for validation of the constants declared in
+`POW2_PRIMES`. The implementation was developed using the following
+resources:
 
- - https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Miller_test
- - https://jeremykun.com/2013/06/16/miller-rabin-primality-test/
- - http://miller-rabin.appspot.com/
- - https://gist.github.com/Ayrx/5884790
+- [en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Miller_test](https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Miller_test)
+- [jeremykun.com/2013/06/16/miller-rabin-primality-test/](https://jeremykun.com/2013/06/16/miller-rabin-primality-test/)
+- [miller-rabin.appspot.com/](http://miller-rabin.appspot.com/)
+- [gist.github.com/Ayrx/5884790](https://gist.github.com/Ayrx/5884790)
 
 ```python
 # lp: primes.is_probable_prime

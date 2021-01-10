@@ -21,8 +21,6 @@ class HashAlgo(enum.Enum):
     ARGON2_V19_ID = 2
 
 
-HashAlgoVal = int
-
 HASH_ALGO_NAMES = {
     HashAlgo.ARGON2_V19_I : 'argon2_v19_i',
     HashAlgo.ARGON2_V19_D : 'argon2_v19_d',
@@ -33,6 +31,13 @@ HASH_ALGO_NAMES = {
 NumThreads = int
 MebiBytes  = int
 Iterations = int
+HashAlgoVal = int
+Seconds = float
+
+# types for progress bar
+Increment = float
+ProgressCallback = typ.Callable[[Increment], None]
+MaybeProgressCallback = typ.Optional[ProgressCallback]
 
 
 # We are looking for an equation of the form
@@ -104,9 +109,9 @@ class KDFParams(typ.NamedTuple):
         f_m = _clamp(val=_log(self.m_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
         f_t = _clamp(val=_log(self.t_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
 
-        assert 0 <= f_p < 2 ** 4
-        assert 0 <= f_m < 2 ** 6
-        assert 0 <= f_t < 2 ** 6
+        assert 0 <= f_p < 2 ** 4, f"f_p={f_p}"
+        assert 0 <= f_m < 2 ** 6, f"f_m={f_m}"
+        assert 0 <= f_t < 2 ** 6, f"f_t={f_t}"
 
         return (f_p, f_m, f_t)
 
@@ -219,14 +224,6 @@ def _hash(data: bytes, p: int, m: int, t: int, h: int = HashAlgo.ARGON2_V19_ID.v
         version=version,
     )
 
-
-Seconds = float
-
-Increment = float
-
-ProgressCallback = typ.Callable[[Increment], None]
-
-
 DIGEST_STEPS = 10
 
 
@@ -273,7 +270,7 @@ def digest(
     data       : bytes,
     kdf_params : KDFParams,
     hash_len   : int,
-    progress_cb: typ.Optional[ProgressCallback] = None,
+    progress_cb: MaybeProgressCallback = None,
 ) -> bytes:
     _ps = ProgressSmoother(progress_cb or _dummy_cb)
 

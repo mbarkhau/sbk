@@ -2,11 +2,8 @@
 
 For the time being, the documentation is mainly for contributors rather than users. You can skip ahead to the [User Guide](#user-guide) if implementation details are not important to you.
 
-> *Aside*: If you are doing code review, please be aware that some portions of the
->   implementation, which might otherwise be deleted, are preserved for future didactic
->   use as I rewrite SBK into a literate program. This relates in particular to the
->   [Luby Transform][href_wiki_ltcodes] based ECC in `sbk/ecc_lt.py` and the $`GF(p)`$
->   arithmetic in `sbk/gf.py`.
+!!! aside "Aside"
+    If you are doing code review, please be aware that some portions of the implementation, which might otherwise be deleted, are preserved for future didactic use while I rewrite SBK into a literate program. This relates in particular to the [Luby Transform][href_wiki_ltcodes] based ECC in `sbk/ecc_lt.py` and the $`GF(p)`$ arithmetic in `sbk/gf.py`.
 
 [href_wiki_ltcodes]: https://en.wikipedia.org/wiki/Luby_transform_code
 
@@ -256,7 +253,7 @@ For those keeping track, by default the total entropy used to generate the walle
 
 ### Parameters
 
-Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hard-coded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hard-coded. Instead they are encoded as a prefix of the `salt` and of every `share`. The downside of this is that there is more data that you have to copy and enter manually. This is why the encoding is kept as compact as possible (4 bytes == 4words == 2 x 6 digits).
+Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hard-coded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hard-coded. Instead they are encoded as a prefix of the `salt` and of every `share`. The downside of this is that there is more data that you have to manually copy and enter. This is why the encoding is kept as compact as possible (4 bytes == 4words == 2 x 6 digits).
 
 Here is the data layout of these 4 bytes:
 
@@ -271,7 +268,7 @@ offset  0       4       8       12      16      20          26        31
 
 The bean counters among you may have notice that 4 bytes is not enough to encode the complete range of valid parameters which the KDF would accept in theory. For example, the `kdf_time_cost`, which corresponds to the "Number of iterations *t*" in [section 3.1 of the Argon 2 Spec][href_github_phc_winner_argon2] with a valid range of `1..2**32 − 1` would by itself already require 32 bits, much more than the 6bits available in the above encoding.
 
-Since the distinction between 1000 iterations and 1001 iterations is not critical, the kdf parameters are not encoded exactly, but using a logarithmic scale. This log base is chosen so that the difficulty can be controlled reasonably well (increments of 1.25x) while still being able to represent values that are sufficiently large (`kdf_mem_cost` up to 5 Terabyte per thread; `kdf_time_cost` up to 5 million iterations). If you specified `--time-cost=1000` for example, this would be rounded to `floor(1.25**25 * 4 - 3) == 1055`.
+Since the distinction between 1000 iterations and 1001 iterations is not critical, the kdf parameters are not encoded exactly, but using a logarithmic scale. This log base is chosen so that the difficulty can be controlled reasonably well (increments of 1.25x) while still being able to represent values that are sufficiently large (`kdf_mem_cost` over 1 Terabyte per thread; `kdf_time_cost` over 1 million iterations). If you specified `--time-cost=1000` for example, this would be rounded to `floor(1.25**31 + 31) == 1040`.
 
 
 |      Field Name     |  Size |              Value               |      Range (inclusive)      |
@@ -354,7 +351,7 @@ For more information on the risks and responsible use of a wallet passphrase, [t
 
 ## Key Derivation
 
-The purpose of the [Key Derivation Function][href_wiki_kdf] is to make a brute-force attack incredibly expensive. The purpose of the `salt` is to make each brute-force attack specific to a particular wallet. Using a KDF together with a `salt` makes it practically impossible to brute-force your wallet and if an attacker has access to your `salt`, then you will at least have some time to move your coins before their attack succeeds (assuming you didn't use a weak `brainkey`, eg. by setting `--brainkey-len=4`).
+The purpose of the [Key Derivation Function][href_wiki_kdf] is to make a brute-force attack incredibly expensive. The purpose of the `salt` is to make each brute-force attack specific to a particular wallet. Using a KDF together with a `salt` makes it practically impossible to brute-force your wallet and if an attacker has access to your `salt`, then you will at least have some time to move your coins before their attack succeeds (assuming you used a strong `brainkey` with at least `--brainkey-len=6`).
 
 The KDF used by SBK is [Argon2][href_github_phc_winner_argon2], which is designed to be ASIC-resistant, GPU-resistant and SBK chooses parameters to use as much memory as is available on your air-gapped computer. This approach mitigates the advantage an attacker has from investing in specialized hardware. The price you pay for this added security is that you have to wait a minute or two every time you want to load your wallet. This shouldn't be too much of an issue if you access your cold-storage wallet only every few weeks or months.
 
@@ -387,7 +384,9 @@ Waiting 1-2 minutes for the key derivation is somewhat inconvenient, but it woul
 ```python
 import argon2     # pip install argon2-cffi
 
-def digest(data: bytes, p: int, m: int, t: int, digest_len: int=32) -> bytes:
+def digest(
+    data: bytes, p: int, m: int, t: int, digest_len: int=32
+) -> bytes:
     constant_kwargs = {
         'hash_len'   : 1024,
         'memory_cost': m * 1024,

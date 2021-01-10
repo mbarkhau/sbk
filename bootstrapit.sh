@@ -23,9 +23,8 @@ GIT_REPO_NAMESPACE="mbarkhau"
 PACKAGE_NAME="sbk"
 MODULE_NAME="sbk"
 
-# PACKAGE_VERSION="v201908.0001-alpha"
+PACKAGE_VERSION="2021.1001-alpha"
 # PACKAGE_VERSION="v0.1.0"
-PACKAGE_VERSION="$(date +'v%Y%m.0001-alpha')"
 
 # These must be valid (space separated) conda package names.
 # A separate conda environment will be created for each of these.
@@ -38,8 +37,8 @@ PACKAGE_VERSION="$(date +'v%Y%m.0001-alpha')"
 # - pypy2.7
 # - pypy3.5
 
-DEFAULT_PYTHON_VERSION="python=3.7"
-# SUPPORTED_PYTHON_VERSIONS="python=3.6 python=3.7"
+DEFAULT_PYTHON_VERSION="python=3.9"
+SUPPORTED_PYTHON_VERSIONS="python=3.9 python=3.7 python=3.6"
 
 # GIT_REPO_URL=https://${GIT_REPO_DOMAIN}/${GIT_REPO_NAMESPACE}/${PACKAGE_NAME}
 

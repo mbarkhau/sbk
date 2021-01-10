@@ -1,6 +1,10 @@
 # [SBK: Split Bitcoin Keys][repo_ref]
 
 <p align="center">
+<b>SBK is still ALPHA quality software, please only use if you want to contribute.</b>
+</p>
+
+<p align="center">
 <img src="https://mbarkhau.keybase.pub/sbk/logo_128.png" height=128 style="background: white;">
 </p>
 

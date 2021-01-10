@@ -354,7 +354,7 @@ def cli() -> None:
 
 
 @cli.command()
-@click.version_option(version="v201906.0001-alpha")
+@click.version_option(version="2021.1001-beta")
 def version() -> None:
     """Show version number."""
     echo(f"SBK version: {sbk.__version__}")

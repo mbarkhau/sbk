@@ -1,7 +1,7 @@
 # Stages:
 #   root       : Common image, both for the builder and for the final image.
 #                This contains only minimal dependencies required in both cases
-#                for miniconda and the makefile.
+#                for miniconda and the Makefile.
 #   env_builder: stage in which the conda envrionment is created
 #                and dependencies are installed
 #   base       : the final image containing only the required environment files,
@@ -32,12 +32,16 @@ RUN if ! test -z "${ENV_SSH_PRIVATE_RSA_KEY}"; then \
 ADD requirements/ requirements/
 ADD scripts/ scripts/
 
-ADD makefile.extra.make makefile.extra.make
-ADD makefile.config.make makefile.config.make
-ADD makefile makefile
+ADD Makefile.bootstrapit.make Makefile.bootstrapit.make
+ADD Makefile Makefile
 
-RUN apt-get install -y gcc
-RUN make install
+# install envs (relatively stable)
+ADD requirements/conda.txt requirements/conda.txt
+RUN make build/envs.txt
+
+# install python package dependencies (change more often)
+ADD requirements/ requirements/
+RUN make conda
 
 RUN rm -f /root/.ssh/id_rsa
 

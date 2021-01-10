@@ -12,7 +12,7 @@ Project/Repo:
 [![LitProg Documentation][docs_img]][docs_ref]
 [![MIT License][license_img]][license_ref]
 [![Supported Python Versions][pyversions_img]][pyversions_ref]
-[![PyCalVer v202001.1001-beta][version_img]][version_ref]
+[![CalVer 2021.1001-beta][version_img]][version_ref]
 [![PyPI Version][pypi_img]][pypi_ref]
 [![PyPI Downloads][downloads_img]][downloads_ref]
 
@@ -64,7 +64,7 @@ $ make lint mypy test
 [downloads_img]: https://pepy.tech/badge/sbk/month
 [downloads_ref]: https://pepy.tech/project/sbk
 
-[version_img]: https://img.shields.io/static/v1.svg?label=PyCalVer&message=v202001.0013-beta&color=blue
+[version_img]: https://img.shields.io/badge/CalVer-2021.1001--beta-blue.svg
 [version_ref]: https://pypi.org/project/pycalver/
 
 [pyversions_img]: https://img.shields.io/pypi/pyversions/sbk.svg

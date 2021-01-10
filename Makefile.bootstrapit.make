@@ -10,11 +10,10 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 .SUFFIXES:
 
-
 PROJECT_DIR := $(notdir $(abspath .))
 
 ifndef DEVELOPMENT_PYTHON_VERSION
-	DEVELOPMENT_PYTHON_VERSION := python=3.6
+	DEVELOPMENT_PYTHON_VERSION := python=3.8
 endif
 
 ifndef SUPPORTED_PYTHON_VERSIONS
@@ -22,6 +21,7 @@ ifndef SUPPORTED_PYTHON_VERSIONS
 endif
 
 PKG_NAME := $(PACKAGE_NAME)
+MODULE_NAME := $(shell echo $(subst -,_,$(PACKAGE_NAME)) | tr A-Z a-z)
 
 # TODO (mb 2018-09-23): Support for bash on windows
 #    perhaps we need to install conda using this
@@ -57,6 +57,7 @@ CONDA_ENV_BIN_PYTHON_PATHS := \
 empty :=
 literal_space := $(empty) $(empty)
 
+# BDIST_WHEEL_PYTHON_TAG := py2.py3
 BDIST_WHEEL_PYTHON_TAG := \
 	$(subst python,py,$(subst $(literal_space),.,$(subst .,,$(subst =,,$(SUPPORTED_PYTHON_VERSIONS)))))
 
@@ -70,6 +71,8 @@ DEV_ENV := $(ENV_PREFIX)/$(DEV_ENV_NAME)
 DEV_ENV_PY := $(DEV_ENV)/bin/python
 
 RSA_KEY_PATH := $(HOME)/.ssh/$(PKG_NAME)_gitlab_runner_id_rsa
+
+DOCKER := $(shell which podman || which docker)
 
 DOCKER_BASE_IMAGE := registry.gitlab.com/mbarkhau/sbk/base
 
@@ -85,13 +88,13 @@ build/envs.txt: requirements/conda.txt
 	@if [[ ! -f $(CONDA_BIN) ]]; then \
 		echo "installing miniconda ..."; \
 		if [[ $(PLATFORM) == "Linux" ]]; then \
-			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" \
+			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" --location \
 				> build/miniconda3.sh; \
 		elif [[ $(PLATFORM) == "MINGW64_NT-10.0" ]]; then \
-			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" \
+			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" --location \
 				> build/miniconda3.sh; \
 		elif [[ $(PLATFORM) == "Darwin" ]]; then \
-			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh" \
+			curl "https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh" --location \
 				> build/miniconda3.sh; \
 		fi; \
 		bash build/miniconda3.sh -b -p $(CONDA_ROOT); \
@@ -182,22 +185,22 @@ help:
 				helpMessage = ""; \
 			} \
 		}' \
-		$(MAKEFILE_LIST)
+		Makefile.bootstrapit.make Makefile
 
 	@if [[ ! -f $(DEV_ENV_PY) ]]; then \
 	echo "Missing python interpreter at $(DEV_ENV_PY) !"; \
-	echo "You problably want to install first:"; \
+	echo "You problably want to first setup the virtual environments:"; \
 	echo ""; \
-	echo "    make install"; \
+	echo "    make conda"; \
 	echo ""; \
 	exit 0; \
 	fi
 
 	@if [[ ! -f $(CONDA_BIN) ]]; then \
 	echo "No conda installation found!"; \
-	echo "You problably want to install first:"; \
+	echo "You problably want to first setup the virtual environments:"; \
 	echo ""; \
-	echo "    make install"; \
+	echo "    make conda"; \
 	echo ""; \
 	exit 0; \
 	fi
@@ -236,7 +239,7 @@ helpverbose:
 				helpMessage = ""; \
 			} \
 		}' \
-		$(MAKEFILE_LIST)
+		Makefile.bootstrapit.make Makefile
 
 
 ## -- Project Setup --
@@ -281,14 +284,9 @@ force:
 	rm -rf vendor/__pycache__/
 
 
-## Setup python virtual environments
-.PHONY: install
-install: build/deps.txt
-
-
-## Update dependencies (pip install -U ...)
-.PHONY: update
-update: build/deps.txt
+## Create/Update python virtual environments
+.PHONY: conda
+conda: build/deps.txt
 
 
 ## Install git pre-push hooks
@@ -296,71 +294,85 @@ update: build/deps.txt
 git_hooks:
 	@rm -f "$(PWD)/.git/hooks/pre-push"
 	ln -s "$(PWD)/scripts/pre-push-hook.sh" "$(PWD)/.git/hooks/pre-push"
-	@rm -f "$(PWD)/.git/hooks/pre-commit"
-	ln -s "$(PWD)/scripts/pre-commit-hook.sh" "$(PWD)/.git/hooks/pre-commit"
 
 
 ## -- Integration --
 
 
-## Run flake8 linter
-.PHONY: lint
-lint:
-	@printf "isort ..\n"
+## Run isort with --check-only
+.PHONY: lint_isort
+lint_isort:
+	@printf "isort ...\n"
 	@$(DEV_ENV)/bin/isort \
 		--check-only \
-		--force-single-line-imports \
-		--length-sort \
-		--recursive \
 		--line-width=$(MAX_LINE_LEN) \
-		--project $(PKG_NAME) \
+		--project $(MODULE_NAME) \
 		src/ test/
 	@printf "\e[1F\e[9C ok\n"
 
-	@printf "sjfmt ..\n"
+
+## Run sjfmt with --check
+.PHONY: lint_fmt
+lint_fmt:
+	@printf "sjfmt ...\n"
 	@$(DEV_ENV)/bin/sjfmt \
-		--target-version py36 \
+		--target-version=py36 \
 		--skip-string-normalization \
 		--line-length=$(MAX_LINE_LEN) \
 		--check \
-		--quiet \
+		src/ test/ 2>&1 | sed "/All done/d" | sed "/left unchanged/d"
+	@printf "\e[1F\e[9C ok\n"
+
+
+## Run flake8
+.PHONY: lint_flake8
+lint_flake8:
+	@rm -f reports/flake8*;
+	@mkdir -p "reports/";
+
+	@printf "flake8 ..\n"
+	@$(DEV_ENV)/bin/flake8 src/ --tee --output-file reports/flake8.txt || exit 0;
+	@$(DEV_ENV)/bin/flake8_junit reports/flake8.txt reports/flake8.xml >> /dev/null;
+	@$(DEV_ENV_PY) scripts/exit_0_if_empty.py reports/flake8.txt;
+
+	@printf "\e[1F\e[9C ok\n"
+
+
+## Run pylint.
+.PHONY: lint_pylint
+lint_pylint:
+	@mkdir -p "reports/";
+
+	@printf "pylint ..\n";
+	@$(DEV_ENV)/bin/pylint-ignore --rcfile=setup.cfg \
 		src/ test/
 	@printf "\e[1F\e[9C ok\n"
 
-	@printf "flake8 ..\n"
-	@$(DEV_ENV)/bin/flake8 src/
-	@printf "\e[1F\e[9C ok\n"
 
+## Run pylint-ignore --update-ignorefile.
+.PHONY: pylint_ignore
+pylint_ignore:
+	$(DEV_ENV)/bin/pylint-ignore --rcfile=setup.cfg \
+		src/ test/ --update-ignorefile
+
+
+## Run flake8 linter and check for fmt
+.PHONY: lint
+lint: lint_isort lint_fmt lint_flake8 lint_pylint
 
 
 ## Run mypy type checker
 .PHONY: mypy
 mypy:
 	@rm -rf ".mypy_cache";
-	@rm -rf "mypycov/";
+	@rm -rf "reports/mypycov";
+	@mkdir -p "reports/";
 
 	@printf "mypy ....\n"
 	@MYPYPATH=stubs/:vendor/ $(DEV_ENV_PY) -m mypy \
-		--html-report mypycov \
+		--html-report reports/mypycov \
 		--no-error-summary \
-		src/ \
-		| sed "/Generated HTML report/d"
-	@printf "\e[1F\e[9C ok\n"
-
-
-## Run pylint. Should not break the build yet
-.PHONY: pylint
-pylint:
-	@printf "pylint ..\n";
-	@$(DEV_ENV)/bin/pylint --jobs=4 --output-format=colorized --score=no \
-		 --disable=C0103,C0301,C0330,C0326,C0330,C0411,R0903,W1619,W1618,W1203 \
-		 --extension-pkg-whitelist=ujson,lxml,PIL,numpy,pandas,sklearn,pyblake2 \
-		 src/
-	@$(DEV_ENV)/bin/pylint --jobs=4 --output-format=colorized --score=no \
-		 --disable=C0103,C0111,C0301,C0330,C0326,C0330,C0411,R0903,W1619,W1618,W1203 \
-		 --extension-pkg-whitelist=ujson,lxml,PIL,numpy,pandas,sklearn,pyblake2 \
-		 test/
-
+		src/ | sed "/Generated HTML report/d"
 	@printf "\e[1F\e[9C ok\n"
 
 
@@ -370,29 +382,41 @@ test:
 	@rm -rf ".pytest_cache";
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";
-	@rm -rf "htmlcov/";
+	@rm -rf "reports/testcov/";
+	@rm -f "reports/pytest*";
+	@mkdir -p "reports/";
 
 	# First we test the local source tree using the dev environment
-	ENV=$${ENV-dev} PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+	ENV=$${ENV-dev} \
+		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		PATH=$(DEV_ENV)/bin:$$PATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--verbose \
-		--cov-report html \
+		--cov-report "html:reports/testcov/" \
 		--cov-report term \
-		-k "$${PYTEST_FILTER}" \
+		--html=reports/pytest/index.html \
+		--junitxml reports/pytest.xml \
+		-k "$${PYTEST_FILTER-$${FLTR}}" \
 		$(shell cd src/ && ls -1 */__init__.py | awk '{ sub(/\/__init__.py/, "", $$1); print "--cov "$$1 }') \
 		test/ src/;
 
 	# Next we install the package and run the test suite against it.
-	@rm -rf test_dists/;
+
+	rm -rf build/test_wheel;
+	mkdir -p build/test_wheel;
 	$(DEV_ENV_PY) setup.py bdist_wheel --python-tag=$(BDIST_WHEEL_PYTHON_TAG) \
-		--dist-dir test_dists/;
+		--dist-dir build/test_wheel;
 
 	IFS=' ' read -r -a env_py_paths <<< "$(CONDA_ENV_BIN_PYTHON_PATHS)"; \
 	for i in $${!env_py_paths[@]}; do \
 		env_py=$${env_py_paths[i]}; \
-		$${env_py} -m pip install --upgrade test_dists/*.whl; \
-		PYTHONPATH="" ENV=$${ENV-dev} $${env_py} -m pytest test/; \
+		$${env_py} -m pip uninstall --yes $(PKG_NAME); \
+		$${env_py} -m pip install --upgrade build/test_wheel/*.whl; \
+		PYTHONPATH="" ENV=$${ENV-dev} \
+		$${env_py} -m pytest \
+		-k "$${PYTEST_FILTER-$${FLTR}}" \
+		test/; \
 	done;
 
 	@rm -rf ".pytest_cache";
@@ -400,31 +424,36 @@ test:
 	@rm -rf "test/__pycache__";
 
 
-## -- Helpers --
+## Run import sorting on src/ and test/
+.PHONY: fmt_isort
+fmt_isort:
+	@$(DEV_ENV)/bin/isort \
+		--line-width=$(MAX_LINE_LEN) \
+		--project $(MODULE_NAME) \
+		src/ test/;
 
 
 ## Run code formatter on src/ and test/
-.PHONY: fmt
-fmt:
-	@$(DEV_ENV)/bin/isort \
-		--force-single-line-imports \
-		--length-sort \
-		--recursive \
-		--line-width=$(MAX_LINE_LEN) \
-		--project $(PKG_NAME) \
-		src/ test/ experiments/ pdf_templates/;
-
+.PHONY: fmt_sjfmt
+fmt_sjfmt:
 	@$(DEV_ENV)/bin/sjfmt \
-		--target-version py36 \
+		--target-version=py36 \
 		--skip-string-normalization \
 		--line-length=$(MAX_LINE_LEN) \
-		src/ test/ experiments/ pdf_templates/;
+		src/ test/;
 
 
+## Run code formatters
+.PHONY: fmt
+fmt: fmt_isort fmt_sjfmt
 
-## Shortcut for make fmt lint mypy test
+
+## -- Helpers --
+
+
+## Shortcut for make fmt lint mypy devtest test
 .PHONY: check
-check:  fmt lint mypy test
+check: fmt lint mypy devtest test
 
 
 ## Start subshell with environ variables set.
@@ -452,6 +481,7 @@ activate:
 	@echo 'export ENV=$${ENV-dev};'
 	@echo 'export PYTHONPATH="src/:vendor/:$$PYTHONPATH";'
 	@echo 'conda activate $(DEV_ENV_NAME);'
+
 	@echo 'function deactivate {'
 	@echo '		if [[ -z $${_env_before_activate} ]]; then'
 	@echo '				export ENV=$${_env_before_activate}; '
@@ -463,6 +493,8 @@ activate:
 	@echo '		else'
 	@echo '				unset PYTHONPATH;'
 	@echo '		fi'
+	@echo '		unset _env_before_activate;'
+	@echo '		unset _pythonpath_before_activate;'
 	@echo '		conda deactivate;'
 	@echo '};'
 
@@ -470,7 +502,9 @@ activate:
 ## Drop into an ipython shell with correct env variables set
 .PHONY: ipy
 ipy:
-	@ENV=$${ENV-dev} PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+	@ENV=$${ENV-dev} \
+		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		PATH=$(DEV_ENV)/bin:$$PATH \
 		$(DEV_ENV)/bin/ipython
 
 
@@ -480,19 +514,18 @@ devtest:
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";
 
-	ENABLE_BACKTRACE=0 \
-		ENV=$${ENV-dev} \
-		PYTEST_SKIP=$${PYTEST_SKIP:-slow} \
+	ENV=$${ENV-dev} \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		PATH=$(DEV_ENV)/bin:$$PATH \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--no-cov \
-		--durations 15 \
+		--durations 5 \
 		--verbose \
 		--capture=no \
 		--exitfirst \
 		--failed-first \
-		-k "$${PYTEST_FILTER}" \
+		-k "$${PYTEST_FILTER-$${FLTR}}" \
 		test/ src/;
 
 	@rm -rf "src/__pycache__";
@@ -502,9 +535,8 @@ devtest:
 ## Run `make lint mypy test` using docker
 .PHONY: citest
 citest:
-	docker build --file Dockerfile --tag tmp_citest_$(PKG_NAME) .
-# 	docker run --tty tmp_citest_$(PKG_NAME) bash -c "PYTEST_FILTER=cli_create_validation make test"
-	docker run --tty tmp_citest_$(PKG_NAME) make lint mypy test
+	$(DOCKER) build --file Dockerfile --tag tmp_citest_$(PKG_NAME) .
+	$(DOCKER) run --tty tmp_citest_$(PKG_NAME) make lint mypy test
 
 
 ## -- Build/Deploy --
@@ -553,6 +585,7 @@ dist_upload:
 	$(DEV_ENV)/bin/twine check $$($(SDIST_FILE_CMD));
 	$(DEV_ENV)/bin/twine check $$($(BDIST_WHEEL_FILE_CMD));
 	$(DEV_ENV)/bin/twine upload --skip-existing \
+		--repository pypi-legacy \
 		$$($(SDIST_FILE_CMD)) $$($(BDIST_WHEEL_FILE_CMD));
 
 
@@ -572,21 +605,18 @@ dist_publish: bump_version dist_build dist_upload
 .PHONY: docker_build
 docker_build:
 	@if [[ -f "$(RSA_KEY_PATH)" ]]; then \
-		docker build \
+		$(DOCKER) build \
 			--build-arg SSH_PRIVATE_RSA_KEY="$$(cat '$(RSA_KEY_PATH)')" \
 			--file docker_base.Dockerfile \
 			--tag $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION) \
 			--tag $(DOCKER_BASE_IMAGE) \
 			.; \
 	else \
-		docker build \
+		$(DOCKER) build \
 			--file docker_base.Dockerfile \
 			--tag $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION) \
 			--tag $(DOCKER_BASE_IMAGE) \
 			.; \
 	fi
 
-	docker push $(DOCKER_BASE_IMAGE)
-
-
-
+	$(DOCKER) push $(DOCKER_BASE_IMAGE)

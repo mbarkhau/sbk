@@ -9,20 +9,23 @@ BOOTSTRAPIT_GIT_PATH=/tmp/bootstrapit;
 
 echo "Updating from $BOOTSTRAPIT_GIT_URL";
 
+OLD_PWD="$PWD";
+
 if [[ ! -e "$BOOTSTRAPIT_GIT_PATH" ]]; then
     git clone "$BOOTSTRAPIT_GIT_URL" "$BOOTSTRAPIT_GIT_PATH";
 else
-    OLD_PWD="$PWD";
     cd "$BOOTSTRAPIT_GIT_PATH";
     git pull --quiet;
     cd "$OLD_PWD";
 fi
 
-BOOTSTRAPIT_DEBUG=0
+cd "$BOOTSTRAPIT_GIT_PATH";
+git checkout "${BOOTSTRAPIT_DEV_BRANCH-master}";
+git pull --quiet;
+cd "$OLD_PWD";
 
-if [[ $BOOTSTRAPIT_DEBUG == 0 ]]; then
+if [[ ${BOOTSTRAPIT_DEBUG-0} == 0 ]]; then
     if [[ -f "$PROJECT_DIR/.git/config" ]]; then
-        OLD_PWD="$PWD"
         cd "$PROJECT_DIR";
         if [[ $( git diff -s --exit-code || echo "$?" ) -gt 0 ]]; then
             echo "ABORTING!: Your repo has local changes which are not comitted."
@@ -32,10 +35,10 @@ if [[ $BOOTSTRAPIT_DEBUG == 0 ]]; then
         cd "$OLD_PWD";
     fi
 
-    md5sum=$(which md5sum || which md5)
+    md5cmd=$(command -v md5sum || command -v md5)
 
-    old_md5=$( cat "$PROJECT_DIR/scripts/bootstrapit_update.sh" | $md5sum );
-    new_md5=$( cat "$BOOTSTRAPIT_GIT_PATH/scripts/bootstrapit_update.sh" | $md5sum );
+    old_md5=$( $md5cmd < "$PROJECT_DIR/scripts/bootstrapit_update.sh" );
+    new_md5=$( $md5cmd < "$BOOTSTRAPIT_GIT_PATH/scripts/bootstrapit_update.sh" );
 
     if [[ "$old_md5" != "$new_md5" ]]; then
         # Copy the updated file, run it and exit the current execution.
@@ -49,6 +52,42 @@ if [[ $BOOTSTRAPIT_DEBUG == 0 ]]; then
     fi
 fi
 
+# One time update of makefile setup
+if [[ -f "makefile.extra.make" && -f "makefile.config.make" ]]; then
+    printf "Converting simplified makefile setup\n\n"
+    printf "  mv makefile makefile.bootstrapit.make\n"
+    printf "  cat makefile.config.make > makefile\n"
+    printf "  cat makefile.extra.make >> makefile\n"
+
+    grep -v "include" makefile | grep -v "Project Specific Tasks" > makefile.bootstrapit.make;
+
+    cat makefile.config.make > makefile;
+    printf "\n\ninclude makefile.bootstrapit.make\n\n" >> makefile;
+    printf "## -- Extra/Custom/Project Specific Tasks --\n" >> makefile;
+    cat makefile.extra.make >> makefile;
+
+    git rm makefile.config.make;
+    git rm makefile.extra.make;
+    git add makefile;
+    git add makefile.bootstrapit.make;
+
+    printf "\nNow the 'makefile' is yours and the bootstrapit targets are in makefile.bootstrapit.make"
+    exit 1
+fi
+
+# One time update of makefile capitalization
+if [[ -f "makefile" && -f "makefile.bootstrapit.make" ]]; then
+    printf "Change capitalization of makefile -> Makefile  # because too many rustled jimmies\n\n"
+    printf "  mv makefile Makefile\n"
+    printf "  mv makefile.bootstrapit.make Makefile.bootstrapit.make\n"
+    sed -i 's/include makefile.bootstrapit.make/include Makefile.bootstrapit.make/g' makefile
+    git add makefile
+    git mv makefile Makefile;
+    git mv makefile.bootstrapit.make Makefile.bootstrapit.make;
+
+    printf "Please commit the renamed files and run bootstrapit_update.sh again."
+    exit 1
+fi
 
 # Argument parsing from
 # https://stackoverflow.com/a/14203146/62997
@@ -73,7 +112,7 @@ done
 
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [[ -z $AUTHOR_EMAIL && ! -z $AUTHOR_CONTACT ]]; then
+if [[ -z $AUTHOR_EMAIL && -n $AUTHOR_CONTACT ]]; then
     AUTHOR_EMAIL="${AUTHOR_CONTACT}"
 fi
 
@@ -321,9 +360,7 @@ elif [[ -z "${IGNORE_IF_EXISTS[*]}" ]]; then
         "CHANGELOG.md"
         "README.md"
         "setup.py"
-        "makefile"
         "requirements/pypi.txt"
-        "requirements/development.txt"
         "requirements/conda.txt"
         "requirements/vendor.txt"
         "src/${MODULE_NAME}/__init__.py"
@@ -360,6 +397,7 @@ mkdir -p "${PROJECT_DIR}/stubs/";
 mkdir -p "${PROJECT_DIR}/src/";
 mkdir -p "${PROJECT_DIR}/requirements/";
 mkdir -p "${PROJECT_DIR}/src/${MODULE_NAME}";
+mkdir -p "${PROJECT_DIR}/.github/workflows/";
 
 copy_template .gitignore;
 copy_template README.md;
@@ -372,8 +410,8 @@ copy_template MANIFEST.in;
 copy_template setup.py;
 copy_template setup.cfg;
 
-copy_template makefile;
-copy_template makefile.bootstrapit.make;
+copy_template Makefile;
+copy_template Makefile.bootstrapit.make;
 copy_template activate;
 copy_template docker_base.Dockerfile;
 copy_template Dockerfile;
@@ -385,9 +423,12 @@ copy_template requirements/integration.txt;
 copy_template requirements/vendor.txt;
 
 copy_template .gitlab-ci.yml;
+copy_template .github/workflows/ci.yml;
+
 copy_template scripts/update_conda_env_deps.sh;
 copy_template scripts/setup_conda_envs.sh;
 copy_template scripts/pre-push-hook.sh;
+copy_template scripts/exit_0_if_empty.py;
 
 copy_template __main__.py "src/${MODULE_NAME}/__main__.py";
 copy_template __init__.py "src/${MODULE_NAME}/__init__.py";
@@ -411,16 +452,16 @@ for src_file in $src_files; do
     fi
     offset=0
     if grep -z -q -E '^#![/a-z ]+?python' "$src_file"; then
-        let offset+=1;
+        (( offset+=1 ));
     fi
     if grep -q -E '^# .+?coding: [a-zA-Z0-9_\-]+' "$src_file"; then
-        let offset+=1;
+        (( offset+=1 ));
     fi
     rm -f "${src_file}.with_header";
     if [[ $offset -gt 0 ]]; then
         head -n $offset "${src_file}" > "${src_file}.with_header";
     fi
-    let offset+=1;
+    (( offset+=1 ));
     cat /tmp/.py_license.header >> "${src_file}.with_header";
     tail -n +$offset "${src_file}" >> "${src_file}.with_header";
     mv "${src_file}.with_header" "$src_file";

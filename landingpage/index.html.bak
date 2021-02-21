@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta name="author" content="Manuel Barkhau">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta charset="utf-8"/>
+<title>SBK: Split Bitcoin Keys</title>
+
+<style type="text/css">
+@font-face {
+  font-family: 'lp-bitter';
+  font-style: normal;
+  font-display: block;
+  font-weight: 400;
+  src: local('Bitter Regular'), local('Bitter-Regular'),
+      url('bitter-v15-latin_latin-ext-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+      url('bitter-v15-latin_latin-ext-regular.woff') format('woff'),
+      url('bitter-v15-latin_latin-ext-regular.ttf') format('truetype'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+body {
+    font-family: lp-bitter;
+    word-spacing: 0.1em;
+    background: #090909;
+    color: white;
+    line-height: 1.6em;
+    hyphens: auto;
+    text-align: justify;
+    font-size: 13pt;
+}
+
+#logo {
+    margin: 3em auto;
+    background-color: white;
+    border-radius: 90px;
+    height: 180px;
+    width: 180px;
+}
+#logo img {
+    height: 128px;
+    width: 128px;
+    margin: 35px 26px;
+}
+#content {
+    margin: 1em auto 10em auto;
+    max-width: 40em;
+}
+h1 {
+    text-align: center;
+    line-height: 1.4em;
+    letter-spacing: 0.02em;
+}
+li {margin: 1em 0em;}
+a {
+    color: white;
+    text-decoration: dashed underline;
+    text-decoration-color: #AAA;
+}
+a:hover {
+    text-decoration: underline;
+}
+.warning {
+    color: #FA3;
+    position: relative;
+    max-width: 35em;
+    margin: 1em;
+    font-size: 0.9em;
+    line-height: 1.35em;
+    padding-left: 3em;
+}
+.warning a {
+    color: #FA3;
+    text-decoration-color: #C83;
+}
+.warning:before {
+    content: " ";
+    background-image: url('warn.svg');
+    position: absolute;
+
+    background-size: 2em 2em;
+    height: 2em;
+    width: 2em;
+    right: 0em;
+    left: 0em;
+}
+</style>
+</head>
+<body>
+<div id="logo">
+    <img src="logo_128.png" alt="SBK logo: A puzzle piece with the Bitcoin symbol inside.">
+</div>
+<div id="content">
+    <h1>SBK - Split&nbsp;Bitcoin&nbsp;Keys</h1>
+    <p>
+    SBK is Free and Open Source Software to generate and recover Bitcoin wallets. The goal of SBK is to keep your Bitcoin safe and secure. This means:
+    <ul>
+        <li>Your wallet is safe, even if your house burns down in a fire and all of your documents and devices are destroyed.</li>
+        <li>Your wallet is safe, even if all your documents are stolen or a hacker copies every file from your computer.</li>
+        <li>Your wallet is safe, even if you trusted some people you shouldn't have (not too many though).</li>
+        <li>Your wallet is safe, even if something happens to you (at least your family can still recover your Bitcoin).</li>
+    </ul>
+    </p>
+    <p>
+    The goal of SBK is to enable most people to live up to the security mantra of Bitcoin:
+    <a href="https://www.youtube.com/watch?v=AcrEEnDLm58">Your keys, your coins; not your keys, not your coins</a>
+    </p>
+    <h2>Avalability</h2>
+    <div class="warning">SBK is not yet ready for general use. You should only use SBK for development and testing. As of now, for any wallet you generate with SBK, you should assume it to be a <b>black hole</b> for any Bitcoin you send to it.</div>
+    <div class="warning">SBK will only ever be available via the domain: <b><a href="https://sbk.dev">sbk.dev</a></b>. You should not trust any version of SBK downloaded from any other domain.</div>
+    <div class="warning"><a href="https://github.com/mbarkhau/sbk/blob/master/LICENSE">The software is provided "as is", without warranty of any kind, express or implied.</a> In particular, the author(s) of SBK shall not be held liable for any funds that are lost or stolen arising from the use of the SBK software.</div>
+    <p>SBK is Free and Open Source Software. The source code is publicly available at <a href="https://github.com/mbarkhau/sbk">github.com/litprog/sbk</a>. The primary focus of current development is on documentation and code review.</p>
+</div>
+</body>
+</html>

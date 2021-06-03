@@ -1,0 +1,5 @@
+filesystem*
+newfilesystem*
+grub.cfg
+**/*.squashfs
+**/*.iso

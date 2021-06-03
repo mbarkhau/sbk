@@ -1,7 +1,7 @@
 # This file is part of the SBK project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Wordlists for SBK."""
@@ -94,33 +94,34 @@ def bytes2phrase(data: bytes) -> PhraseStr:
         return "\n".join(word_pairs)
 
 
-def _fuzzy_match(word: str) -> str:
+def fuzzy_match(word: str) -> str:
     def dist_fn(wl_word: str) -> int:
         return pylev.damerau_levenshtein(word, wl_word)
 
     dist, wl_word = min((dist_fn(wl_word), wl_word) for wl_word in WORDLIST)
-    if dist >= 4:
+    if dist < 4:
+        return wl_word
+    else:
         errmsg = f"Unknown word: {word}"
         raise ValueError(errmsg, word)
-
-    return wl_word
 
 
 def phrase2words(phrase: PhraseStr) -> typ.Iterable[str]:
     for word in phrase.split():
         word = word.strip().lower()
         if word not in WORDSET:
-            word = _fuzzy_match(word)
+            word = fuzzy_match(word)
         yield word
+
+
+def _phrase2bytes(phrase: PhraseStr) -> typ.Iterable[bytes]:
+    for word in phrase2words(phrase):
+        yield struct.pack("B", wordlist_index(word))
 
 
 def phrase2bytes(phrase: PhraseStr) -> bytes:
     """Decode human readable phrases to bytes."""
-    data: typ.List[bytes] = []
-    for word in phrase2words(phrase):
-        data.append(struct.pack("B", wordlist_index(word)))
-
-    return b"".join(data)
+    return b"".join(_phrase2bytes(phrase))
 
 
 def main() -> None:

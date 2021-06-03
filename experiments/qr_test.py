@@ -21,8 +21,8 @@ def main(args=sys.argv[1:]):
     qr.print_ascii(out=bw_buf, invert=False)
     qr.print_ascii(out=wb_buf, invert=True)
 
-    bw_lines = bw_buf.getvalue().splitlines()
-    wb_lines = wb_buf.getvalue().splitlines()
+    bw_lines = bw_buf.getvalue().replace("\x0a", " ").splitlines()
+    wb_lines = wb_buf.getvalue().replace("\x0a", " ").splitlines()
 
     print()
     for bw_line, wb_line in zip(bw_lines, wb_lines):

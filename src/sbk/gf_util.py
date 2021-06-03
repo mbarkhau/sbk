@@ -1,7 +1,7 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Galois Field arithmetic functions."""
@@ -89,7 +89,7 @@ DIV_LUT: typ.Dict[int, int] = {}
 
 def div(a: int, b: int) -> int:
     assert 0 <= a < 65536, a
-    assert 0 < b, b
+    assert b > 0, b
 
     key = a * 65536 + b
     if key not in DIV_LUT:
@@ -185,6 +185,8 @@ class XGCDResult(typ.NamedTuple):
 
 def xgcd(a: int, b: int) -> XGCDResult:
     """Extended euclidien greatest common denominator."""
+    # pylint: disable=unpacking-non-sequence
+
     if a == 0:
         return XGCDResult(b, 0, 1)
 

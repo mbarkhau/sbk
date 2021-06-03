@@ -1,11 +1,10 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 """KDF parameter encoding and key derivation."""
 
-import enum
 import math
 import time
 import typing as typ
@@ -13,32 +12,23 @@ import threading
 
 import argon2
 
-
-class HashAlgo(enum.Enum):
-
-    ARGON2_V19_D  = 0
-    ARGON2_V19_I  = 1
-    ARGON2_V19_ID = 2
-
-
-HASH_ALGO_NAMES = {
-    HashAlgo.ARGON2_V19_I : 'argon2_v19_i',
-    HashAlgo.ARGON2_V19_D : 'argon2_v19_d',
-    HashAlgo.ARGON2_V19_ID: 'argon2_v19_id',
-}
-
-
 NumThreads = int
 MebiBytes  = int
 Iterations = int
-HashAlgoVal = int
-Seconds = float
+Seconds    = float
 
 # types for progress bar
-Increment = float
-ProgressCallback = typ.Callable[[Increment], None]
+Increment             = float
+ProgressCallback      = typ.Callable[[Increment], None]
 MaybeProgressCallback = typ.Optional[ProgressCallback]
 
+
+# NOTE (mb 2021-05-29): Since we feed the hash output back into the
+#   following iteration (to implement the progress bar), the HASH_LEN
+#   is chosen to be much larger than the original input, hopefully
+#   this makes loss of entropy between iterations negligable.
+#   Feedback welcome.
+HASH_LEN = 128
 
 # We are looking for an equation of the form
 #
@@ -76,20 +66,39 @@ MaybeProgressCallback = typ.Optional[ProgressCallback]
 #           1 = s * (b - 1)           # factor out s
 # 1 / (b - 1) = s                     # / (b - 1)
 #
-# if we chose b = 2   , then s = 1 and o = 0
-# if we chose b = 1.25, then s = 4 and o = -3
+# if we chose b = 2     , then s =  1 and o = 0
+# if we chose b = 1.5   , then s =  2 and o = -1
+# if we chose b = 1.25  , then s =  4 and o = -3
+# if we chose b = 1.125 , then s =  8 and o = -7
+# if we chose b = 1.0625, then s = 16 and o = -15
 
 
-def _exp(field_val: int, base: float) -> int:
+def curve_params(base: float) -> typ.Tuple[int, int]:
     s = 1 / (base - 1)
     o = 1 - s
-    return math.floor(o + s * base ** field_val)
+    return (s, o)
 
 
-def _log(raw_val: int, base: float) -> int:
-    s = 1 / (base - 1)
-    o = 1 - s
-    return round(math.log((raw_val - o) / s) / math.log(base))
+P_BASE = 1.5
+M_BASE = 1.125
+T_BASE = 1.125
+
+MIN_P = 1
+MIN_M = 10
+MIN_T = 1
+
+
+FieldVal = int
+
+
+def log(raw_val: int, base: float) -> FieldVal:
+    s, o = curve_params(base)
+    return math.floor(math.log((raw_val - o) / s) / math.log(base))
+
+
+def exp(field_val: FieldVal, base: float) -> float:
+    s, o = curve_params(base)
+    return math.ceil(o + s * base ** field_val)
 
 
 def _clamp(val: int, lo: int, hi: int) -> int:
@@ -101,13 +110,14 @@ class KDFParams(typ.NamedTuple):
     p_raw: NumThreads
     m_raw: MebiBytes
     t_raw: Iterations
-    h    : HashAlgoVal
 
     @property
-    def _field_values(self,) -> typ.Tuple[int, int, int]:
-        f_p = _clamp(val=_log(self.p_raw, base=2   ), lo=0, hi=2 ** 4 - 1)
-        f_m = _clamp(val=_log(self.m_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
-        f_t = _clamp(val=_log(self.t_raw, base=1.25), lo=0, hi=2 ** 6 - 1)
+    def _field_values(
+        self,
+    ) -> typ.Tuple[int, int, int]:
+        f_p = _clamp(val=log(self.p_raw // MIN_P, base=P_BASE), lo=0, hi=2 ** 4 - 1)
+        f_m = _clamp(val=log(self.m_raw // MIN_M, base=M_BASE), lo=0, hi=2 ** 6 - 1)
+        f_t = _clamp(val=log(self.t_raw // MIN_T, base=T_BASE), lo=0, hi=2 ** 6 - 1)
 
         assert 0 <= f_p < 2 ** 4, f"f_p={f_p}"
         assert 0 <= f_m < 2 ** 6, f"f_m={f_m}"
@@ -131,16 +141,18 @@ class KDFParams(typ.NamedTuple):
 
     @staticmethod
     def decode(fields: int) -> 'KDFParams':
-        assert 0 <= fields < 2 ** 16
+        if not 0 <= fields < 2 ** 16:
+            errmsg = f"Invalid fields, out of bounds: {fields}"
+            raise AssertionError(errmsg)
+
         f_p = (fields >> 12) & 0xF
         f_m = (fields >>  6) & 0x3F
         f_t = (fields >>  0) & 0x3F
 
-        p = _exp(f_p, base=2)
-        m = _exp(f_m, base=1.25)
-        t = _exp(f_t, base=1.25)
-        h = HashAlgo.ARGON2_V19_ID.value
-        return KDFParams(p, m, t, h)
+        p = exp(f_p, base=P_BASE) * MIN_P
+        m = exp(f_m, base=M_BASE) * MIN_M
+        t = exp(f_t, base=T_BASE) * MIN_T
+        return KDFParams(p, m, t)
 
     def _verify_encoding(self) -> None:
         """Validator for serialization.
@@ -149,9 +161,10 @@ class KDFParams(typ.NamedTuple):
         that can be serialized correctly. This should not be
         needed if we always use init_kdf_params.
         """
-        other  = KDFParams.decode(self.encode())
-        errmsg = f"{self} != {other}"
-        assert self == other, errmsg
+        other = KDFParams.decode(self.encode())
+        if self != other:
+            errmsg = f"{self} != {other}"
+            raise AssertionError(errmsg)
 
     @property
     def p(self) -> NumThreads:
@@ -168,20 +181,11 @@ class KDFParams(typ.NamedTuple):
         self._verify_encoding()
         return self.t_raw
 
-    @property
-    def argon2_type(self) -> int:
-        if self.h == HashAlgo.ARGON2_V19_D.value:
-            return argon2.low_level.Type.D
-        if self.h == HashAlgo.ARGON2_V19_I.value:
-            return argon2.low_level.Type.I
-        if self.h == HashAlgo.ARGON2_V19_ID.value:
-            return argon2.low_level.Type.ID
-
-        err_msg = f"Unknown hash_algo={self.h}"
-        raise ValueError(err_msg)
-
     def _replace_any(
-        self, p: typ.Optional[int] = None, m: typ.Optional[int] = None, t: typ.Optional[int] = None
+        self,
+        p: typ.Optional[int] = None,
+        m: typ.Optional[int] = None,
+        t: typ.Optional[int] = None,
     ) -> 'KDFParams':
         updated = self
 
@@ -204,25 +208,55 @@ def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
     #
     # Only certain parameter values can be serialized. Everything goes through this
     # constructor to make sure we only use valid values.
-    h   = HashAlgo.ARGON2_V19_ID.value
-    tmp = KDFParams(p, m, t, h)
+    tmp = KDFParams(p, m, t)
     return KDFParams.decode(tmp.encode())
 
 
-def _hash(data: bytes, p: int, m: int, t: int, h: int = HashAlgo.ARGON2_V19_ID.value) -> bytes:
+def _hash_pyargon2(
+    data: bytes,
+    p   : NumThreads,
+    m   : MebiBytes,
+    t   : Iterations,
+) -> bytes:
+    # NOTE: only used for testing/validation
+    import pyargon2
+
+    return pyargon2.hash(
+        password=data,
+        salt=data,
+        encoding='raw',
+        hash_len=HASH_LEN,
+        parallelism=p,
+        memory_cost=m * 1024,
+        time_cost=t,
+        variant='id',
+        version=19,
+    )
+
+
+def _hash_argon2_cffi(
+    data: bytes,
+    p   : NumThreads,
+    m   : MebiBytes,
+    t   : Iterations,
+) -> bytes:
     version = argon2.low_level.ARGON2_VERSION
     assert version == 19, version
 
     return argon2.low_level.hash_secret_raw(
         secret=data,
         salt=data,
-        hash_len=1024,
+        hash_len=HASH_LEN,
         parallelism=p,
         memory_cost=m * 1024,
         time_cost=t,
-        type=h,
+        type=argon2.low_level.Type.ID,
         version=version,
     )
+
+
+_hash = _hash_argon2_cffi
+
 
 DIGEST_STEPS = 10
 
@@ -235,23 +269,24 @@ class ProgressSmoother:
         self.increments = [0]
 
         def fake_progress() -> None:
-            tzero = time.time()
+            step_duration = 0.1
+            tzero         = time.time()
             while True:
-                time.sleep(1)
-                if self.total_incr == 0:
-                    progress_cb(0.1)
-                elif self.total_incr >= 100:
+                time.sleep(step_duration)
+                if self.total_incr() == 0:
+                    progress_cb(0.01)
+                elif self.total_incr() >= 100:
                     progress_cb(100)
                     return
                 else:
-                    duration     = time.time() - tzero
-                    incr_per_sec = self.total_incr / duration
-                    progress_cb(incr_per_sec * 1)
+                    duration      = time.time() - tzero
+                    steps         = duration / step_duration
+                    incr_per_step = self.total_incr() / steps
+                    progress_cb(incr_per_step)
 
         self._thread = threading.Thread(target=fake_progress)
         self._thread.start()
 
-    @property
     def total_incr(self):
         return sum(self.increments) + max(self.increments) * 0.55
 
@@ -262,17 +297,17 @@ class ProgressSmoother:
         self._thread.join()
 
 
-def _dummy_cb(incr: Increment) -> None:
-    pass
-
-
 def digest(
     data       : bytes,
     kdf_params : KDFParams,
     hash_len   : int,
     progress_cb: MaybeProgressCallback = None,
 ) -> bytes:
-    _ps = ProgressSmoother(progress_cb or _dummy_cb)
+    _ps           : typ.Optional[ProgressSmoother]
+    if progress_cb:
+        _ps = ProgressSmoother(progress_cb)
+    else:
+        _ps = None
 
     remaining_iters   = kdf_params.t
     remaining_steps   = min(remaining_iters, DIGEST_STEPS)
@@ -281,20 +316,24 @@ def digest(
     constant_kwargs = {
         'p': kdf_params.p,
         'm': kdf_params.m,
-        'h': kdf_params.argon2_type,
     }
     result = data
 
     while remaining_iters > 0:
         step_iters = max(1, round(remaining_iters / remaining_steps))
         result     = _hash(result, t=step_iters, **constant_kwargs)
-        _ps.progress_cb(step_iters * progress_per_iter)
+
+        if _ps:
+            _ps.progress_cb(step_iters * progress_per_iter)
+
         remaining_iters -= step_iters
         remaining_steps -= 1
 
     assert remaining_iters == 0, remaining_iters
     assert remaining_steps == 0, remaining_steps
-    _ps.join()
+
+    if _ps:
+        _ps.join()
 
     return result[:hash_len]
 
@@ -302,12 +341,16 @@ def digest(
 MEASUREMENT_SIGNIFICANCE_THRESHOLD = 2
 
 
-def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Seconds) -> KDFParams:
+def kdf_params_for_duration(
+    baseline_kdf_params : KDFParams,
+    target_duration     : Seconds,
+    max_measurement_time: Seconds = 5,
+) -> KDFParams:
     test_kdf_params = baseline_kdf_params._replace_any(t=1)
     constant_kwargs = {
+        # we only vary t, the baseline should be chosen to max out the others
         'p': test_kdf_params.p,
         'm': test_kdf_params.m,
-        'h': test_kdf_params.argon2_type,
     }
 
     tgt_step_duration = target_duration / DIGEST_STEPS
@@ -322,14 +365,42 @@ def kdf_params_for_duration(baseline_kdf_params: KDFParams, target_duration: Sec
         iters_per_sec = test_kdf_params.t / duration
         step_iters    = tgt_step_duration * iters_per_sec * 1.25
 
-        # print("<", round(duration, 3), "i/s =", iters_per_sec, "tgt =", step_iters)
+        # t = test_kdf_params.t
+        # print(f"< {duration:4.3f} t: {t} i/s: {iters_per_sec} tgt: {step_iters}")
         is_tgt_exceeded            = duration   > tgt_step_duration
         is_measurement_significant = duration   > MEASUREMENT_SIGNIFICANCE_THRESHOLD
-        is_enough_already          = total_time > 5
+        is_enough_already          = total_time > max_measurement_time
         if is_tgt_exceeded or is_measurement_significant or is_enough_already:
-            return test_kdf_params._replace_any(t=round(step_iters * DIGEST_STEPS))
+            new_t = round(step_iters * DIGEST_STEPS)
+            return test_kdf_params._replace_any(t=new_t)
+        else:
+            # min_iters is used to make sure we're always measuring with a higher value for t
+            min_iters       = math.ceil(test_kdf_params.t * 1.25)
+            min_t           = round(1.25 * MEASUREMENT_SIGNIFICANCE_THRESHOLD * iters_per_sec)
+            new_t           = max(min_iters, min_t)
+            test_kdf_params = test_kdf_params._replace_any(t=new_t)
 
-        # min_iters is used to make sure we're always measuring with a higher value for t
-        min_iters       = math.ceil(test_kdf_params.t * 1.25)
-        new_t           = max(min_iters, round(1.25 * MEASUREMENT_SIGNIFICANCE_THRESHOLD * iters_per_sec))
-        test_kdf_params = test_kdf_params._replace_any(t=new_t)
+
+def debug_params() -> None:
+    max_p = exp(2 ** 4 - 1, base=P_BASE)
+    max_m = exp(2 ** 6 - 1, base=M_BASE) * 10
+    max_t = exp(2 ** 6 - 1, base=T_BASE)
+
+    print(f"       {max_p=:>12}     {max_m=:>12}     {max_t=:>12}")
+
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 30, 31, 32, 62, 63, 64]:
+        p = exp(i, base=P_BASE) * MIN_P
+        m = exp(i, base=M_BASE) * MIN_M
+        t = exp(i, base=T_BASE) * MIN_T
+
+        p = min(p, max_p)
+
+        kdf_params = init_kdf_params(p=p, m=m, t=t)
+        print(f"{i:>2}"                     , end=" ")
+        print(f"p: {kdf_params.p:>9} {p:>9}", end=" ")
+        print(f"m: {kdf_params.m:>9} {m:>9}", end=" ")
+        print(f"t: {kdf_params.t:>9} {t:>9}")
+
+
+if __name__ == '__main__':
+    debug_params()

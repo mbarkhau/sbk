@@ -8,8 +8,9 @@
 <img src="https://mbarkhau.keybase.pub/sbk/logo_128.png" height=128 style="background: white;">
 </p>
 
-SBK is a program to generate and recover Bitcoin wallets. The goal of SBK is to enable most people to live up to the security mantra of Bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_aantonop].
+SBK is a program to generate and recover Bitcoin wallets. The goal of SBK is to enable most people to live up to the security mantra of Bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_held_storing_btc].
 
+[href_yt_held_storing_btc]: https://www.youtube.com/watch?v=5WWfQM0SFXQ
 
 Project/Repo:
 
@@ -40,7 +41,6 @@ $ make install
 $ make lint mypy test
 ```
 
-[href_yt_aantonop]: https://www.youtube.com/watch?v=AcrEEnDLm58
 
 [docs_img]: https://mbarkhau.keybase.pub/sbk/litprog_badge.svg
 [docs_ref]: https://mbarkhau.gitlab.io/sbk/docs

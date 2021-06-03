@@ -1,7 +1,7 @@
 # This file is part of the SBK project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """CLI input/output reading/printing functions."""
@@ -13,9 +13,9 @@ import click
 
 from . import ecc_rs
 from . import params
-from . import cli_util
 from . import enc_util
 from . import mnemonic
+from . import ui_common
 
 
 def _echo(msg: str = "") -> bool:
@@ -40,15 +40,15 @@ def _prompt(text: str, default: typ.Optional[str] = None) -> str:
 InputType = str
 
 
-DATA_TYPE_SALT     = 'salt'
-DATA_TYPE_SHARE    = 'share'
-DATA_TYPE_BRAINKEY = 'brainkey'
+SECRET_TYPE_SALT     = 'salt'
+SECRET_TYPE_SHARE    = 'share'
+SECRET_TYPE_BRAINKEY = 'brainkey'
 
 
 MESSAGES = {
-    DATA_TYPE_SALT    : {'header': 'Enter "Salt"'},
-    DATA_TYPE_SHARE   : {'header': 'Enter "Share"'},
-    DATA_TYPE_BRAINKEY: {'header': 'Enter "Brainkey"'},
+    SECRET_TYPE_SALT    : {'header': 'Enter "Salt"'},
+    SECRET_TYPE_SHARE   : {'header': 'Enter "Share"'},
+    SECRET_TYPE_BRAINKEY: {'header': 'Enter "Brainkey"'},
 }
 
 
@@ -72,85 +72,69 @@ def _parse_command(in_val: str) -> MaybeCommand:
 
 
 # Decoded inputs
-Inputs      = typ.List[cli_util.MaybeIntCode]
+Inputs      = typ.List[ui_common.MaybeIntCode]
+DataLen     = int
 MaybeInputs = typ.Optional[Inputs]
 
 # Markers for which inputs were entered/accepted by user
 Accepted = typ.List[bool]
 
 
-def _init_blank_inputs(
-    data_type: str, data_len: typ.Optional[int] = None,
-) -> typ.Tuple[Inputs, int]:
-    assert not (data_type == DATA_TYPE_BRAINKEY and data_len is None)
-
-    num_inputs: int = 0
-    if data_len is None:
-        if data_type == DATA_TYPE_SALT:
-            data_len_guess = params.SALT_LEN
-        elif data_type == DATA_TYPE_SHARE:
-            data_len_guess = params.DEFAULT_SHARE_LEN
-        else:
-            errmsg = f"PromtState.data_len not implemented for data_type={data_type}"
-            raise NotImplementedError(errmsg)
+def _data_len(secret_type: str) -> DataLen:
+    if secret_type == SECRET_TYPE_SALT:
+        return params.SALT_LEN
+    elif secret_type == SECRET_TYPE_SHARE:
+        return params.SHARE_LEN
+    elif secret_type == SECRET_TYPE_BRAINKEY:
+        return params.BRAINKEY_LEN
     else:
-        data_len_guess = data_len
+        errmsg = f"PromtState.data_len not implemented for secret_type={secret_type}"
+        raise NotImplementedError(errmsg)
 
-    # round up if there are an uneven number of inputs (eg for shares)
-    num_inputs = ((data_len_guess + 1) // 2) * 2
+
+def _init_blank_inputs(secret_type: str) -> Inputs:
+    # round up if there are an uneven number of inputs (e.g. for shares)
+    data_len = _data_len(secret_type)
+    num_inputs: int = ((data_len + 1) // 2) * 2
     assert num_inputs > 0
     assert num_inputs % 2 == 0
 
-    blank_inputs: Inputs = [None] * num_inputs
-    return (blank_inputs, data_len_guess)
-
-
-def _parse_share_len(inputs: Inputs) -> int:
-    # parse data_len from first field of param_cfg
-    parts = cli_util.intcodes2parts(inputs[:1])
-    data  = b"".join(parts)
-    assert len(data) == 2
-    dummy_kdf_data = b"\x00\x00"
-    param_cfg      = params.bytes2param_cfg(data + dummy_kdf_data)
-    return (
-        params.PARAM_CFG_LEN
-        + params.SHARE_X_COORD_LEN
-        + params.RAW_SALT_LEN
-        + param_cfg.brainkey_len
-    )
+    return [None] * num_inputs
 
 
 def _newline_mod(num_lines: int) -> int:
-    if num_lines < 6:
-        newline_mod = 99
-    else:
+    if num_lines in (6, 8, 10, 12, 14, 16):
         newline_mod = (num_lines + 1) // 2
         # newline_mod = 3
         # for n in range(3, 6):
         #     if num_lines % n == 0 or 0 < num_lines % newline_mod < num_lines % n:
         #         newline_mod = n
+    else:
+        newline_mod = 99
     return newline_mod
+
+
+def _line_marker(idx: int) -> str:
+    return f"{idx + 1:02}"
 
 
 class PromptState:
 
-    data_type: InputType
-    data_len : int
-    inputs   : Inputs
-    accepted : Accepted
-    cursor   : int
+    secret_type: InputType
+    inputs     : Inputs
+    accepted   : Accepted
+    cursor     : int
 
     def __init__(
         self,
-        data_type: InputType,
-        data_len : int,
-        inputs   : Inputs,
-        cursor   : int = 0,
-        accepted : typ.Optional[Accepted] = None,
+        secret_type: InputType,
+        inputs     : Inputs,
+        cursor     : int = 0,
+        accepted   : typ.Optional[Accepted] = None,
     ) -> None:
-        self.data_type = data_type
-        self.data_len  = data_len
         assert len(inputs) % 2 == 0
+
+        self.secret_type = secret_type
 
         if accepted is None:
             _accepted = [False] * len(inputs)
@@ -170,21 +154,19 @@ class PromptState:
     def is_completable(self) -> bool:
         return all(self.inputs)
 
-    @property
     def is_complete(self) -> bool:
         return all(self.inputs) and all(self.accepted)
 
-    @property
     def result(self) -> bytes:
-        assert self.is_complete
-        return cli_util.maybe_intcodes2bytes(self.inputs, msg_len=self.data_len)
-
-    def _line_marker(self, idx: int) -> str:
-        return f"{idx + 1:02}"
+        if self.is_complete():
+            msg_len = _data_len(self.secret_type)
+            return ui_common.maybe_intcodes2bytes(self.inputs, msg_len=msg_len)
+        else:
+            raise RuntimeError("Invalid State")
 
     def message(self, key: str) -> str:
         if key == 'prompt':
-            cursor_marker = self._line_marker(idx=self.cursor)
+            cursor_marker = _line_marker(idx=self.cursor)
             if self.is_completable:
                 if self.is_cursor_at_ecc:
                     return f"Enter code at {cursor_marker} (or Enter to Accept)"
@@ -196,7 +178,7 @@ class PromptState:
                 else:
                     return f"Enter code/words at {cursor_marker}"
 
-        return MESSAGES[self.data_type][key]
+        return MESSAGES[self.secret_type][key]
 
     def _formatted_lines(self) -> typ.List[str]:
         num_lines = len(self.inputs) // 2
@@ -209,7 +191,7 @@ class PromptState:
             else:
                 intcode = maybe_intcode
 
-            marker = self._line_marker(line_index)
+            marker = _line_marker(line_index)
             lines[line_index] += marker + ": " + intcode
 
         for line_index, maybe_intcode in enumerate(self.inputs[:num_lines]):
@@ -217,7 +199,7 @@ class PromptState:
                 dummy_word = "_" * 9
                 words      = dummy_word + " " + dummy_word
             else:
-                parts = cli_util.intcodes2parts([maybe_intcode], idx_offset=line_index)
+                parts = ui_common.intcodes2parts([maybe_intcode], idx_offset=line_index)
                 words = mnemonic.bytes2phrase(b"".join(parts))
 
             lines[line_index] += "   " + words + "   "
@@ -230,7 +212,7 @@ class PromptState:
             else:
                 intcode = maybe_intcode
 
-            marker = self._line_marker(idx_offset)
+            marker = _line_marker(idx_offset)
             lines[line_index] += marker + ": " + intcode + " "
 
         return lines
@@ -256,52 +238,33 @@ class PromptState:
 
     def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
         header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
-        if show_cursor:
-            header = "   " + header
-
         return [header] + list(self._iter_out_lines(show_cursor))
 
     def _copy(self, **overrides) -> 'PromptState':
         return PromptState(
-            data_type=overrides.get('data_type', self.data_type),
-            data_len=overrides.get('data_len', self.data_len),
+            secret_type=overrides.get('secret_type', self.secret_type),
             cursor=overrides.get('cursor', self.cursor),
             inputs=overrides.get('inputs', self.inputs),
             accepted=overrides.get('accepted', self.accepted),
         )
 
-    def resize_to(self, data_len: int) -> 'PromptState':
-        if self.data_len == data_len:
-            return self
-
-        new_inputs, _ = _init_blank_inputs(self.data_type, data_len)
-        new_accepted = [False] * len(new_inputs)
-
-        # copy over as many previous inputs as possible
-        for i in range(min(len(new_inputs), len(self.inputs))):
-            new_inputs[i] = self.inputs[i]
-            new_accepted[i] = self.accepted[i]
-
-        return self._copy(data_len=data_len, inputs=new_inputs, accepted=new_accepted)
-
     def _eval_cmd(self, cmd: str) -> 'PromptState':
         if cmd == 'accept':
             return self._copy(accepted=[True] * len(self.inputs))
-        if cmd == 'delete':
+        elif cmd == 'delete':
             new_inputs   = list(self.inputs)
             new_accepted = list(self.accepted)
             new_inputs[self.cursor] = None
             new_accepted[self.cursor] = False
             return self._copy(cursor=self.cursor + 1, inputs=new_inputs, accepted=new_accepted)
-
-        if cmd == 'next':
+        elif cmd == 'next':
             return self._copy(cursor=self.cursor + 1)
-        if cmd == 'prev':
+        elif cmd == 'prev':
             return self._copy(cursor=self.cursor - 1)
-        if cmd == 'cancel':
+        elif cmd == 'cancel':
             raise click.Abort()
-
-        raise Exception(f"Invalid command {cmd}")
+        else:
+            raise Exception(f"Invalid command {cmd}")
 
     def parse_input(self, in_val: str) -> typ.Optional['PromptState']:
         in_val, _ = re.subn(r"[^\w\s]", "", in_val.lower().strip())
@@ -310,12 +273,13 @@ class PromptState:
         try:
             if re.match(r"^[\d\s]+$", in_val):
                 parts   = list(re.findall(r"\d{6}", in_val))
-                in_data = b"".join(cli_util.intcodes2parts(parts, idx_offset=self.cursor))
+                in_data = b"".join(ui_common.intcodes2parts(parts, idx_offset=self.cursor))
             else:
                 if len(in_val.strip()) == 0 and self.is_completable and self.is_cursor_at_ecc:
                     cmd = 'accept'
                 else:
                     cmd = _parse_command(in_val)
+
                 if cmd is None:
                     in_data = mnemonic.phrase2bytes(in_val)
                 else:
@@ -343,8 +307,7 @@ class PromptState:
     def _updated_input_data(self, in_data: bytes) -> typ.Tuple[Inputs, Accepted]:
         new_accepted = list(self.accepted)
         new_inputs   = [
-            (input_value if accepted else None)
-            for input_value, accepted in zip(self.inputs, self.accepted)
+            (input_value if accepted else None) for input_value, accepted in zip(self.inputs, self.accepted)
         ]
         pairs = [in_data[i : i + 2] for i in range(0, len(in_data), 2)]
         for i, pair in enumerate(pairs):
@@ -352,48 +315,43 @@ class PromptState:
                 _echo("Warning, too many inputs.")
                 break
 
-            in_intcode = cli_util.bytes2incode_part(pair, self.cursor + i)
+            in_intcode = ui_common.bytes2incode_part(pair, self.cursor + i)
             new_inputs[self.cursor + i] = in_intcode
             new_accepted[self.cursor + i] = True
 
         input_data_len = sum(2 for maybe_intcode in new_inputs if maybe_intcode)
-        is_recoverable = input_data_len >= self.data_len
+        msg_len        = _data_len(self.secret_type)
+        is_recoverable = input_data_len >= msg_len
 
-        if not is_recoverable:
-            return (new_inputs, new_accepted)
+        if is_recoverable:
+            try:
+                recovered_data     = ui_common.maybe_intcodes2bytes(new_inputs, msg_len=msg_len)
+                recovered_intcodes = ui_common.bytes2intcodes(recovered_data)
 
-        try:
-            recovered_data     = cli_util.maybe_intcodes2bytes(new_inputs, msg_len=self.data_len)
-            recovered_intcodes = cli_util.bytes2intcodes(recovered_data)
-
-            new_inputs = [
-                (new_input if accepted else recovered)
-                for accepted, new_input, recovered in zip(
-                    new_accepted, new_inputs, recovered_intcodes
-                )
-            ]
-        except ecc_rs.ECCDecodeError as err:
-            _echo(f"Recovery failed, possibly invalid inputs. {err}")
+                new_inputs = [
+                    (new_input if accepted else recovered)
+                    for accepted, new_input, recovered in zip(new_accepted, new_inputs, recovered_intcodes)
+                ]
+            except ecc_rs.ECCDecodeError as err:
+                _echo(f"Recovery failed, possibly invalid inputs. {err}")
 
         return (new_inputs, new_accepted)
 
 
-def format_secret_lines(data_type: str, data: bytes) -> typ.Sequence[str]:
-    intcodes     = list(cli_util.bytes2intcodes(data))
+def format_secret_lines(secret_type: str, data: bytes) -> typ.Sequence[str]:
+    intcodes     = list(ui_common.bytes2intcodes(data))
     inputs       = typ.cast(Inputs, intcodes)
-    prompt_state = PromptState(data_type, len(data), inputs)
+    prompt_state = PromptState(secret_type, inputs)
     return prompt_state.formatted_input_lines(show_cursor=False)
 
 
-def format_secret(data_type: str, data: bytes) -> str:
-    return "\n".join(format_secret_lines(data_type, data))
+def format_secret(secret_type: str, data: bytes) -> str:
+    return "\n".join(format_secret_lines(secret_type, data))
 
 
-def prompt(
-    data_type: str, header_text: typ.Optional[str] = None, data_len: typ.Optional[int] = None,
-) -> bytes:
-    blank_inputs, data_len_guess = _init_blank_inputs(data_type, data_len)
-    current_ps = PromptState(data_type, data_len_guess, blank_inputs)
+def prompt(secret_type: str, header_text: typ.Optional[str] = None) -> bytes:
+    blank_inputs = _init_blank_inputs(secret_type)
+    current_ps   = PromptState(secret_type, blank_inputs)
 
     if header_text is None:
         _header_text = current_ps.message('header')
@@ -424,28 +382,24 @@ def prompt(
             in_val = _prompt(current_ps.message('prompt'), default="")
             new_ps = current_ps.parse_input(in_val)
 
-        if new_ps.is_complete:
-            return new_ps.result
-
-        if data_type == DATA_TYPE_SHARE and new_ps.inputs[0]:
-            share_data_len = _parse_share_len(new_ps.inputs)
-            new_ps         = new_ps.resize_to(share_data_len)
+        if new_ps.is_complete():
+            return new_ps.result()
 
         current_ps = new_ps
 
 
-def main() -> None:
-    data = prompt(DATA_TYPE_SHARE)
+def _debug_test() -> None:
+    data = prompt(SECRET_TYPE_SHARE)
     print("<<<<", enc_util.bytes_repr(data))
 
-    data = prompt(DATA_TYPE_SALT)
+    data = prompt(SECRET_TYPE_SALT)
     print("<<<<", enc_util.bytes_repr(data))
     _prompt("...", default="")
 
-    data = prompt(DATA_TYPE_BRAINKEY, data_len=params.DEFAULT_BRAINKEY_LEN)
+    data = prompt(SECRET_TYPE_BRAINKEY)
     print("<<<<", enc_util.bytes_repr(data))
     _prompt("...", default="")
 
 
 if __name__ == '__main__':
-    main()
+    _debug_test()

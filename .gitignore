@@ -77,7 +77,11 @@ build/miniconda3.sh
 *.swp
 *.swo
 
+sbk-live-build/iso/
 sbk-live-workdir/
+*.iso
+*.squashfs
+newfilesystem.tar
 
 compat_test/
 
@@ -224,3 +228,7 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+
+# litprog output
+doc/
+pdfscratch/

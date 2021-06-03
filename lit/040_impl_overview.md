@@ -1,38 +1,32 @@
 # Implementation Overview
 
-For the time being, the documentation is mainly for contributors rather than users. You can skip ahead to the [User Guide](#user-guide) if implementation details are not important to you.
-
 !!! aside "Aside"
     If you are doing code review, please be aware that some portions of the implementation, which might otherwise be deleted, are preserved for future didactic use while I rewrite SBK into a literate program. This relates in particular to the [Luby Transform][href_wiki_ltcodes] based ECC in `sbk/ecc_lt.py` and the $`GF(p)`$ arithmetic in `sbk/gf.py`.
 
 [href_wiki_ltcodes]: https://en.wikipedia.org/wiki/Luby_transform_code
 
 
-## High Level Overview: Generating, Joining and Using Keys
+## High Level Overview: Create, Join and Load
 
 
 <!-- TODO: alt="SBK Data-flow Diagram" -->
 
 ```bob
-                    "1. Generate Keys"      "3. Load Wallet"
-
-                     .---------------.    .---------------.
-                     |  "Random Data"|    |  "Wallet Name"|
-                     '-------o-------'    '-------o-------'
-                             |                    |
-                     .-------+-------.            |
-                  .--o      Salt     o--.         V
-  +---------+    /   +---------------+   \    +--------+
-  |  Split  |<--+----o    Brainkey   o----+-->+  KDF   |
-  +----*----+        '-------+-------'        +---*----+
-       |                     ^                    |
-       V                     |                    |
-.-------------.              |                    V
-|    Shares   +-.       +----*----+        .-------------.
-'-+-----------' o------>+   Join  |        |    Wallet   |
-  '-------------'       +---------+        '-------------'
-
- "2. Recover Keys"
+                        +------+------+
+ +---------+            |   Generate  |     .---------------.
+ |   Split +-----.      +------+------+     |  "Wallet Name"|
+ +----+----+     |             |            '-------O-------'
+      |          |             V                    |
+      V          |     .---------------.            |
+.-----------.    |  .--O      Salt     O--.     +---+----+
+|   "Shares"+-.  '--+  +---------------+  +-----+  "KDF" |
+'-+---O-----' |     '--O    Brainkey   O--'     +---+----+
+  '---+-O-----'        '---------------'            |
+      | |                      ^                    |
+      V V                      |                    V
+ +---------+                   |             .-------------.
+ |   Join  +-------------------'             |    Wallet   |
+ +---------+                                 '-------------'
 ```
 
 This diagram can only tell so much of course (some of the boxes might as well be labeled with "magic"). The next few sections explain in a little more detail how each step works.
@@ -226,8 +220,6 @@ In principle it would have been fine[^fnote_gfp_bignum] for SBK to use $` GF(p) 
 |   Term/Notation   |                                              Meaning                                              |
 |-------------------|---------------------------------------------------------------------------------------------------|
 | `version`         | Version number to support iteration of the data format.                                           |
-| `flags`           | A bit-field for options (eg. segwit)                                                              |
-| `brainkey_len`    | Length of the `brainkey` in bytes.<br/>min: 2, max: 32, default: 8                                |
 | `threshold`       | Minimum number of shares required for recovery.<br/>min: 1, max: 16, default: 3                   |
 | `num_shares`      | The number of shamir shares to generate from the `master_key`.                                    |
 | KDF               | Key Derivation Function.<br/>The algorithm used by SBK is [Argon2](#key_derivation_using_argon2). |
@@ -243,12 +235,11 @@ In principle it would have been fine[^fnote_gfp_bignum] for SBK to use $` GF(p) 
 | `raw_share`       | Encoded points in $`GF(256)`$.<br/>See [Share Data](#share-data)                                  |
 | `share`           | `share` = `parameters` &#124;&#124; `raw_share`                                                   |
 | `master_key`      | `master_key` = `salt` &#124;&#124; `brainkey`                                                     |
-| `is_segwit`       | Determines the electrum seed type (default: `true`)                                               |
 | `wallet_name`     | Identifier to generate multiple wallets from a single `master_key`.                               |
 | `kdf_input`       | `kdf_input` = `master_key` &#124;&#124; `wallet_name`                                             |
 | `wallet_seed`     | The Electrum seed derived from the `kdf_input`.                                                   |
 
-For those keeping track, by default the total entropy used to generate the wallet seed is `12 + 8 == 16 bytes == 160 bits`. The 4 bytes of the `parameters` are not counted as they are somewhat predictable.
+For those keeping track, by default the total entropy used to generate the wallet seed is `12 + 4 == 16 bytes == 128 bits`. The 4 bytes of the `parameters` are not counted as they are very predictable.
 
 
 ### Parameters
@@ -258,11 +249,12 @@ Any change in the parameters used to derive the wallet seed would result in a di
 Here is the data layout of these 4 bytes:
 
 ```
-offset  0       4       8       12      16      20          26        31
-        [ ver  ][flags ][bk_len][thresh][kdf_p ][ kdf_mem  ][ kdf_time ]
+offset  0     3 4     7 8    11 12       17 18       23 24            31
+        [ ver ] [thres] [kdf_p] [ kdf_mem ] [ kdf_time] [   share_no   ]
+         4bit    4bit    4bit      6bit        6bit          8bit
 ```
 
-> Aside: The `salt_len` is not an encoded parameter. Instead it is hard-coded to 12 bytes (96 bits). You can alleviate entropy paranoia by choosing a larger value for `--brainkey-len`.
+> Aside: The `salt_len` is not an encoded parameter. Instead it is hard-coded to 12 bytes (96 bits). The brainkey adds another 32 bits of entropy.
 >
 > Aside: While the `threshold` is encoded, `num_shares` is not, as it is only used once when the `shares` are first created. It is not needed for recovery, so it is not encoded in the `parameters`.
 
@@ -274,8 +266,6 @@ Since the distinction between 1000 iterations and 1001 iterations is not critica
 |      Field Name     |  Size |              Value               |      Range (inclusive)      |
 |---------------------|-------|----------------------------------|-----------------------------|
 | `f_version`         | 4 bit | Hard-coded to `0`.               |                             |
-| `f_flags`           | 4 bit | (-, -, -, `is_segwit`)           |                             |
-| `f_brainkey_len`    | 4 bit | `brainkey_len // 2 - 1`          | 2, 4, 6..32                 |
 | `f_threshold`       | 4 bit | `threshold - 1`                  | 1..16                       |
 | `f_kdf_parallelism` | 4 bit | `log2(kdf_parallelism)`          | 1, 2, 4, 8..32768           |
 | `f_kdf_mem_cost`    | 6 bit | `log(kdf_mem_cost) / log(1.25)`  | 1, 2, 3, 4, 6, 9, 12, 16... |
@@ -313,10 +303,10 @@ Shares are generated from the `shares_input` (`raw_salt || brainkey`). The split
 
 <!-- TODO: alt="Data layout for Shares"  -->
 ```bob
-         Parameters "X"       "Share Data"         "ECC Data"
-        .---------..---..-------------------..-------------------.
-Share 1 | 0 1 2 3 || 1 ||  F A Y U K T E M  ||  K D X U Q B D P  |
-        '---------''---''-------------------''-------------------'
+         Params   "X"      "Share Data"         "ECC Data"
+        .-------..---..-------------------..-------------------.
+Share 1 | 0 1 2 || 1 ||  F A Y U K T E M  ||  K D X U Q B D P  |
+        '-------''---''-------------------''-------------------'
 ```
 
 The "full" `share` also includes the serialized parameters as a prefix in the first four bytes, and it also includes ECC data of the same length as the `raw_share`. The ECC code used is a Reed-Solomon code.
@@ -340,7 +330,7 @@ Please remember that you are at a much greater risk of loosing your bitcoin thro
  - If you forget the `--wallet-name` and you're the only person who ever knew it, then your wallet will be lost.
  - If you write it down on a single piece of paper, and that piece of paper is destroyed, then your wallet will be lost.
 
-To avoid such a single point of failure, the default value for `--wallet-name` is hard-coded to `disabled` (literally). There are some legitimate reasons to use a `--wallet-name`, but if you do use it, do not treat it as a password. Instead, write it down in clear handwriting and make sure it is available when your wallet has to be recovered, for example by writing the wallet name(s) on some or all of the shares.
+To avoid such a single point of failure, the default value for `--wallet-name` is hard-coded to `empty` (literally). There are some legitimate reasons to use a `--wallet-name`, but if you do use it, do not treat it as a password. Instead, write it down in clear handwriting and make sure it is available when your wallet has to be recovered, for example by writing the wallet name(s) on some or all of the shares.
 
 Since the `--wallet-name` is chosen by you and since it is not encoded using a mnemonic or ECC data, there is a greater risk that it may not be possible to decipher your handwriting. To reduce this risk, the set of valid characters is restricted. Valid characters are lower-case letters `"a-z"`, digits `"0-9"` and the dash `"-"` character. In other words, the `--wallet-name` must match the following regular expression: [`^[a-z0-9\-]+$`](https://regex101.com/r/v9eqiM/2).
 
@@ -365,9 +355,10 @@ The KDF used by SBK is [Argon2][href_github_phc_winner_argon2], which is designe
 Some back of the envelope calculations to illustrate the difficulty of a brute-force attack: If we assume the attacker has gained access to your `salt`, then they will have a 50% chance of loading your wallet if they can calculate $` 2^{47} `$ hashes. Let's assume you used an average computer from 2012 as your air-gapped computer and the Argon2 parameters which SBK chose were `-p=2`, `-m=539` and `-t=26`. This might take 1-2 minutes to calculate on the old machine, but on a more modern system it may take only 10 seconds. For easy math and to be conservative, let's assume that an attacker has access to future hardware that can calculate one of these hashes in 1 second, further assume that they have unlimited access to 1000 systems of this caliber (and more money to spend on electricity than they could ever get from your wallet). After $` \frac{2^{47}}{1000 \times 86400 \times 365} = `$ 4500 years they would have 50:50 chance to have cracked your wallet. It would be cheaper for them to find you and persuade you to talk. Beware of shorter keys lengths though: if you use `--brainkey-len=4` (32 bits), the same attacker would need only $` \frac{2^{31}}{1000 \times 86400} = `$ 25 days.
 
 All of this is assuming of course, that the attacker has somehow gained access to your `salt`. It may be OK for you to use a value lower than `--brainkey-len=8`, as long as you can satisfy one of the following conditions:
- - You are confident that your `salt` will *never* be found by an attacker.
- - If your `salt` is found, then you have some way to know that this happened, so that you will at least have enough time to move your coins to a new wallet.
- - You regularly generate a new wallet and move all your coins, so every `salt` becomes obsolete before any brute-force attack has enough time to succeed.
+
+- You are confident that your `salt` will *never* be found by an attacker.
+- If your `salt` is found, then you have some way to know that this happened, so that you will at least have enough time to move your coins to a new wallet.
+- You regularly generate a new wallet and move all your coins, so every `salt` becomes obsolete before any brute-force attack has enough time to succeed.
 
 
 ### Parameter Choices
@@ -487,7 +478,15 @@ If you want your shares to survive until they are needed, there are simple ways 
 
 ### Mnemonic for Memory
 
-From personal experience I know that it is possible to remember phone numbers, mathematical constants, poems or an old ICQ number even after multiple decades. In light of this, a `brainkey` can be a reasonable choice to generate a wallet, provided you are diligent and regularly practice recall of the `brainkey`, so you build up a habit.
+> [Stop puking bits!][href_yt_kaminsky_mnemonics]
+>
+> &mdash; Dan Kaminsky
+
+[href_yt_kaminsky_mnemonics]: https://youtu.be/xneBjc8z0DE?t=2460
+
+From personal experience I know that it is possible to remember phone numbers, mathematical constants, poems or an old ICQ number even after multiple decades. In light of this, a `brainkey` can be a reasonable choice to generate a wallet, provided you are diligent and regularly practice ([spaced repetition][href_wiki_spaced_repetition]) recall of the `brainkey`, so you build up a habit.
+
+[href_wiki_spaced_repetition]: https://en.wikipedia.org/wiki/Spaced_repetition
 
 SBK uses a mnemonic encoding that is designed to help with memorization of the `brainkey`. The format is designed with the following in mind:
 
@@ -521,7 +520,7 @@ I hope this illustrates of ability of humans to remember what has been very impo
 
 > Caveat: The choices for the current wordlist are probably not optimal as I have not done exhaustive tests. It may be for example, that it is easier to memorize fewer words from a larger wordlist. The price for this is that a larger wordlist leads to smaller levenshtein/edit distances between words, to longer word lengths, to less phonetic distinctiveness and the to a larger burden on non-native speakers of English (because less frequently used words must be used to fill out the wordlist).
 >
-> Improving the wordlist is a rabbit hole that involves trade-offs and diminishing returns, so I'm leaving it as is for now, but it is subject to change before final release, so your `brainkey` may become invalid!
+> Improving the wordlist is a rabbit hole that involves trade-offs and diminishing returns, so I'm leaving it as is.
 
 
 ### Integer Codes

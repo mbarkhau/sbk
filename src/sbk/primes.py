@@ -1,7 +1,7 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Prime constants."""
@@ -11,15 +11,24 @@ import typing as typ
 import hashlib
 import logging
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
+
+Pow2PrimeN    = int
+Pow2PrimeK    = int
+Pow2PrimeItem = typ.Tuple[Pow2PrimeN, Pow2PrimeK]
+
+
+# fmt: off
 
 # https://oeis.org/A000040/list
-SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59]
-SMALL_PRIMES += [ 61,  67,  71,  73,  79,  83,  89,  97, 101, 103, 107, 109, 113, 127]
-SMALL_PRIMES += [131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191]
-SMALL_PRIMES += [193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257]
-SMALL_PRIMES += [263, 269, 271]
+SMALL_PRIMES = [
+      2,   3,   5,   7,  11,  13,  17,  19,  23,  29,  31,  37,
+     41,  43,  47,  53,  59,  61,  67,  71,  73,  79,  83,  89,
+     97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151,
+    157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223,
+    227, 229, 233, 239, 241, 251, 257, 263, 269, 271,
+]
 
 # For this application we want a known prime number as close as
 # possible to our security level; e.g. desired security level of 128
@@ -29,11 +38,6 @@ SMALL_PRIMES += [263, 269, 271]
 # MERSENNE_PRIME_EXPONENTS = [
 #     2, 3, 5, 7, 13, 17, 19, 31, 61, 89, 107, 127, 521, 607, 1279
 # ]
-
-
-Pow2PrimeN = int
-Pow2PrimeK   = int
-Pow2PrimeItem = typ.Tuple[Pow2PrimeN, Pow2PrimeK]
 
 
 # Taken from https://oeis.org/A014234
@@ -60,21 +64,19 @@ POW2_PRIME_PARAMS: typ.Dict[Pow2PrimeN, Pow2PrimeK] = {
     648:  195, 656:  143, 664:   17, 672:  399, 680:  939,
     688:  759, 696:  447, 704:  245, 712:  489, 720:  395,
     728:   77, 736:  509, 744:  173, 752:  875, 760:  173,
-    768:  825,
+    768:  825
 }
+# fmt: on
 
 
 def pow2prime(n: Pow2PrimeN, k: Pow2PrimeK) -> int:
-    if n % 8 != 0:
+    if n % 8 == 0:
+        return int((2 ** n) - k)
+    else:
         raise ValueError(f"Invalid n={n}, must be divisible by 8")
 
-    return 2 ** n - k
 
-
-POW2_PRIMES = [
-    pow2prime(n, k)
-    for n, k in sorted(POW2_PRIME_PARAMS.items())
-]
+POW2_PRIMES = [pow2prime(n, k) for n, k in sorted(POW2_PRIME_PARAMS.items())]
 
 
 # NOTE: since the index into POW2_PRIMES is derived from the
@@ -117,8 +119,8 @@ def validate_pow2_prime_params() -> None:
     has_changed = len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
 
     if has_changed:
-        log.error(f"Current  hash: {digest}")
-        log.error(f"Expected hash: {_V1_PRIMES_VERIFICATION_SHA256}")
+        logger.error(f"Current  hash: {digest}")
+        logger.error(f"Expected hash: {_V1_PRIMES_VERIFICATION_SHA256}")
         raise Exception("Integrity error: POW2_PRIMES changed!")
 
 
@@ -131,8 +133,8 @@ def get_pow2prime_index(num_bits: int) -> int:
         raise ValueError(err)
 
     target_exp = num_bits
-    for p2pp_idx, param in enumerate(POW2_PRIME_PARAMS):
-        if param.exp >= target_exp:
+    for p2pp_idx, param_exp in enumerate(POW2_PRIME_PARAMS):
+        if param_exp >= target_exp:
             return p2pp_idx
 
     err = f"Invalid num_bits={num_bits}, no known 2**n-k primes "
@@ -234,8 +236,8 @@ def a014234_verify(a014234_content: str) -> typ.Iterable[Pow2PrimeItem]:
 # lp: primes.oeis_org_a014234_verify
 def read_oeis_org_a014234() -> str:
     import time
-    import tempfile
     import pathlib as pl
+    import tempfile
     import urllib.request
 
     cache_path = pl.Path(tempfile.gettempdir()) / "oeis_org_b014234.txt"

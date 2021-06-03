@@ -1,6 +1,8 @@
+# pylint: disable=wildcard-import
+# pylint: disable=unused-wildcard-import
+
 import os
 
-import pylev
 import pytest
 
 import sbk.gf
@@ -27,7 +29,7 @@ def test_bytes2bytesrepr():
 
 
 def test_hex2bytes_fuzz():
-    for i in range(100):
+    for _ in range(100):
         data     = os.urandom(10)
         hex_text = bytes2hex(data)
         assert hex2bytes(hex_text) == data
@@ -94,7 +96,7 @@ def test_bytes2gfpoint():
     data_len = 32
     prime    = sbk.primes.get_pow2prime(data_len * 8 - 8)
 
-    field = sbk.gf.GFNum.field(prime)
+    field = sbk.gf.init_field(prime)
     x     = field[         7]
     y     = field[1234567890]
 
@@ -105,7 +107,7 @@ def test_bytes2gfpoint():
 
 
 def test_bytes2gfpoint_fail():
-    field = sbk.gf.GFNum.field(257)
+    field = sbk.gf.init_field(257)
 
     assert bytes2gfpoint(b"\x01\x00\x00\xff", field) == sbk.gf_poly.Point(field[1], field[255])
     assert bytes2gfpoint(b"\x01\x00\x01\x00", field) == sbk.gf_poly.Point(field[1], field[256])
@@ -117,7 +119,7 @@ def test_bytes2gfpoint_fail():
 
 
 def test_gfpoint2bytes():
-    field = sbk.gf.GFNum.field(257)
+    field = sbk.gf.init_field(257)
 
     point_data = gfpoint2bytes(sbk.gf_poly.Point(field[1], field[127]))
     assert point_data[:1] == b"\x01"
@@ -129,7 +131,7 @@ def test_gfpoint2bytes():
 
 
 def test_gfpoint2bytes_fail():
-    field = sbk.gf.GFNum.field(257)
+    field = sbk.gf.init_field(257)
     gfpoint2bytes(sbk.gf_poly.Point(field[  1], field[101]))
     gfpoint2bytes(sbk.gf_poly.Point(field[254], field[101]))
 

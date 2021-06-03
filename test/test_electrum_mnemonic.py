@@ -1,5 +1,5 @@
-import math
-import random
+# pylint: disable=wildcard-import
+# pylint: disable=unused-wildcard-import
 
 from sbk.electrum_mnemonic import *
 

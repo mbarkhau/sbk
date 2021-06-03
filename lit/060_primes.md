@@ -1,4 +1,4 @@
-# Primes of Form $`2^n - k`$
+# Primes where p < 2^n for GF(p)
 
 TODOs:
 
@@ -14,6 +14,7 @@ GF(p) `$ is less complicated, so SBK includes a GF implementation for
 use with a prime number. In other words, this chapter is mainly for
 validation and didactic purposes, it is not a functional part of the
 implementation of SBK.
+
 
 ## API of `sbk.primes`
 
@@ -55,13 +56,14 @@ will `raise NotImplementedError`. This function is only used for
 sanity checks, so it's fine that it only works with the subset of
 primes we're actually interested in.
 
+
 ## Implementation of `sbk.primes`
 
 We generate a python module and a test script.
 
 ```python
 # lp_file: src/sbk/primes.py
-# lp_include: common.license_header
+# lp_include: impl_boilerplate.license_header
 """Prime constants for sbk.gf.GFNum and sbk.gf.Field."""
 # lp_include:
 #   common.logging
@@ -102,7 +104,7 @@ because we will only be encoding secrets with a length in bytes.
 ```
 
 ```python
-# lp: primes.constants
+# def: primes.constants
 Pow2PrimeN     = int
 Pow2PrimeK     = int
 Pow2PrimeItem  = typ.Tuple[Pow2PrimeN, Pow2PrimeK]
@@ -128,7 +130,7 @@ POW2_PRIME_PARAMS: typ.Dict[Pow2PrimeN, Pow2PrimeK] = {
     648:  195, 656:  143, 664:   17, 672:  399,  680:  939,
     688:  759, 696:  447, 704:  245, 712:  489,  720:  395,
     728:   77, 736:  509, 744:  173, 752:  875,  760:  173,
-    768:  825,
+    768:  825
     # 768:  825, 776: 1539, 784:  759, 792: 1299,  800:  105,
     # 808:   17, 816:  959, 824:  209, 832:  143,  840:  213,
     # 848:   17, 856:  459, 864:  243, 872:  177,  880:  113,
@@ -141,12 +143,12 @@ POW2_PRIME_PARAMS: typ.Dict[Pow2PrimeN, Pow2PrimeK] = {
 Evaluate of the parameters into the actual `POW2_PRIMES`.
 
 ```python
-# lp: primes.constants
+# def: primes.constants
 def pow2prime(n: Pow2PrimeN, k: Pow2PrimeK) -> int:
-    if n % 8 != 0:
+    if n % 8 == 0:
+        return 2 ** n - k
+    else:
         raise ValueError(f"Invalid n={n}, must be divisible by 8")
-
-    return 2 ** n - k
 
 
 POW2_PRIMES = [
@@ -156,15 +158,15 @@ POW2_PRIMES = [
 ```
 
 ```python
-# lp: primes.get_pow2prime
+# def: primes.get_pow2prime
 def get_pow2prime_index(num_bits: int) -> int:
     if num_bits % 8 != 0:
         err = f"Invalid num_bits={num_bits}, not a multiple of 8"
         raise ValueError(err)
 
     target_exp = num_bits
-    for p2pp_idx, param in enumerate(POW2_PRIME_PARAMS):
-        if param.exp >= target_exp:
+    for p2pp_idx, param_exp in enumerate(POW2_PRIME_PARAMS):
+        if param_exp >= target_exp:
             return p2pp_idx
 
     err = f"Invalid num_bits={num_bits}, no known 2**n-k primes "
@@ -182,7 +184,7 @@ actually a prime (presumably by accident), so let's start with some
 basic sanity/double checks.
 
 ```python
-# lp: primes.validation
+# def: primes.validation
 # https://oeis.org/A132358
 assert 251                                     in POW2_PRIMES
 assert 65521                                   in POW2_PRIMES
@@ -201,7 +203,7 @@ we will somehow have to encode which prime is used. That would be
 done most easilly as an index of `POW2_PRIMES` using only one byte.
 
 ```python
-# lp: primes.validation
+# def: primes.validation
 assert len(POW2_PRIMES) < 256
 ```
 
@@ -213,7 +215,7 @@ pattern from the [wikipedia article][href_wiki_mrtest_bases].
 Primes [oeis.org/A000040](https://oeis.org/A000040/list)
 
 ```python
-# lp: primes.constants
+# def: primes.constants
 SMALL_PRIMES = [
       2,   3,   5,   7,  11,  13,  17,  19,  23,
      29,  31,  37,  41,  43,  47,  53,  59,  61,
@@ -230,7 +232,7 @@ PRIMES = sorted(set(SMALL_PRIMES + POW2_PRIMES))
 [href_wiki_mrtest_bases]: https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Testing_against_small_sets_of_bases
 
 ```python
-# lp: primes.test_primelist_validation
+# def: primes.test_primelist_validation
 def test_primelist_validation():
     sbk.primes.validate_pow2_prime_params()
     original = sorted(sbk.primes.POW2_PRIME_PARAMS.items())
@@ -252,7 +254,7 @@ against accidental changes. We start with the most basic test if `n`
 is a prime.
 
 ```python
-# lp: primes.is_prime
+# def: primes.is_prime
 def is_prime(n: int) -> bool:
     for p in PRIMES:
         if n == p:
@@ -280,7 +282,7 @@ resources:
 - [gist.github.com/Ayrx/5884790](https://gist.github.com/Ayrx/5884790)
 
 ```python
-# lp: primes.is_probable_prime
+# def: primes.is_probable_prime
 # lp_include: primes.is_probable_prime_support
 def is_probable_prime(n: int, k: int = 100) -> bool:
     # Early exit if not prime
@@ -309,7 +311,7 @@ def is_probable_prime(n: int, k: int = 100) -> bool:
 
 
 ```python
-# lp: primes.is_probable_prime_support
+# def: primes.is_probable_prime_support
 from random import randrange
 
 # Jim Sinclair
@@ -329,7 +331,7 @@ def _miller_test_bases(n: int, k: int) -> typ.Iterable[int]:
 
 
 ```python
-# lp: primes.is_probable_prime_support
+# def: primes.is_probable_prime_support
 
 def _is_composite(n: int, r: int, x: int) -> bool:
     for _ in range(r - 1):
@@ -342,7 +344,7 @@ def _is_composite(n: int, r: int, x: int) -> bool:
 Basic test of is_probable_prime.
 
 ```python
-# lp: primes.test_is_probable_prime
+# def: primes.test_is_probable_prime
 def test_is_probable_prime():
     assert sbk.primes.is_probable_prime(2 ** 127 -  1)
     assert sbk.primes.is_probable_prime(2 **  64 - 59)
@@ -356,7 +358,7 @@ def test_is_probable_prime():
 Test the constants with `is_probable_prime`.
 
 ```python
-# lp: primes.test_primes_a014234
+# def: primes.test_primes_a014234
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Primes don't change")
 @pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
 def test_prime(prime_idx):
@@ -374,7 +376,7 @@ For the verification, we simply greate a string representation of the `POW2_PRIM
 
 
 ```python
-# lp: primes.validate_pow2_prime_params
+# def: primes.validate_pow2_prime_params
 # Hardcoded digest of POW2_PRIME_PARAMS
 _V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
 
@@ -399,7 +401,7 @@ validate_pow2_prime_params()
 With this test, we verify that any manipulation the `POW2_PRIME_PARAMS` list will cause the digest to change.
 
 ```python
-# lp: primes.test_primelist_validation
+# def: primes.test_primelist_validation
 def test_primelist_validation():
     sbk.primes.validate_pow2_prime_params()
     _original = sorted(sbk.primes.POW2_PRIME_PARAMS.items())
@@ -426,7 +428,7 @@ The format from aeis.org is a text file where each line consists of `n` and the 
 We can calculate $` k = 2^n - p `$ , e.g. $` 2^{8} - 251 = 5 `$ . Assuming we have the content of such a file, we can use it to verify the constants of `POW2_PRIME_PARAMS`.
 
 ```python
-# lp: primes.oeis_org_a014234_verify
+# def: primes.oeis_org_a014234_verify
 def a014234_verify(a014234_content: str) -> Pow2PrimeItems:
     for line in a014234_content.splitlines():
         if not line.strip():
@@ -449,7 +451,7 @@ For the tests we'll be nice and not download the file for every test run and ins
 
 
 ```python
-# lp: primes.test_a014234_verfiy
+# def: primes.test_a014234_verfiy
 def test_a014234_verfiy():
     fixture = pl.Path(__file__).parent / "test_primes_a014234.txt"
     with fixture.open(mode="r") as fobj:
@@ -462,7 +464,7 @@ def test_a014234_verfiy():
 So that you don't need to run the test suite, the `sbk.primes` module is has a `main` funciton which downloads the A014234 dataset...
 
 ```python
-# lp: primes.oeis_org_a014234_verify
+# def: primes.oeis_org_a014234_verify
 def read_oeis_org_a014234() -> str:
     import time
     import tempfile
@@ -487,7 +489,7 @@ def read_oeis_org_a014234() -> str:
 
 
 ```python
-# lp: primes.oeis_org_a014234_verify
+# def: primes.oeis_org_a014234_verify
 def download_oeis_org_a014234() -> None:
     """Helper to verify local primes against https://oeis.org/A014234.
 

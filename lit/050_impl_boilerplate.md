@@ -3,22 +3,22 @@
 This code is used in multiple modules.
 
 ```python
-# lp: common.license_header
+# def: license_header
 # This file is part of the sbk project
 # https://gitlab.com/mbarkhau/sbk
 #
-# Copyright (c) 2020 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 ```
 
 ```python
-# lp: common.imports
+# def: imports
 import typing as typ
 ```
 
 ```python
-# lp: common.logger
+# def: logger
 import logging
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 ```

@@ -1,7 +1,7 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Polynomial calculation functions.
@@ -39,9 +39,7 @@ class DebugRandom:
         return self._state % stop
 
 
-DEBUG_WARN_MSG = (
-    "Warning, SBK using debug random! This should only happen when debugging or testing."
-)
+DEBUG_WARN_MSG = "Warning, SBK using debug random! This should only happen when debugging or testing."
 
 _debug_rand = DebugRandom()
 _rand       = random.SystemRandom()
@@ -157,7 +155,9 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
 
     # validate x coordinates
     for i, p in enumerate(points):
-        if not 0 < p.x < 255:
+        is_primitive = isinstance(p.x, (int, float))
+        is_valid_x   = p.x > 0 and (is_primitive or p.x.val < 255)
+        if not is_valid_x:
             errmsg = f"Invalid share {i + 1} with x={p.x}. Possible attack."
             raise Exception(errmsg)
 
@@ -168,15 +168,15 @@ def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
     return accu
 
 
-def val_of(n: typ.Union[int, float, gf.GFNum, gf.GF256]) -> int:
+def val_of(n: typ.Union[int, float, gf.GFP, gf.GF256]) -> int:
     # Helper function to allow n to be a plain integer or float in tests.
     if isinstance(n, int):
         return n
-    if isinstance(n, float):
+    elif isinstance(n, float):
         return int(n)
-
-    assert isinstance(n, (gf.GFNum, gf.GF256))
-    return n.val
+    else:
+        assert isinstance(n, (gf.GFP, gf.GF256))
+        return n.val
 
 
 def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[[int], int]:

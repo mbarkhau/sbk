@@ -1,36 +1,100 @@
-# User Guide
+# SBK - User Guide
 
-The great thing about Bitcoin is that *you have complete control* of your own money: you are your own bank. The terrible thing about Bitcoin is that *you are responsibile* for your own money: you are your own bank. Unlike traditional financial systems, if your bitcoin is lost or stolen, you have no recourse to any institution whatsoever. No government, no bank, no company and no programmer has any obligation or even any ability to help you if something goes wrong. The goal of SBK is to make it easier for you to bear this burden of responsibility and to minimize the chance that you lose control of your bitcoin.
+The great thing about Bitcoin is that *you have complete control* of your own money: you are your own bank. The terrible thing about Bitcoin is that *you are responsible* for your own money: you are your own bank.
+
+Unlike traditional financial systems, if your bitcoin is lost or stolen, you have no recourse to any institution whatsoever. No government, no bank, no company and no programmer has any obligation or even any ability to help you if something goes wrong.
+
+The goal of SBK is to make it more easy for you to bear this burden of responsibility. SBK is designed for individuals[^fnote_joint_custody] who want to take **personal custody** of their bitcoin while mitigating the risk of loss or theft.
+
+[^fnote_joint_custody]: SBK is not designed for institutions where more than one person will usually have joint custody over bitcoin belonging to a treasury. For this use-case you should look into a multi-signature setup.
 
 
 ## Roles
 
-There are three different roles involved with an SBK wallet:
+```bob
+    Owner                   Agent
+     .-. +----+              .-. +----+
+     '-' |Keys|~~~.          '-' |~~~~|
+     /|\ '----'   :          /|\ |~~~~|
+      |  Personal :           |  +----+
+     / \ Custody  :          / \ Recovery
+                  V Backup       Instructions
+        _ Vault   . Shares
+       |s|~~~~~~~~:
+       '-'        :     Trustee   Trustee  "Bad Guy"
+        _ Lockbox :     _ .-.     _ .-.      |-|
+       |s|~~~~~~~~:    |s|'-'    |s|'-'      '-'
+       '-'        :    '-'/|\    '-'/|\      /|\
+        _ Bank    :     :  |      :  |        |
+       |s|~~~~~~~~:     : / \     : / \      / \
+       '-'        '~~~~~~~~~~~~~~~'
+```
 
- 1. Owner: As an owner, you have some bitcoin that you want to protect from loss and theft. You generate the wallet keys, create the backup shares and make preparations so that your wallet can be recovered in a worst-case scenario.
- 2. Trustee: As a trustee, you have been given a share by the owner, which is part of a backup of their wallet. You should keep this share *safe*, *secret* and *secure* so that it will be available if the owners wallet has to be recovered.
- 3. Agent: As an agent, the owner has entrusted you to act on their behalf and in their best intrests if they become incapactiated. This may include the recovery of the owners wallet (in cooperation with the trustees) and the distribution of the bitcoin according to the wishes of the owner.
+There are four different roles involved with an SBK wallet:
 
-No matter your role, you should be aware that the security of a wallet depends on your dilligence. While SBK is built with redundancy, to protect a wallet from being lost, it would be foolish of you to rely on that protection too much. If enough trustees neglect their responsibilities (e.g. by assuming that there are enough other trustees who are more dilligent), then the backup shares may become worthless and the owners wallet will be lost.
+ 1. **Owner**: You own some bitcoin that you want to protect from loss and theft.
+ 2. **Agent**: The owner has instructed you to act on their behalf, should they not be able to.
+ 3. **Trustee**: The owner has given you an SBK share, which is part of a backup of their wallet.
+ 4. **Bad Guy**: You know of
 
+No matter your role, you should make an effort to be dilligent. SBK may be built with redundancy, but it would be foolish to lean too much on that protection. If enough trustees neglect their responsibilities (e.g. by assuming that there are other trustees who are diligent enough), then the backup shares may become worthless and the wallet will be lost. Do not succumb to the moral hazard of trusting that others will do it better than you. Who knows, perhaps the last will of the owner has a clause regarding those who were negligent...
 
-## Minimal Owners Guide
+## Tasks
 
-I will start with a bare-bones guide for how to use SBK. It is written with the assumption that you are mostly worried that your wallet will be lost, for example due to a fire, software virus, hardware failure or your untimely demise. If all you want is a geographically distributed backup of your wallet, then this minimal guide may be enough for you. If you are additionally worried that some people that you currently trust might betray you (which is where things get complicated), then you should continue reading the full user guide.
+### Owner
 
-
-### Deciding on a Scheme
-
-The first thing to do, as an owner, is to decide on a threshold and level of redundancy. This is known as the "scheme" and it is controlled using `--scheme=TofN` when you initially create your wallet. The first parameter `T` is the *threshold*, which is the minimum number of shares that are required to recover your wallet. The second parameter `N` is the total number of shares that are created. The default scheme is `3of5`, but this may be a bad choice for your circumstances.
-
-If you were not worried that any share would ever fall into the hands of a *bad actor*, then you could in theory set a threshold to `T=1`. In that case however, you may as well not bother to use SBK at all and instead just create a normal bitcoin wallet with the ususal 12-word wallet seed and just make duplicate copies of that seed. Since you are considering SBK however, presumably you *are worried* about bad actor(s) who might try to collect enough SBK shares to recover your wallet. Indeed you may be worried that people you currently trust will collude and betray you or they may be inept and fail to keep their share secret (e.g. they may hand it over to a scammer or crafty social engineer). In this case you should think about the worst-case scenario: How many shares will a bad actor be able to collect, before you notice and before you have a chance to move your bitcoin to a fresh wallet. If the worst-case you can imagine is that they will be able to collect 2 shares, then you should choose a threshold of `T=3` or more. If they can only collect 2 shares, then they will not have enough for them to recover your wallet.
-
-For the parameter `N` (the total number of shares), you should consider how many SBK shares you expect will be lost in a worst-case scenario. If you expect the recovery to be done years after the wallet was created, then you should assume that some of the shares will be lost, forgotten about or destroyed, even despite the best efforts of your trustees. If you expect up to 2 shares to be lost, then you should choose `N=T+2` for the total number of shares (i.e. `N=5` if your threshold choice was `T=3`). With this scheme, if either your salt or brainkey are lost and also two shares are lost, then the remaining three shares will still be enough to recover your wallet.
+As the owner of an SBK wallet, you generate the salt and brainkey, create the backup shares and make preparations so that your wallet can be recovered in a worst-case scenario.
 
 
-### Preparation
+### Agent
 
-Once you've decided on a scheme and presumably have a plan where you will keep your backup shares and who will be your trustees and agents, it's time to prepare some materials. To create a wallet, you will need the following:
+As the agent of the owner, it is your responsibility to facilitate the recoverery their wallet and
+This may include the recovery of the owners wallet (in cooperation with the trustees) and the distribution of the bitcoin according to the wishes of the owner.
+
+
+### Truestee
+
+A person or institution who has custody of an SBK share, which is part of a wallet backup.
+You should keep this share *safe*, *secret* and *secure* so that it will be available if the owners wallet has to be recovered.
+
+
+## s - Minimal Owners Guide
+
+I will start with a bare-bones guide for how to use SBK. It is written with the assumption that you are mostly worried that your wallet will be lost, for example due to a fire, software virus, hardware failure or your untimely demise.
+
+If all you want is a geographically distributed backup of your wallet (to protect against loss and accidents), then this minimal guide may be enough for you. If you are additionally worried that some people that you currently trust might betray you (which is where things get complicated), then you should continue reading the full user guide.
+
+
+### s - Deciding on a Scheme
+
+The first thing to do, as an owner, is to decide on a "scheme". This is the threshold `T` and number of backup shares `N`, controlled using `--scheme=TofN` when you initially create your wallet. The first parameter `T` is the *threshold*, which is the minimum number of shares that are required to recover your wallet. The second parameter `N` is the total number of shares that are created.
+
+The default scheme is `3of5`. With this scheme:
+
+ - To recover your wallet, you will need at least 3 backup shares.
+ - You will not be able to recover your wallet, if more than 2 shares are lost or destroyed.
+
+For `T` parameter in `--scheme=TofN`, you should consider the worst-case scenarios:
+
+- How many backup shares could be destroyed at once?
+- How many backup shares could bad actor collect?
+
+You may well have geographically distribute your backup shares, but if they're written on paper and kept in an area that is prone to be flooded, then you may lose too many of them at once. If the child of a trustee can find a share in their houshold and in addition is at some point a guest in your house, where they also find a backup share, then it would be better if you have a threshold set to `T=3` or higher.
+
+For the parameter `N` (the total number of shares), you should consider how many SBK shares you expect will be lost in a worst-case scenario. If you expect the recovery to be done years after the wallet was created, then you should assume that some of the shares will be lost, forgotten about or destroyed, even despite your best efforts and your trustees to choose secure locations.
+
+If you expect at most 2 shares to be lost, then you should choose `N=T+2`. This means, if you have decided on `T=3` then you should choose `N=5`. With this scheme, if either your salt or brainkey are lost and also two backup shares are lost, then the remaining three shares will still be enough to recover your wallet.
+
+
+!!! aside "T=1 is Stupid"
+
+    If you were not worried that any share would ever fall into the hands of a bad actor, then you could set a threshold to `T=1`. In that case however, you may as well not bother to use SBK and instead just create a normal Bitcoin wallet with the usual 12-word wallet seed. For any redundency you need, you can just make duplicate copies of the seed.
+
+
+
+### Preparation and Materials
+
+Once you've decided on a scheme and after you have made plans about where you will keep your backup shares and who will be your trustees and agents, it's time to prepare some materials. To create a wallet, you will need the following:
 
  - A download of the [bootable sbklive_x64.iso image][href_sbk_download_sbklive_x64].
  - A USB flash drive or SD card with at least 2GB
@@ -40,7 +104,7 @@ Once you've decided on a scheme and presumably have a plan where you will keep y
  - A ballpoint pen (or anything similar as long as the ink is not erasable)
  - A stapler or adhesive tape
 
-There are more materials that you can and should prepare, but this will do for now to understand the basic idea.
+There are more materials that you could prepare to make your shares more robust, but this will do for now to understand the basic idea.
 
 
 [href_sbk_download_sbklive_x64]: TODO
@@ -58,24 +122,33 @@ Ideally you should use a computer that is dedicated to your wallet and nothing e
  - It has no HDD or SSD drive (on which keys could be stored and read back from by a bad actor who has access to it later).
  - It has the fastest CPU and most Memory money can buy (so that you can run the key derivation with the highest difficulty).
 
-To be practical, for this minimal guide at least, I'm going to assume that your system doesn't satisfy any of these reccomendations. Instead I will assume that you will use your current computer and that it can at least satisfy the following reduced requirements:
+To be practical, for this minimal guide at least, I'm going to assume that your system doesn't satisfy any of these recommendations. Instead I will assume that you will use your current computer but booted from a flash drive using the SBK live distribution. You and that it can at least satisfy the following reduced requirements:
 
  - You have disconnected any network cable before you boot into SBK.
- - You don't connect to any Wifi network and enable airplane mode as soon as possible.
+ - You don't connect to any WiFi network and enable airplane mode as soon as possible.
  - You boot from a flash drive using the SBK Linux live distribution.
- - You only use the flash drive for SBK.
+ - You use the flash drive *only* for SBK.
  - You never connect the flash drive to any other system.
  - You disconnect the flash drive from your computer before you boot back into your regular OS.
 
-, your air-gapped system will be booted from a flash drive with the SBK Linux live distribution on your usual computer. The flash drive should be used *only* for SBK and should not be used for any purpose other than for your SBK wallet. All data that is currently on it will be erased, so you should make a copy of any files you want to keep. A reasonable air-gap may still be maintained if you:
+SBK does not have any persistence and should in theory run on a system that does not have any disk and is booted from a read-only medium. If you're using an SD card, you may want to switch it to read-only after you've written the SBK live image to it. The files that SBK creates will only ever be written to RAM (which is presumably volatile), so when you boot up your regular operating system again, there should be no trace of your wallet on any HDD or SSD. If we presume your regular OS to have security issues, then there should not be any files from your wallet that could possibly be leaked.
 
+!!! aside "Flash"
 
-SBK does not have any persistence and should in theory run on a system that does not have any disk and is booted from a read-only medium. If you're using an SD card, you may want to witch it to read-only once you've written the iso image to it. The files that SBK creates will only ever be written to RAM (which is presumably volatile), so when you boot up your regular operating system again, there should be no trace of your wallet on any HDD or SSD. If we presume your regular os to have security issues, then there should not be any files left from your wallet which could possibly be leaked but I won't make any guarantees.
+    All data that is currently on your flash drive will be erased, so you should make a copy of any files you want to keep.
+
+!!! warning "Cold Boot Attack"
+
+    The previous contents of RAM can still be [readable after a reboot][href_wiki_cold_boot]. While it is not reccomended to use SBK on a computer that you will later use for other purposes, if you do, the Tails image which SBK is uses features [memory erasure][href_tails_memory_erasure]. For this to work propperly, you should do a clean shutdown, rather than a hard reset of your computer.
+
+[href_wiki_cold_boot]: https://en.wikipedia.org/wiki/Cold_boot_attack
+
+[href_tails_memory_erasure]: https://tails.boum.org/contribute/design/memory_erasure/
 
 
 ## Extended Instructions
 
-These instructions are written with the assumption that you have a high level of paranioa. You may even want to get some tinfoil out of your cupboard (though you won't be using it to make any hats).
+These instructions are written with the assumption that you have a high level of paranoia. You may even want to get some tinfoil out of your cupboard (though you won't be using it to make any hats).
 
 
 ### Safe, Secret and Secure
@@ -86,11 +159,11 @@ The most important thing to understand, is that your wallet is generated using w
 
 When you initially create a wallet, you will usually be instructed to write down your wallet seed on a piece of paper (for example in the form of a 12-word phrase) and to put it in a safe place. There are some disadvantages to this approach:
 
- - Safety: The piece of paper may be destroyed (eg. in a fire) or become unreadable (eg. due to damage by water), so without a high degree of dilligence on your part, such a wallet seed can be unsafe.
+ - Safety: The piece of paper may be destroyed (eg. in a fire) or become unreadable (eg. due to damage by water), so without a high degree of diligence on your part, such a wallet seed can be unsafe.
  - Secrecy: You may not be the only one who has access to your computer or to the place you decide to keep your wallet seed. A hacker or a thief could gain access to your wallet seed and steal your bitcoin. Even a curious child, without any ill intent, might find your wallet seed and take a picture of it to ask "what is this?" on the internet, so that your wallet seed is the leaked to the public. If your lucky, an honest person will find it first, take the bitcoin before anybody else can and contact you to give them back. If you're not lucky, they don't contact you... In other words, a wallet seed can be difficult to keep secret.
  - Security: The highest degree of vigilance is difficult to maintain over a long period of time. Even if you have kept your wallet seed safe and secret until now, that does not mean it will be safe and secret in the future. A wallet seed represents a single point of failure, which means you have to constantly think about its security.
 
-This last point is perhaps the greatest benefit of SBK: You can worry much less. Yes, vigilance is still required, but not so much that any one mistake is a catastrophy and mostly on specific ocations which you can prepare for:
+This last point is perhaps the greatest benefit of SBK: You can worry much less. Yes, vigilance is still required, but not so much that any one mistake is a catastrophe and mostly on specific occasions which you can prepare for:
 
  - When you create your wallet.
  - When you access your wallet.
@@ -105,8 +178,8 @@ Adding redundancy and making sure there is no single point of failure means that
 
 The greatest risk to your funds is human error (rather than for example a software bug), but it's worth breaking down what these errors typically look like:
 
- - Bad IT Security: For convenience you may prefer to use your regular Windows based, network connected computer, or your regular smartphone not realizing that it has a back-door or may eventually have a back-door when it is infected with a virus. An attacker can then read the wallet files from your computer or use a keyboard logger to evesdrop your wallet seed as you type it.
- - Lack of Knowledge: You may have a poor understanding of how to use your wallet. You might for example not know the difference between [the PIN to your wallet and your wallet seed][href_twitter_pschiff_idiot]. Without appreceating this difference, you may never write down your wallet seed and lose your bitcoin when you switch to a new device or directly after you close the wallet software.
+ - Bad IT Security: For convenience you may prefer to use your regular Windows based, network connected computer, or your regular smartphone not realizing that it has a back-door or may eventually have a back-door when it is infected with a virus. An attacker can then read the wallet files from your computer or use a keyboard logger to eavesdrop your wallet seed as you type it.
+ - Lack of Knowledge: You may have a poor understanding of how to use your wallet. You might for example not know the difference between [the PIN to your wallet and your wallet seed][href_twitter_pschiff_idiot]. Without appreciating this difference, you may never write down your wallet seed and lose your bitcoin when you switch to a new device or directly after you close the wallet software.
  - Misplaced Trust: If you don't trust your technical abilities, you may prefer to trust others to do this for you. The trouble is that the people you trust may turn out to [either be scammers or grossly negligent][href_wiki_emptygox].
 
 [href_twitter_pschiff_idiot]: https://twitter.com/PeterSchiff/status/1220135541330542592
@@ -126,7 +199,7 @@ The software required to load your wallet may no longer be available. SBK is hos
 
 ### Web Wallets: Leaked by Design
 
-The most common case for a leaked coin is a web wallet, where your keys are in a certain sense leaked by design. The service provider of your wallet has control over your keys or if they don't then they might send you a software update to leak your keys. Note that this is not simply a question of whether or not you can trust in the good intentions and well aligned business interests of the service provider of a wallet, it is also a question of how competent they are to protect a masive honey pot (your wallet and those of all of their other users) from attackers (who might even be employees of the company) that what to take your keys.
+The most common case for a leaked coin is a web wallet, where your keys are in a certain sense leaked by design. The service provider of your wallet has control over your keys or if they don't then they might send you a software update to leak your keys. Note that this is not simply a question of whether or not you can trust in the good intentions and well aligned business interests of the service provider of a wallet, it is also a question of how competent they are to protect a massive honey pot (your wallet and those of all of their other users) from attackers (who might even be employees of the company) that what to take your keys.
 
 SBK is not a service provider, has no access to your keys and can be audited for
 
@@ -154,22 +227,22 @@ Whenever you use any any bitcoin wallet, you are exposed to various risks:
  2. You can fall prey to a scam: This can happen if you download your wallet software from an untrustworthy source, ie. from the website of a malicious programmer or scammer, rather than from the website of the original author.
  3. The wallet software may have a bug: Your wallet may be generated in a way that it cannot be recovered or in a way that can be exploited by others to steal your funds. (As of this writing, such bugs may be the greatest risk when using SBK).
 
-For most people, the greatest risk is usually the first: Important but complicated steps are either skipped or not done with dilligence, so that your keys are lost or stolen. This is due to a combination of factors:
+For most people, the greatest risk is usually the first: Important but complicated steps are either skipped or not done with diligence, so that your keys are lost or stolen. This is due to a combination of factors:
 
 You can lose your funds through a lack of diligence when using your wallet. This can happen if you do not keep your keys secret, for example by loading your wallet on an insecure system, you may lose your keys in an accident or you may simply forget a critical password.
 
  - Complicated and tedious
  - Lack of justification
- - Steps are complicated and tedious. If the extra effort is not justified, and if the consequences of skipping them are Without an understanding of  Due to a lack of understanding of security practices, the consequences of which are either years in the future or appear to be , important steps are skipped . causes leads to the inability to dilligently first and it is the risk that SBK is primarilly designed to address. Far more funds are lost or stolen due to improper handling of keys, than are lost due to hacking or bugs. The goal of SBK is therefore to:
+ - Steps are complicated and tedious. If the extra effort is not justified, and if the consequences of skipping them are Without an understanding of  Due to a lack of understanding of security practices, the consequences of which are either years in the future or appear to be , important steps are skipped . causes leads to the inability to diligently first and it is the risk that SBK is primarily designed to address. Far more funds are lost or stolen due to improper handling of keys, than are lost due to hacking or bugs. The goal of SBK is therefore to:
 
-SBK is by no means free from tedium. It can be a considerable effort to prepare a secure computer, to manually copy dozens and dozens of words and numbers with dilligence and to . The documentation of SBK is written to help you judge if this effort is justified for you.
+SBK is by no means free from tedium. It can be a considerable effort to prepare a secure computer, to manually copy dozens and dozens of words and numbers with diligence and to . The documentation of SBK is written to help you judge if this effort is justified for you.
 
  - Minimize the risk of you losing your keys.
  - Minimize the risk of your keys being exposed to vulnerable computer systems.
  - Minimize the involvement of third parties who might steal your keys.
  - Minimize the trust placed in any individual third party.
 
-For more information on how to minimize the risk of downloading a mallicious version of SBK, please review the section on [software verification](#software-verification).
+For more information on how to minimize the risk of downloading a malicious version of SBK, please review the section on [software verification](#software-verification).
 
 
 
@@ -180,7 +253,7 @@ TODO
 
 ### Security vs Usability
 
-SBK is not the most convenient way to create a Bitcoin wallet. If you follow the reccomended approach, during setup you will have to:
+SBK is not the most convenient way to create a Bitcoin wallet. If you follow the recommended approach, during setup you will have to:
 
  - [Prepare an air-gapped system](#setting-up-an-air-gapped-system) with SBK installed
  - create `shares` and transcribe them onto paper,
@@ -191,9 +264,9 @@ SBK is not the most convenient way to create a Bitcoin wallet. If you follow the
 In addition, every time you want to use your wallet, you will have to
 
  - manually enter a 12 word `salt` every time you use it,
- - remember and manually enter a 6 to 8 word `brainkey`.
+ - remember and manually enter your 6 word `brainkey`.
 
-The price of the extra security provided by SBK is that it is a bit more tedious to use than other approaches. The indended use-case of an SBK wallet is for an infrequently accessed wallet, sometimes referred to as ["cold storage"][href_btcwiki_cold_storage]. This is suitable if you intend to use bitcoin for long-term savings. If you intend to spend some of your bitcoin more frequently, you may want to use a separate ["hot wallet"][href_btcwiki_hot_wallet] which has only a smaller balance that you can afford to lose. This approach minimizes the risk to your funds also minimizes the tedium of using SBK.
+The price of the extra security provided by SBK is that it is a bit more tedious to use than other approaches. The intended use-case of an SBK wallet is for an infrequently accessed wallet, sometimes referred to as ["cold storage"][href_btcwiki_cold_storage]. This is suitable if you intend to use bitcoin for long-term savings. If you intend to spend some of your bitcoin more frequently, you may want to use a separate ["hot wallet"][href_btcwiki_hot_wallet] which has only a smaller balance that you can afford to lose. This approach minimizes the risk to your funds also minimizes the tedium of using SBK.
 
 [href_btcwiki_cold_storage]: https://en.bitcoin.it/wiki/Cold_storage
 
@@ -229,7 +302,7 @@ tamper-evident
 
 ### Secrecy
 
-They recieve an SBK share from the owner, which is piece of paper that has been folded and sealed.
+They receive an SBK share from the owner, which is piece of paper that has been folded and sealed.
 
 
 ### How to Verify an Agent
@@ -242,17 +315,17 @@ The owner may chose their agent and trustees, so that they do not know each othe
 
 Before you create a wallet, you should make some preparations. You should:
 
- 1. Consider how to distribute your backup shares so that you minimise your vulnrability to bad actors.
+ 1. Consider how to distribute your backup shares so that you minimize your vulnerability to bad actors.
  2. Prepare materials to create shares. Ideally a share should survive a fire and it should have a tamper-evident seal.
 
-We will start with the considerations wrt. bad actors. There are some risks that you will have to weigh, depending on your situtation.
+We will start with the considerations wrt. bad actors. There are some risks that you will have to weigh, depending on your situation.
 
  - Risk of Extortion: A person who has a share can assume that you have at least some bitcoin. Even if they are trustworthy and would never try to threaten and extort you, they might be careless about this information. Giving somebody one of your shares can be the equivalent of painting a target on your back and somebody might knock down your door in the middle of the night.
  - Holdouts: A person who has a share might get the idea that you depend on them. This means that they could refuse to return the share to you unless you compensate them somehow.
 
 There are two ways to protect yourself from extortion:
 
- - Only use the backup shares and make sure a share from at least one person or institution is required. If the only way for you to recover your wallet is by using the backup shares, then it is not enough for extorionist to threaten you. They must also threaten the additional person or institution, which puts them at a much greater risk of being apprehended. To maintain the plausability of this, it is best if you do
+ - Only use the backup shares and make sure a share from at least one person or institution is required. If the only way for you to recover your wallet is by using the backup shares, then it is not enough for extortionist to threaten you. They must also threaten the additional person or institution, which puts them at a much greater risk of being apprehended. To maintain the plausibility of this, it is best if you do
 
 
  - In your safe at home.
@@ -278,7 +351,8 @@ Ideally you will have access to enough backup shares so that you. This
 ### Setting Up an Air-Gapped System
 
  using [an iso-image][href_sbk_downloads]
-[href_sbk_downloads]: https://mbarkhau.gitlab.io/sbk/downloads/
+
+[href_sbk_downloads]: https://sbk.dev/downloads/
 
 
 ### Creating Shares
@@ -309,12 +383,13 @@ While we're on the topic of plausible deniability; another approach you can take
 
 ## Agent Guide
 
-As the trusted agent of the owner, it is your responsibility to act on their behalf and in their intrest, not as you see it but as they seen it or would have seen it. Part of this responsibility is to prepare yourself in advance and not react in an ad-hoc way only when a worst-case scenario is already underway. This guide is written to help you with this preparation.
+As the trusted agent of the owner, it is your responsibility to act on their behalf and in their interest, not as you see it but as they seen it or would have seen it. Part of this responsibility is to prepare yourself in advance and not react in an ad-hoc way only when a worst-case scenario is already underway. This guide is written to help you with this preparation.
 
 ### Where are the Shares
 
-!!! aside ""
-    Since both the `salt` and `shares` are to be treated in a very similar way, as far as an agent is concerned, in this section I will refer to them both under the common term *secrets*.
+!!! aside "Secrets: Salts and Shares"
+
+    Since you and the agent should treat `salt` and `shares` in a very similar way, in this section I will refer to them both under the common term *secrets*.
 
 Before the event that you have to act, the owner should give you instructions and over time they should keep you updated of any changes to these instructions. These you on a few things
 
@@ -323,7 +398,7 @@ Before the event that you have to act, the owner should give you instructions an
 
 ### Secure Insecure Shares
 
-Your first concern as the agent should be to secure any secrets that were under the control of the owner. Should the owner become incapacitated, there may be a newly added risk to such secrets. It might be the case for example, that the owner has a `salt` or some `shares` in their posession or in their home, which are now accessible to relatives or caretakers that may not be trusted by the owner. There may be keys to a safe or safety deposit box with such secrets. You as the trusted agent should secure any and all of these as soon as possible. While these secrets were not under your control and you therefore must presume them to have been copied/compromised, this step is nonetheless important in order to minimize risk.
+Your first concern as the agent should be to secure any secrets that were under the control of the owner. Should the owner become incapacitated, there may be a newly added risk to such secrets. It might be the case for example, that the owner has a `salt` or some `shares` in their possession or in their home, which are now accessible to relatives or caretakers that may not be trusted by the owner. There may be keys to a safe or safety deposit box with such secrets. You as the trusted agent should secure any and all of these as soon as possible. While these secrets were not under your control and you therefore must presume them to have been copied/compromised, this step is nonetheless important in order to minimize risk.
 
 
 ### Preparation

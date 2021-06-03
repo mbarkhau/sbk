@@ -1,3 +1,6 @@
+# pylint: disable=wildcard-import
+# pylint: disable=unused-wildcard-import
+
 import os
 import random
 import hashlib
@@ -71,7 +74,7 @@ def test_fuzz_bytes2phrase():
 
 
 def test_fuzz_phrase2bytes():
-    for i in range(1, 100):
+    for _ in range(1, 100):
         words_1 = random.sample(WORDLIST, 8)
         words_2 = random.sample(WORDLIST, 8)
         words   = "\n".join(w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2))
@@ -90,17 +93,13 @@ def test_fuzz_phrase2words_fuzzymatch(num_typos, max_fail_ratio):
 
     ok   = 0
     fail = 0
-    for i in range(5):
+    for _ in range(5):
         words_1 = random.sample(WORDLIST, 8)
         words_2 = random.sample(WORDLIST, 8)
 
-        expected_phrase = "\n".join(
-            w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2)
-        )
-        typo_words = "\n".join(
-            _sim_typo(w1, num_typos=num_typos).ljust(9)
-            + " "
-            + _sim_typo(w2, num_typos=num_typos).ljust(9)
+        expected_phrase = "\n".join(w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2))
+        typo_words      = "\n".join(
+            _sim_typo(w1, num_typos=num_typos).ljust(9) + " " + _sim_typo(w2, num_typos=num_typos).ljust(9)
             for w1, w2 in zip(words_1, words_2)
         )
         data          = phrase2bytes(typo_words)

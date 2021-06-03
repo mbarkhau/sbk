@@ -1,3 +1,6 @@
+# pylint: disable=wildcard-import
+# pylint: disable=unused-wildcard-import
+
 import io
 import os
 import re
@@ -18,9 +21,10 @@ import click.testing
 import sbk.cli
 import sbk.cli_io
 import sbk.ecc_rs
+import sbk.params
 from sbk import electrum_mnemonic
-from sbk.cli_util import *
 from sbk.mnemonic import *
+from sbk.ui_common import *
 
 
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="ECC recovery can be intense")
@@ -68,6 +72,32 @@ def test_intcode_fuzz_loss(data_len):
         parts[clear_idx] = None
         decoded = maybe_intcodes2bytes(parts)
         assert decoded == data
+
+
+def test_intcode_odd_data_len():
+    in_data = b"\x11\x00\x004444444444"
+    assert len(in_data) == sbk.params.SALT_LEN
+    expected_inputs = [
+        "004-352",
+        "065-588",
+        "144-436",
+        "209-972",
+        "275-508",
+        "341-044",
+        "406-586",
+        "507-031",
+        "572-636",
+        "615-112",
+        "665-113",
+        "754-258",
+        "787-637",
+        "003-921",
+    ]
+
+    inputs = bytes2intcodes(in_data)
+    assert inputs == expected_inputs
+    result = maybe_intcodes2bytes(inputs, msg_len=sbk.params.SALT_LEN)
+    assert result == in_data
 
 
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="ECC recovery can be intense")
@@ -183,8 +213,21 @@ def test_threading():
         time.sleep(0.1)
         return arg * 2
 
+    class Bar:
+        def __init__(self, length):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def update(self, step_ms):
+            pass
+
     tzero  = time.time()
-    result = run_with_progress_bar(dummy_func, eta_sec=0.1, label="Test")
+    result = run_with_progress_bar(dummy_func, eta_sec=0.1, init_progressbar=Bar)
     assert result == arg * 2
     elapsed = time.time() - tzero
     assert 0.1 < elapsed < 0.3
@@ -194,70 +237,58 @@ DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
 
         Data          Mnemonic               ECC
-   01: 000-289   academy   boeing      13: 839-540
-   02: 065-536   abraham   abraham     14: 006-657
-   03: 131-522   academy   seattle     15: 107-612
-   04: 247-256   sheriff   theatre     16: 187-871
+   01: 004-352   auburn    abraham     11: 713-070
+   02: 065-537   abraham   academy     12: 754-573
+   03: 180-933   seattle   sheriff     13: 805-186
+   04: 252-115   theatre   taiwan      14: 036-834
+   05: 317-161   tequila   uruguay     15: 078-867
 
-   05: 316-374   taiwan    tequila     17: 248-045
-   06: 387-564   uruguay   veteran     18: 289-066
-   07: 452-602   umbrella  whisky      19: 388-700
-   08: 523-760   yoghurt   virginia    20: 437-022
-
-   09: 560-014   muffin    nagasaki    21: 508-272
-   10: 622-980   library   macbook     22: 558-874
-   11: 696-210   oxford    netflix     23: 647-162
-   12: 759-084   nintendo  champion    24: 692-246
+   06: 388-327   veteran   umbrella    16: 192-110
+   07: 457-469   whisky    yoghurt     17: 227-392
+   08: 520-331   virginia  muffin      18: 325-188
+   09: 560-769   nagasaki  library     19: 366-108
+   10: 623-775   macbook   oxford      20: 451-601
 
                      Share 2/3
 
         Data          Mnemonic               ECC
-   01: 000-289   academy   boeing      13: 787-724
-   02: 065-536   abraham   abraham     14: 041-874
-   03: 131-779   acrobat   server      15: 067-805
-   04: 249-335   squid     warrior     16: 146-514
+   01: 004-352   auburn    abraham     11: 662-110
+   02: 065-538   abraham   acrobat     12: 734-756
+   03: 181-197   server    squid       13: 841-650
+   04: 260-065   warrior   tsunami     14: 032-863
+   05: 322-453   vampire   nintendo    15: 072-100
 
-   05: 319-979   tsunami   vampire     17: 201-071
-   06: 365-983   nintendo  oxford      18: 301-536
-   07: 428-467   mosquito  queen       19: 372-128
-   08: 507-303   salmon    pilot       20: 426-302
-
-   09: 545-115   freddie   gotham      21: 496-647
-   10: 607-567   embassy   forest      22: 574-163
-   11: 686-435   kingdom   hendrix     23: 649-798
-   12: 748-815   italy     atlantic    24: 662-138
+   06: 368-521   oxford    mosquito    16: 167-279
+   07: 439-229   queen     salmon      17: 199-935
+   08: 501-585   pilot     freddie     18: 278-018
+   09: 547-653   gotham    embassy     19: 372-396
+   10: 610-169   forest    kingdom     20: 419-446
 
                      Share 3/3
 
         Data          Mnemonic               ECC
-   01: 000-289   academy   boeing      13: 803-620
-   02: 065-536   abraham   abraham     14: 015-843
-   03: 131-893   admiral   crown       15: 093-346
-   04: 211-995   diesel    berlin      16: 156-457
+   01: 004-352   auburn    abraham     11: 703-054
+   02: 065-539   abraham   admiral     12: 764-995
+   03: 144-700   crown     diesel      13: 808-162
+   04: 203-526   berlin    albino      14: 034-100
+   05: 264-520   android   escort      15: 066-249
 
-   05: 263-689   albino    android     17: 241-425
-   06: 346-183   escort    engine      18: 313-766
-   07: 416-381   gorilla   lasagna     19: 353-780
-   08: 488-547   kangaroo  hendrix     20: 421-591
-
-   09: 585-441   vietnam   tsunami     21: 501-546
-   10: 651-519   virginia  zimbabwe    22: 526-484
-   11: 709-317   suzuki    sheriff     23: 653-787
-   12: 773-351   sparrow   umbrella    24: 693-598
-
+   06: 345-946   engine    gorilla     16: 175-257
+   07: 425-332   lasagna   kangaroo    17: 204-899
+   08: 484-334   hendrix   vietnam     18: 298-953
+   09: 582-128   tsunami   virginia    19: 347-957
+   10: 655-314   zimbabwe  suzuki      20: 399-522
 
                        Salt
 
         Data          Mnemonic               ECC
-   01: 000-289   academy   boeing      09: 585-354
-   02: 065-536   abraham   abraham     10: 604-186
-   03: 144-436   cowboy    cowboy      11: 697-429
-   04: 209-972   cowboy    cowboy      12: 739-428
-
-   05: 275-508   cowboy    cowboy      13: 845-213
-   06: 341-044   cowboy    cowboy      14: 026-334
-   07: 406-580   cowboy    cowboy      15: 103-947
-   08: 472-116   cowboy    cowboy      16: 178-527
+   01: 004-352   auburn    abraham     08: 507-031
+   02: 065-588   abraham   cowboy      09: 572-636
+   03: 144-436   cowboy    cowboy      10: 615-112
+   04: 209-972   cowboy    cowboy      11: 665-113
+   05: 275-508   cowboy    cowboy      12: 754-258
+   06: 341-044   cowboy    cowboy      13: 787-637
+   07: 406-586   cowboy    detroit     14: 003-921
 
                      Brainkey
 
@@ -284,8 +315,7 @@ def _parse_output(output: str) -> typ.Dict[str, ParsedSecret]:
             secret_lines[headline].append(line)
 
     return {
-        headline.lower(): parse_formatted_secret("\n".join(lines))
-        for headline, lines in secret_lines.items()
+        headline.lower(): parse_formatted_secret("\n".join(lines)) for headline, lines in secret_lines.items()
     }
 
 
@@ -306,7 +336,7 @@ class Result(typ.NamedTuple):
     exit_code: int
 
 
-def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
+def _run(cli_fn, argv=(), env=None, playbook=()) -> Result:
     subcommand = cli_fn.name.replace("_", "-")
 
     sub_env = os.environ.copy()
@@ -350,7 +380,6 @@ def _run(cli_fn, argv=(), env=None, playbook=[]) -> Result:
 def test_cli_create_basic():
     argv = [
         "--scheme=2of3",
-        "--brainkey-len=6",
         "--yes-all",
         "--parallelism=1",
         "--memory-cost=1",
@@ -360,6 +389,7 @@ def test_cli_create_basic():
         'SBK_PROGRESS_BAR': '0',
         # 'SBK_DEBUG_RANDOM': 'DANGER',
     }
+
     result = _run(sbk.cli.create, argv, env=env, playbook=[])
 
     # print("---------------------")
@@ -417,13 +447,13 @@ def test_cli_create_validation():
         interaction(expect=r".*press enter to continue ", send=""),
         interaction(expect=r".*Enter code/words at 01: ", send=salt_codes),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: ", send=brainkey_codes,),
+        interaction(expect=r".*Enter code/words at 01: ", send=brainkey_codes),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: ", send=share_1_codes,),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_1_codes),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: ", send=share_2_codes,),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_2_codes),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
-        interaction(expect=r".*Enter code/words at 01: ", send=share_3_codes,),
+        interaction(expect=r".*Enter code/words at 01: ", send=share_3_codes),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
 
@@ -460,7 +490,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 585-354 <=") == 1
+    assert result.output.count("08: 507-031 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -481,7 +511,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 585-354 <=") == 1
+    assert result.output.count("08: 507-031 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -498,9 +528,8 @@ def test_cli_recover_salt_from_ecc():
         interaction(expect=r".*Enter code/words at 05: ", send="next"),
         interaction(expect=r".*Enter code/words at 06: ", send="next"),
         interaction(expect=r".*Enter code/words at 07: ", send="next"),
-        interaction(expect=r".*Enter code/words at 08: ", send="next"),
-        interaction(expect=r".*Enter code at 09: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
-        interaction(expect=r".*Enter code at 13: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
+        interaction(expect=r".*Enter code at 08: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
+        interaction(expect=r".*Enter code at 12: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)
@@ -527,7 +556,7 @@ def test_cli_load_wallet():
         argv   = ("--show-seed", "--yes-all", "--wallet-name", f'"{name}"')
         result = _run(sbk.cli.load_wallet, argv=argv, playbook=playbook)
 
-        commands, wallet_seed = result.output.lower().split("electrum wallet seed:")
+        _commands, wallet_seed = result.output.lower().split("electrum wallet seed:")
         seed_words = wallet_seed.strip().split()
         assert len(seed_words) == 12, seed_words
         assert all(w in electrum_mnemonic.wordlist_indexes for w in seed_words)

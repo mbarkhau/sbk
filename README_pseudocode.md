@@ -1,3 +1,10 @@
+!!! warning "THIS IS OUTDATED"
+
+    Things that have changed: Header encoding. In theory it's
+    pseudocode, but it shouldn't show things differently than how the
+    final implementation works.
+
+
 ## High Level Pseudocode
 
 To conclude the technical overview, here is some pseudocode covering all the basic parts of SBK. It is based on the actual implementation, but it is simplified and abreviated.
@@ -12,10 +19,8 @@ class ParamConfig:
     """Parameters required for key derivation and recovery."""
 
     version     : int
-    flags       : int
     threshold   : int 
     num_shares  : Optional[int] 
-    brainkey_len: int  
 
     # Argon2 parameters
     kdf_parallelism: int   
@@ -24,31 +29,26 @@ class ParamConfig:
 
     @staticmethod
     def decode(self, data: bytes) -> Params:
-        """Parses 4 byte representation of params from salt or a share."""
-        field01, field23, fields_456 =  struct.unpack('!BBH', data[:4])
+        """Deserialize ParamConfig from the Salt or a Share."""
+        fields_01, fields_234, fields_5 = struct.unpack("!BHB", data[:4])
         ...
-        f_brainkey_len = (fields_23 >> 4) & 0xF
-        f_threshold    = (fields_23 >> 0) & 0xF
-        brainkey_len = (f_brainkey_len + 1) * 2
+        version      = (fields_01 >> 4) & 0xF
+        f_threshold  = (fields_01 >> 0) & 0xF
         threshold    = f_threshold + 1
+        share_no     = fields_5
         ...
         return Params(...)
 
     def encode(self) -> bytes:
         """Returns 4 byte representation of params."""
         ...
-        f_brainkey_len = (param_cfg.brainkey_len // 2) - 1
-        f_threshold    = param_cfg.threshold - 1
+        f_threshold    = self.threshold - 1
 
-        fields_23 = 0
-        fields_23 |= f_brainkey_len << 4
-        fields_23 |= f_threshold
+        fields_01 = 0
+        fields_01 |= self.version << 4
+        fields_01 |= f_threshold
         ...
-        return struct.unpack('!BBH', field01, field23, fields_456)
-
-    @property
-    def is_segwit(self) -> bool:
-        return self.flags & FLAG_IS_SEGWIT == 1
+        return struct.pack('!BBH', fields_01, field234, fields_5)
 
     ...
 ```
@@ -151,8 +151,8 @@ def split(master_key: MasterKey, param_cfg: params.ParamConfig) -> List[PointDat
 
 ```python
 # src/sbk/cli.py
-SALT_LEN = 12
-BRAINKEY_LEN = 8
+SALT_LEN = 10
+BRAINKEY_LEN = 6
 
 @cli.command()
 def create(scheme: str = "3of5", brainkey_len: int = BRAINKEY_LEN, ...) -> None:

@@ -1,13 +1,15 @@
----
-project_name : "SBK: Split Bitcoin Keys"
-logo_url     : "https://mbarkhau.keybase.pub/sbk/logo_128.png"
-repo_url     : "https://gitlab.com/mbarkhau/sbk"
-title        : "SBK: Split Bitcoin Keys"
-lang         : "en-UK"
-author       : "Manuel Barkhau"
-description  : "SBK - Keep your Coins Safe and Secure."
-keywords     : "Bitcoin,Wallet,Electrum,Shamir,Crypto"
-docs_url     : "https://mbarkhau.keybase.pub/sbk/"
-copyright    : "2020 Manuel Barkhau - MIT License"
-copyright_url: "https://gitlab.com/mbarkhau/sbk/blob/master/LICENSE"
----
++++
+title        = "SBK: Split Bitcoin Keys"
+lang         = "en-US"
+logo_url     = "https://raw.githubusercontent.com/mbarkhau/sbk/master/logo_128.png"
+repo_url     = "https://github.com/mbarkhau/sbk"
+authors       = [
+    "Manuel Barkhau <mbarkhau@gmail.com>"
+]
+description  = "SBK - Keep your Coins Safe and Secure."
+keywords     = "Bitcoin,Wallet,Electrum,Shamir,Crypto"
+docs_url     = "https://sbk.dev/docs"
+
+copyright    = "2019-2021 Manuel Barkhau - MIT License"
+copyright_url= "https://github.com/mbarkhau/sbk/blob/master/LICENSE"
++++

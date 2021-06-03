@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # This file is part of the SBK project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Shamir Share generation."""
@@ -24,19 +24,22 @@ Share    = bytes  # RawShare but prefixed with ParamConfig data
 
 
 def _split_data_gf_p(
-    data: bytes, threshold: int, num_shares: int, prime: int,
+    data      : bytes,
+    threshold : int,
+    num_shares: int,
+    prime     : int,
 ) -> typ.Iterable[RawShare]:
     secret_int = enc_util.bytes2int(data)
     assert secret_int < prime
 
-    field    = gf.GFNum.field(prime)
+    field    = gf.init_field(prime)
     gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)
     for gfpoint in gfpoints:
         yield enc_util.gfpoint2bytes(gfpoint)
 
 
 def _join_gf_p(raw_shares: typ.List[RawShare], threshold: int, prime: int) -> MasterKey:
-    field      = gf.GFNum.field(order=prime)
+    field      = gf.init_field(order=prime)
     points     = tuple(enc_util.bytes2gfpoint(share, field) for share in raw_shares)
     secret_int = gf_poly.join(field, points, threshold)
     return enc_util.int2bytes(secret_int, zfill_bytes=math.ceil(math.log2(prime) / 8))
@@ -56,12 +59,15 @@ def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> typ.Iter
 
     y_coords: YCoords = {}
     for i, secret_int in enumerate(data):
-        assert 0 <= secret_int <= 255, secret_int
+        if not 0 <= secret_int <= 255:
+            errmsg = f"Value out of gf bounds {secret_int}"
+            raise ValueError(errmsg)
+
         gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)
         for gfpoint in gfpoints:
             y_coords[gfpoint.x.val, i] = gfpoint.y.val
 
-    x_coords = {x_coord for x_coord, _ in y_coords.keys()}
+    x_coords = {x_coord for x_coord, _ in y_coords}
     for x_coord in x_coords:
         y_values  = [y_coords[x_coord, i] for i in range(len(data))]
         raw_share = bytes([x_coord]) + bytes(y_values)
@@ -80,7 +86,7 @@ def _join_gf_256(raw_shares: typ.List[RawShare], threshold: int) -> MasterKey:
             y_coords[x_coord, i] = y_coord
 
     data_len = len(raw_shares[0]) - 1
-    x_coords = {x_coord for x_coord, _ in y_coords.keys()}
+    x_coords = {x_coord for x_coord, _ in y_coords}
     assert all(0 < x < 64 for x in x_coords)
     assert len(x_coords) >= threshold
 
@@ -97,14 +103,20 @@ def _join_gf_256(raw_shares: typ.List[RawShare], threshold: int) -> MasterKey:
 
 
 def split(
-    param_cfg: params.ParamConfig, raw_salt: RawSalt, brainkey: BrainKey, use_gf_p: bool = False,
+    param_cfg: params.ParamConfig,
+    raw_salt : RawSalt,
+    brainkey : BrainKey,
+    use_gf_p : bool = False,
 ) -> typ.Iterable[Share]:
-    errmsg = f"{len(raw_salt)} != {params.RAW_SALT_LEN}"
-    assert len(raw_salt) == params.RAW_SALT_LEN, errmsg
+    if len(raw_salt) != params.RAW_SALT_LEN:
+        errmsg = f"{len(raw_salt)} != {params.RAW_SALT_LEN}"
+        raise Exception(errmsg)
 
     shares_input = raw_salt + brainkey
-    errmsg       = f"{len(shares_input)} != {param_cfg.master_key_len}"
-    assert len(shares_input) == param_cfg.master_key_len, errmsg
+
+    if len(shares_input) != params.MASTER_KEY_LEN:
+        errmsg = f"{len(shares_input)} != {params.MASTER_KEY_LEN}"
+        raise Exception(errmsg)
 
     param_cfg_data = params.param_cfg2bytes(param_cfg)
     threshold      = param_cfg.threshold
@@ -118,10 +130,13 @@ def split(
     for raw_share in raw_shares:
         share_data = param_cfg_data + raw_share
 
-        errmsg = f"{len(raw_share)} != {param_cfg.master_key_len + 1}"
-        assert len(raw_share) == param_cfg.master_key_len + 1, errmsg
-        errmsg = f"{len(share_data)} != {param_cfg.share_len}"
-        assert len(share_data) == param_cfg.share_len, errmsg
+        if len(raw_share) != params.MASTER_KEY_LEN + 1:
+            errmsg = f"{len(raw_share)} != {params.MASTER_KEY_LEN + 1}"
+            raise ValueError(errmsg)
+
+        if len(share_data) != params.SHARE_LEN:
+            errmsg = f"{len(share_data)} != {params.SHARE_LEN}"
+            raise ValueError(errmsg)
 
         yield share_data
 
@@ -135,14 +150,22 @@ def join(
     else:
         master_key = _join_gf_256(raw_shares, param_cfg.threshold)
 
-    assert len(master_key) == param_cfg.master_key_len
+    if len(master_key) != params.MASTER_KEY_LEN:
+        errmsg = f"Invaid master_key_len={len(master_key)}"
+        raise ValueError(errmsg)
 
-    salt_end = param_cfg.raw_salt_len
-    bk_start = param_cfg.raw_salt_len
+    salt_end = params.RAW_SALT_LEN
+    bk_start = params.RAW_SALT_LEN
 
     raw_salt = master_key[:salt_end]
     brainkey = master_key[bk_start:]
 
-    assert len(raw_salt) == param_cfg.raw_salt_len
-    assert len(brainkey) == param_cfg.brainkey_len
+    if len(raw_salt) != params.RAW_SALT_LEN:
+        errmsg = f"Invalid raw_salt {len(raw_salt)}"
+        raise ValueError(errmsg)
+
+    if len(brainkey) != params.BRAINKEY_LEN:
+        errmsg = f"Invalid brainkey {len(brainkey)}"
+        raise ValueError(errmsg)
+
     return (raw_salt, brainkey)

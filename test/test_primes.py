@@ -10,7 +10,8 @@ import sbk.primes
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Primes don't change")
 @pytest.mark.parametrize("prime_idx", range(len(sbk.primes.POW2_PRIMES)))
 def test_prime(prime_idx):
-    n, k = sbk.primes.POW2_PRIME_PARAMS[prime_idx]
+    items = sorted(sbk.primes.POW2_PRIME_PARAMS.items())
+    n, k = items[prime_idx]
     prime = sbk.primes.POW2_PRIMES[prime_idx]
     assert sbk.primes.is_probable_prime(prime), (n, k)
 
@@ -53,9 +54,9 @@ def test_a014234_verfiy():
 
 def test_primelist_validation():
     sbk.primes.validate_pow2_prime_params()
-    original = sorted(sbk.primes.POW2_PRIME_PARAMS.items())
+    original = sbk.primes.POW2_PRIME_PARAMS
+    sbk.primes.POW2_PRIME_PARAMS[768] = 1
     try:
-        sbk.primes.POW2_PRIME_PARAMS[-1] = (768, 1)
         sbk.primes.validate_pow2_prime_params()
         assert False, "expected Exception"
     except Exception as ex:

@@ -1,7 +1,7 @@
 # This file is part of the SBK project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Helper functions related to data/type encoding/decoding."""
@@ -112,7 +112,7 @@ def gfpoint2bytes(point: gf_poly.Point) -> bytes:
     # NOTE: for x=0 or x=255 the y value may be the secret, which should not be serialized.
     x = point.x.val
     if not (0 < x < 255):
-        raise ValueError(f"Invalid point with x={x}. Was not 0 < x < 255")
+        raise ValueError(f"Invalid point with x={x}. Was not (0 < x < 255)")
 
     num_bits  = math.ceil(math.log2(point.y.order))
     num_bytes = num_bits // 8

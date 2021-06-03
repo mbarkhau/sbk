@@ -48,3 +48,6 @@ lxml
 # for pdf_templates
 qrcode
 weasyprint
+
+# for validation
+pyargon2

@@ -1,4 +1,7 @@
-import os
+# pylint: disable=wildcard-import
+# pylint: disable=unused-wildcard-import
+# pylint: disable=broad-except
+
 import random
 
 import pytest
@@ -121,7 +124,7 @@ def alt_eval_at(coeffs, p):
 
 
 def test_gfpoly_eval():
-    gf7       = GFNum.field(7)
+    gf7       = init_field(7)
     coeffs    = [2, 3, 4]
     gf_coeffs = [gf7[2], gf7[3], gf7[4]]
 
@@ -146,10 +149,10 @@ def test_gfpoly_eval():
 
 
 def test_gfpoly_eval_fuzz():
-    primes = sorted(sbk.primes.PRIMES)
+    all_primes = sorted(sbk.primes.PRIMES)
     for _ in range(100):
-        p     = random.choice(primes)
-        field = GFNum.field(p)
+        p     = random.choice(all_primes)
+        field = init_field(p)
 
         coeffs    = [random.randrange(p) for _ in range(random.randint(1, min(9, p)))]
         gf_coeffs = [field[coeff] for coeff in coeffs]
@@ -203,7 +206,7 @@ def test_interpolate_overspecified():
 
 
 def test_gf_arithmetic():
-    gf7 = GFNum.field(7)
+    gf7 = init_field(7)
 
     assert val_of(3  ) == 3
     assert val_of(3.0) == 3.0
@@ -229,7 +232,7 @@ def test_gf_arithmetic():
 
 
 def test_interpolate_gf():
-    gf7 = GFNum.field(7)
+    gf7 = init_field(7)
 
     points = [
         Point(gf7[1], gf7[0]),
@@ -241,11 +244,13 @@ def test_interpolate_gf():
     interp_y = interpolate(points[:-1], at_x=at_x)
     assert interp_y == at_y
 
-    assert interpolate(points[:-1], at_x=gf7[1] / gf7[2]) == gf7[1] / gf7[4]
+    interp_at_x = gf7[1] / gf7[2]
+    expected    = gf7[1] / gf7[4]
+    assert interpolate(points[:-1], at_x=interp_at_x) == expected
 
 
 def test_interpolate_fail():
-    gf7    = GFNum.field(7)
+    gf7    = init_field(7)
     points = [
         Point(gf7[1], gf7[0]),
         Point(gf7[1], gf7[1]),
@@ -271,23 +276,23 @@ def test_interpolate_fail():
 
 
 def test_interpolate_attack():
-    gf = GFNum.field(1021)
+    field = init_field(1021)
 
     points = [
-        Point(gf[1], gf[0]),
-        Point(gf[2], gf[1]),
-        Point(gf[3], gf[4]),
+        Point(field[1], field[0]),
+        Point(field[2], field[1]),
+        Point(field[3], field[4]),
     ]
 
     try:
-        interpolate([Point(gf[0], gf[0])] + points, at_x=gf[0])
+        interpolate([Point(field[0], field[0])] + points, at_x=field[0])
         assert False, "expected Exception"
     except Exception as ex:
         assert "Invalid share" in str(ex)
         assert "Possible attack" in str(ex)
 
     try:
-        interpolate([Point(gf[255], gf[0])] + points, at_x=gf[0])
+        interpolate([Point(field[255], field[0])] + points, at_x=field[0])
         assert False, "expected Exception"
     except Exception as ex:
         assert "Invalid share" in str(ex)
@@ -296,7 +301,7 @@ def test_interpolate_attack():
 
 def test_split_and_join_2of3():
     prime = min(p for p in sbk.primes.PRIMES if p > 10000000)
-    field = GFNum.field(prime)
+    field = init_field(prime)
 
     secret = random.randrange(10000000)
     points = split(field, threshold=2, num_shares=3, secret=secret)
@@ -329,7 +334,7 @@ def test_split_and_join_fuzz(prime_index):
         'prime'     : prime,
         'secret'    : secret,
     }
-    field     = GFNum.field(prime)
+    field     = init_field(prime)
     points    = split(field=field, threshold=threshold, num_shares=num_shares, secret=secret)
     actual_xs = [p.x.val for p in points]
     actual_ys = [p.y.val for p in points]

@@ -1,7 +1,7 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Reed Solomon style (home-grown) Forward Error Correction code.
@@ -70,11 +70,12 @@ def _encode(msg: Message, ecc_len: int) -> Block:
 
     data_points  = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(msg))
     ecc_x_coords = tuple(field[x] for x in range(len(msg), len(msg) + ecc_len))
-    ecc_points   = tuple(
-        gf_poly.Point(x=x, y=_interpolate(data_points, at_x=x)) for x in ecc_x_coords
-    )
-    y_vals = tuple(p.y.val for p in data_points + ecc_points)
-    assert all(0 <= y <= 255 for y in y_vals)
+    ecc_points   = tuple(gf_poly.Point(x=x, y=_interpolate(data_points, at_x=x)) for x in ecc_x_coords)
+    y_vals       = tuple(p.y.val for p in data_points + ecc_points)
+
+    if not all(0 <= y <= 255 for y in y_vals):
+        raise AssertionError()
+
     return bytes(y_vals)
 
 
@@ -86,14 +87,19 @@ def encode(msg: Message, ecc_len: typ.Optional[int] = None, verify: bool = True)
     else:
         _ecc_len = ecc_len
 
-    assert _ecc_len >= 0
+    if _ecc_len < 0:
+        raise AssertionError(str(_ecc_len))
+
     if _ecc_len == 0:
         return msg
 
     block = _encode(msg, ecc_len=_ecc_len)
-    assert block.startswith(msg)
-    if verify:
-        assert decode(block, len(msg)) == msg
+    if not block.startswith(msg):
+        raise AssertionError()
+
+    if verify and decode(block, len(msg)) != msg:
+        raise AssertionError()
+
     return block
 
 
@@ -126,9 +132,7 @@ def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
 
 def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
     field  = gf.Field[gf.GF256](256, gf.GF256)
-    points = tuple(
-        gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None
-    )
+    points = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None)
 
     if len(points) < msg_len:
         raise ECCDecodeError("Not enough data to recover message.")
@@ -142,21 +146,21 @@ def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
 
         if (sample_num + 1) % 10 == 0:
             if len(candidates) == 1:
-                ((top, top_n),) = candidates.most_common(1)
+                ((top, _top_n),) = candidates.most_common(1)
                 return top
 
-            (top_0, top_0_n), (top_1, top_1_n) = candidates.most_common(2)
+            (top_0, top_0_n), (_top_1, top_1_n) = candidates.most_common(2)
             # print("???", top_0_n, "vs", top_1_n, "of", sample_num)
 
             if top_0_n > top_1_n * 10:
                 return top_0
 
     if len(set(candidates)) == 1:
-        ((top, top_n),) = candidates.most_common(1)
+        ((top, _top_n),) = candidates.most_common(1)
         return top
 
     # last ditch check
-    (top_0, top_0_n), (top_1, top_1_n) = candidates.most_common(2)
+    (top_0, top_0_n), (_top_1, top_1_n) = candidates.most_common(2)
     if top_0_n > top_1_n * 2:
         return top_0
 
@@ -220,7 +224,8 @@ Example usage:
 """
 
 
-def main(args: typ.List[str] = sys.argv[1:], stdin: typ.TextIO = sys.stdin) -> int:
+def main(args: typ.Sequence[str] = sys.argv[1:], stdin: typ.TextIO = sys.stdin) -> int:
+    # pylint: disable=dangerous-default-value; we don't modify it, I promise.
     if "-h" in args or "--help" in args or not args:
         print(main.__doc__)
         return 0

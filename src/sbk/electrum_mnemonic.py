@@ -1,5 +1,5 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
 # Large portions of this module are based on the
 # electrum implementation itself in particular on:
@@ -16,6 +16,8 @@
 
 These are replicated so that SBK can invoke "electrum restore <mnemonic>".
 """
+# pylint:disable=too-many-lines; tis waht it is
+
 import os
 import hmac
 import string
@@ -3821,6 +3823,7 @@ def bh2u(x: bytes) -> str:
 
 
 def is_old_seed(seed: str) -> bool:
+    # pylint: disable=broad-except; vendored from electrum
     seed  = normalize_text(seed)
     words = seed.split()
 
@@ -3850,9 +3853,9 @@ def is_new_seed(x: str, prefix: str = SEED_PREFIX) -> bool:
 ElectrumSeed = str
 
 
-def raw_seed2phrase(int_seed: RawSeed, seed_type: str = 'segwit') -> SeedPhrase:
+def raw_seed2phrase(int_seed: RawSeed) -> SeedPhrase:
     # based on Mnemonic.make_seed
-    prefix = seed_prefix(seed_type)
+    prefix = seed_prefix('segwit')
 
     nonce = 0
     while True:

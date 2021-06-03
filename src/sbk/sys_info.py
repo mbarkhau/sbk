@@ -1,7 +1,7 @@
 # This file is part of the sbk project
-# https://gitlab.com/mbarkhau/sbk
+# https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 """Evaluate memory available on system (for kdf parameters)."""
 
@@ -35,9 +35,8 @@ import pathlib as pl
 import argon2
 
 from . import kdf
-from . import cli_util
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger("sbk.sys_info")
 
 
 Seconds = float
@@ -69,9 +68,10 @@ def mem_total() -> kdf.MebiBytes:
             for line in data.splitlines():
                 key, num, unit = line.decode("ascii").strip().split()
                 if key == "MemTotal:":
+                    assert unit == "kB"
                     return int(num) // 1024
         except Exception:
-            log.error("Error while evaluating system memory", exc_info=True)
+            logger.error("Error while evaluating system memory", exc_info=True)
 
     return FALLBACK_MEM_TOTAL_MB
 
@@ -81,7 +81,6 @@ class Measurement(typ.NamedTuple):
     p: kdf.NumThreads
     m: kdf.MebiBytes
     t: kdf.Iterations
-    h: kdf.HashAlgoVal
 
     duration: Seconds
 
@@ -91,10 +90,10 @@ def _measure(kdf_params: kdf.KDFParams) -> Measurement:
     kdf.digest(b"saltsaltsaltsaltbrainkey", kdf_params, hash_len=16)
     duration = round(time.time() - tzero, 5)
 
-    log.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
+    logger.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
 
-    p, m, t, h = kdf_params
-    return Measurement(p=p, m=m, t=t, h=h, duration=duration)
+    p, m, t = kdf_params
+    return Measurement(p=p, m=m, t=t, duration=duration)
 
 
 class SystemInfo(typ.NamedTuple):
@@ -108,7 +107,7 @@ class SystemInfo(typ.NamedTuple):
 _SYS_INFO: typ.Optional[SystemInfo] = None
 
 
-def _dump_sys_info(sys_info: SystemInfo) -> None:
+def dump_sys_info(sys_info: SystemInfo) -> None:
     global _SYS_INFO
     _SYS_INFO = sys_info
 
@@ -116,7 +115,7 @@ def _dump_sys_info(sys_info: SystemInfo) -> None:
     try:
         cache_path.parent.mkdir(exist_ok=True, parents=True)
     except Exception as ex:
-        log.warning(f"Unable to create cache dir {cache_path.parent}: {ex}")
+        logger.warning(f"Unable to create cache dir {cache_path.parent}: {ex}")
         return
 
     sys_info_data = {
@@ -130,11 +129,38 @@ def _dump_sys_info(sys_info: SystemInfo) -> None:
         with cache_path.open(mode="w", encoding="utf-8") as fobj:
             json.dump(sys_info_data, fobj, indent=4)
     except Exception as ex:
-        log.warning(f"Error writing cache file {cache_path}: {ex}")
+        logger.warning(f"Error writing cache file {cache_path}: {ex}")
         return
 
 
-def _init_sys_info() -> SystemInfo:
+def load_cached_sys_info() -> SystemInfo:
+    cache_path = SYSINFO_CACHE_FPATH
+    try:
+        with cache_path.open(mode="rb") as fobj:
+            sys_info_data = json.load(fobj)
+        nfo = SystemInfo(**sys_info_data)
+    except Exception as ex:
+        logger.warning(f"Error reading cache file {cache_path}: {ex}")
+        nfo = init_sys_info()
+
+    return nfo
+
+
+def load_sys_info(use_cache: bool = True) -> SystemInfo:
+    global _SYS_INFO
+    if _SYS_INFO:
+        return _SYS_INFO
+
+    if use_cache and SYSINFO_CACHE_FPATH.exists():
+        nfo = load_cached_sys_info()
+    else:
+        nfo = init_sys_info()
+
+    _SYS_INFO = nfo
+    return nfo
+
+
+def init_sys_info() -> SystemInfo:
     num_cores = len(os.sched_getaffinity(0))
     total_mb  = mem_total()
 
@@ -146,9 +172,9 @@ def _init_sys_info() -> SystemInfo:
             kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
             initial_p  = kdf_params.p
             initial_m  = kdf_params.m
-            log.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
+            logger.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
             _measure(kdf_params)
-            log.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
+            logger.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
             break  # success
         except argon2.exceptions.HashingError as err:
             if "Memory allocation error" not in str(err):
@@ -156,38 +182,3 @@ def _init_sys_info() -> SystemInfo:
             initial_m = (2 * initial_m) // 3
 
     return SystemInfo(num_cores, total_mb, initial_p, initial_m)
-
-
-def init_sys_info() -> SystemInfo:
-    sys_info = cli_util.run_with_progress_bar(
-        _init_sys_info, eta_sec=2, label="Memory test for KDF parameters"
-    )
-    _dump_sys_info(sys_info)
-    return sys_info
-
-
-def _load_cached_sys_info() -> SystemInfo:
-    cache_path = SYSINFO_CACHE_FPATH
-    try:
-        with cache_path.open(mode="rb") as fobj:
-            sys_info_data = json.load(fobj)
-        sys_info = SystemInfo(**sys_info_data)
-    except Exception as ex:
-        log.warning(f"Error reading cache file {cache_path}: {ex}")
-        sys_info = init_sys_info()
-
-    return sys_info
-
-
-def load_sys_info(use_cache: bool = True) -> SystemInfo:
-    global _SYS_INFO
-    if _SYS_INFO:
-        return _SYS_INFO
-
-    if use_cache and SYSINFO_CACHE_FPATH.exists():
-        sys_info = _load_cached_sys_info()
-    else:
-        sys_info = init_sys_info()
-
-    _SYS_INFO = sys_info
-    return sys_info

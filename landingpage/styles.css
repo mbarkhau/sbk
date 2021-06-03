@@ -5,7 +5,7 @@
   font-family: 'lp-bitter';
   font-style: normal;
   font-display: block;
-  font-weight: 300;
+  font-weight: 400;
   src: local(''),
       url('bitter-v17-latin-ext_latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
       url('bitter-v17-latin-ext_latin-regular.woff') format('woff'),
@@ -16,7 +16,7 @@
   font-family: 'lp-bitter';
   font-style: italic;
   font-display: block;
-  font-weight: 300;
+  font-weight: 400;
   src: local(''),
       url('bitter-v17-latin-ext_latin-italic.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
       url('bitter-v17-latin-ext_latin-italic.woff') format('woff'),
@@ -36,14 +36,20 @@
 
 
 body {
-    font: 300 14pt/1.6em lp-bitter;
+    font: 400 14pt/1.6em lp-bitter;
+    letter-spacing: -0.02em;
     word-spacing: 0.1em;
-    letter-spacing: -0.015em;
 
     hyphens: auto;
 
     background-color: #FBFAFA;
-    color: black;
+    color: #000;
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        color: #EEE;
+        background: #090909;
+    }
 }
 
 @media screen and (max-width: 800px) {
@@ -91,13 +97,18 @@ li {
     margin: 0.8em 1em 0.8em 0em;
     line-height: 1.4em;
 }
-a, a:visited {
-    color: black;
-    text-decoration: dashed underline;
+
+a {color: #03B;}
+a:visited {color: #606;}
+
+@media (prefers-color-scheme: dark) {
+    a {color: #9CF;}
+    a:visited {color: #DBF;}
 }
-a:hover {
-    text-decoration: underline;
-}
+
+a, a:visited {text-decoration: none;}
+a:hover {text-decoration: underline;}
+
 .warning {
     position: relative;
     max-width: 46em;
@@ -121,13 +132,6 @@ a:hover {
 }
 
 @media (prefers-color-scheme: dark) {
-    body {
-        color: white;
-        background: #090909;
-    }
-    a, a:visited {
-        color: white;
-    }
     .warning {
         background-color: #950;
         box-shadow: 0px 0px 8px #666;

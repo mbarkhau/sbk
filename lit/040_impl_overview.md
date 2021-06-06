@@ -465,7 +465,7 @@ If you want your shares to survive until they are needed, there are simple ways 
  - Use a [pouch laminator][href_wiki_puche_laminator] to create protective seal against the elements.
  - Use a number punch set to [punch the share data onto a metal plate][href_yt_metal_stamp]. Such a plate can survive a house fire much better than paper. Even with the better heat resistance, it is best to store such plates as close to the ground as possible, where the heat from a fire is much lower.
  - Use a hole punch in a to mark the share data into a metal plate. This is can be slightly harder to read but it is easier to punch a hole in metal than to stamp a pattern, so you can use metals that are harder and more resistant to high temperatures.
- - Use [various metal seed storage products][href_loppnet_metal_seed_storage], which can survive hotter fires (no affiliation).
+ - Use [various metal seed][href_loppnet_metal_seed_storage] [storage products][href_jlopp_reviews], which can survive hotter fires (no affiliation).
 
 [href_wiki_acid_free_paper]: https://en.wikipedia.org/wiki/Acid-free_paper
 
@@ -475,6 +475,7 @@ If you want your shares to survive until they are needed, there are simple ways 
 
 [href_loppnet_metal_seed_storage]: https://blog.lopp.net/metal-bitcoin-seed-storage-stress-test-round-iii/
 
+[href_jlopp_reviews]: https://jlopp.github.io/metal-bitcoin-storage-reviews/
 
 ### Mnemonic for Memory
 

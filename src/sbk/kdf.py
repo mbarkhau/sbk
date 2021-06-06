@@ -10,12 +10,10 @@ import time
 import typing as typ
 import threading
 
-import argon2
-
 NumThreads = int
 MebiBytes  = int
 Iterations = int
-Seconds    = float
+Seconds    = int
 
 # types for progress bar
 Increment             = float
@@ -240,6 +238,8 @@ def _hash_argon2_cffi(
     m   : MebiBytes,
     t   : Iterations,
 ) -> bytes:
+    import argon2
+
     version = argon2.low_level.ARGON2_VERSION
     assert version == 19, version
 

@@ -82,13 +82,25 @@ MUL_INVERSE_LUT = [int(val, 16) for val in MUL_INVERSE_LUT_STR.split()]
 #   (0x01 + 0xC6) % 255 = 0xC7
 # - Look up the sum, 0xC7, on the exponentiation table. We get 0x09.
 
-MUL_LUT = [
-    [0 if (a == 0 or b == 0) else EXP_LUT[(LOG_LUT[a] + LOG_LUT[b]) % 255] for b in range(256)]
-    for a in range(256)
-]
+MUL_LUT = []
+
+
+def init_mul_lut() -> None:
+    if MUL_LUT:
+        return
+
+    for a in range(256):
+        row = []
+        for b in range(256):
+            if a == 0 or b == 0:
+                row.append(0)
+            else:
+                row.append(EXP_LUT[(LOG_LUT[a] + LOG_LUT[b]) % 255])
+        MUL_LUT.append(row)
 
 
 def main() -> None:
+    init_mul_lut()
     for table in [EXP_LUT, LOG_LUT, MUL_INVERSE_LUT]:
         print()
         for i, n in enumerate(table):

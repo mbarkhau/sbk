@@ -15,6 +15,7 @@ PyQT docs:
 - https://realpython.com/python-pyqt-gui-calculator/
 - https://zetcode.com/gui/pyqt5/
 """
+import os
 import sys
 import time
 import typing as typ
@@ -26,9 +27,12 @@ import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
+from . import kdf
 from . import cli_io
+from . import ecc_rs
 from . import params
 from . import mnemonic
+from . import sys_info
 from . import ui_common
 
 logger = logging.getLogger("sbk.gui")
@@ -75,7 +79,7 @@ class SelectCommandPanel(Panel):
 
     def init_button_handler(self, button_name: str) -> typ.Callable:
         def handler(*args, **kwargs):
-            print("handle button", button_name, args, kwargs)
+            logger.info(f"handle button {button_name=} {args} {kwargs}")
             p = self.parent()
 
             if button_name == 'create':
@@ -116,6 +120,35 @@ class NavigablePanel(Panel):
         return handler
 
 
+class ProgressStatus(typ.NamedTuple):
+
+    current: int
+    length : int
+
+
+def init_progres_status_emitter_clazz(signal) -> typ.Callable:
+    """Create a class that can be used with ui_common.run_with_progress_bar."""
+
+    class _ProgressStatusEmitter:
+        def __init__(self, length: int) -> None:
+            self.current = 0
+            self.length  = length
+
+        def __enter__(self) -> '_ProgressStatusEmitter':
+            return self
+
+        def update(self, n_steps: int) -> None:
+            self.current += n_steps
+            status = ProgressStatus(self.current, self.length)
+            signal.emit(status)
+
+        def __exit__(self, exc_type, exc_value, tb) -> None:
+            status = ProgressStatus(self.length, self.length)
+            signal.emit(status)
+
+    return _ProgressStatusEmitter
+
+
 class CreateWalletParamsPanel(NavigablePanel):
     def __init__(self, index: int):
         self.title            = "SBK - Create New Wallet"
@@ -128,20 +161,21 @@ class CreateWalletParamsPanel(NavigablePanel):
 
         self.threshold = qtw.QSpinBox()
         self.threshold.setRange(2, 5)
-        self.threshold.setValue(3)
+        self.threshold.setValue(params.DEFAULT_THRESHOLD)
         form.addRow("&Threshold", self.threshold)
 
         self.num_shares = qtw.QSpinBox()
         self.num_shares.setRange(3, 63)
-        self.num_shares.setValue(5)
+        self.num_shares.setValue(params.DEFAULT_NUM_SHARES)
         form.addRow("&Shares", self.num_shares)
 
         self.wallet_name = qtw.QLineEdit()
         self.wallet_name.setPlaceholderText("empty")
-        form.addRow("&Shares", self.wallet_name)
+        form.addRow("&Wallet Name", self.wallet_name)
 
         def constrain_threshold():
-            self.threshold.setMaximum(min(self.num_shares.value(), 16))
+            threshold = min(self.num_shares.value(), params.MAX_THRESHOLD)
+            self.threshold.setMaximum(threshold)
 
         def constrain_num_shares():
             self.num_shares.setMinimum(self.threshold.value())
@@ -149,10 +183,25 @@ class CreateWalletParamsPanel(NavigablePanel):
         self.num_shares.valueChanged.connect(constrain_threshold)
         self.threshold.valueChanged.connect(constrain_num_shares)
 
-        self.kdf_memory = qtw.QSpinBox()
-        self.kdf_memory.setRange(100, 15)
-        self.kdf_memory.setValue(6)
-        form.addRow("&Memory Usage", self.kdf_memory)
+        self.sys_info = sys_info.init_sys_info()
+        num_cores     = len(os.sched_getaffinity(0))
+
+        max_parallelism = num_cores * 4
+        max_sys_memory  = self.sys_info.total_mb
+
+        default_parallelism = num_cores               * 2
+        default_memory      = self.sys_info.initial_m * self.sys_info.initial_p
+
+        self.parallelism = qtw.QSpinBox()
+        self.parallelism.setRange(1, max_parallelism)
+        self.parallelism.setValue(default_parallelism)
+        form.addRow("&Parallelism [Threads]", self.parallelism)
+
+        self.target_memory = qtw.QSpinBox()
+        self.target_memory.setRange(10, max_sys_memory)
+        self.target_memory.setValue(default_memory)
+        self.target_memory.setSingleStep(10)
+        form.addRow("&Memory Usage [MB]", self.target_memory)
 
         self.target_duration = qtw.QSpinBox()
         self.target_duration.setRange(1, 600)
@@ -187,13 +236,6 @@ SECRET_TMPL = """
 """
 
 
-class CurrentSecret(typ.NamedTuple):
-
-    secret_type: str
-    label_text : str
-    secret_data: bytes
-
-
 class SecurityWarningPanel(NavigablePanel):
     def __init__(self, index: int):
         self.title            = "SBK - Create New Wallet"
@@ -216,17 +258,22 @@ class SecurityWarningPanel(NavigablePanel):
         self.setLayout(self.layout)
 
 
-_secrets_state = {
-    'index': 0,
-}
-
-
 class SecretsResult(typ.NamedTuple):
     errmsg   : str
-    raw_salt : bytes
+    salt     : bytes
     brainkey : bytes
     shares   : typ.List[bytes]
     seed_data: bytes
+
+
+class CurrentSecret(typ.NamedTuple):
+
+    label_text : str
+    secret_type: str
+    secret_data: bytes
+
+
+_shared_panel_state = {'index': 0}
 
 
 class SecretPanel(NavigablePanel):
@@ -239,27 +286,27 @@ class SecretPanel(NavigablePanel):
         return derivation_panel.secrets
 
     def current_secret(self) -> CurrentSecret:
-        idx        = _secrets_state['index']
         secrets    = self.secrets()
         num_shares = len(secrets.shares)
 
-        if idx < num_shares:
-            share_no = idx + 1
+        panel_index = _shared_panel_state['index']
+        if panel_index < num_shares:
+            share_no = panel_index + 1
             return CurrentSecret(
+                label_text=f"Verify Share {share_no}/{num_shares}",
                 secret_type=cli_io.SECRET_TYPE_SHARE,
-                label_text=f"Share {share_no}/{num_shares}",
-                secret_data=secrets.shares[idx],
+                secret_data=secrets.shares[panel_index],
             )
-        elif idx == num_shares:
+        elif panel_index == num_shares:
             return CurrentSecret(
+                label_text="Verify Salt",
                 secret_type=cli_io.SECRET_TYPE_SALT,
-                label_text="Salt",
-                secret_data=secrets.raw_salt,
+                secret_data=secrets.salt,
             )
         else:
             return CurrentSecret(
+                label_text="Verify Brainkey",
                 secret_type=cli_io.SECRET_TYPE_BRAINKEY,
-                label_text="Brainkey",
                 secret_data=secrets.brainkey,
             )
 
@@ -299,24 +346,23 @@ class ShowSecretPanel(SecretPanel):
 
     @property
     def prev_panel_clazz(self) -> Panel:
-        _secrets_state['index'] = max(_secrets_state['index'] - 1, 0)
-        if _secrets_state['index'] == 0:
+        logger.info(f"prev show {_shared_panel_state['index']}")
+        if _shared_panel_state['index'] == 0:
             return ShowSecretPanel
         else:
-            return ValidateSecretPanel
+            _shared_panel_state['index'] = max(_shared_panel_state['index'] - 1, 0)
+            return VerifySecretPanel
 
     @property
     def next_panel_clazz(self) -> Panel:
-        return ValidateSecretPanel
+        logger.info(f"next show {_shared_panel_state['index']}")
+        return VerifySecretPanel
 
     def switch(self) -> None:
         secret = self.current_secret()
         self.header.setText(secret.label_text)
 
-        output_lines = cli_io.format_secret_lines(
-            secret.secret_type,
-            secret.secret_data,
-        )
+        output_lines = cli_io.format_secret_lines(secret.secret_type, secret.secret_data)
 
         content = "\n".join(output_lines) + "\n"
         text    = SECRET_TMPL.format(content=content)
@@ -336,6 +382,9 @@ def _label_widget(parent: Panel, text: str) -> qtw.QLabel:
 
 
 class IntCodeEdit(qtw.QLineEdit):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
     def event(self, event) -> bool:
         if event.type() != qtc.QEvent.KeyPress:
             return super().event(event)
@@ -355,20 +404,6 @@ class IntCodeEdit(qtw.QLineEdit):
             self.setText(text + num_val)
             return True
 
-        if key == qtc.Qt.Key_Tab and len(text) == 0:
-            p = self.parent()
-            if self == p.intcode_widgets[0]:
-                p.mnemonic_widgets[0].setFocus(True)
-                return True
-
-        is_enter = key == qtc.Qt.Key_Enter or key == qtc.Qt.Key_Return
-        if is_enter:
-            p   = self.parent()
-            idx = p.intcode_widgets.index(self)
-            if idx + 1 < len(p.intcode_widgets):
-                p.mnemonic_widgets[idx + 1].setFocus(True)
-                return True
-
         return super().event(event)
 
     def setText(self, text) -> None:
@@ -378,18 +413,26 @@ class IntCodeEdit(qtw.QLineEdit):
         else:
             return super().setText(text)
 
-    def focusInEvent(self, event) -> None:
-        self.setStyleSheet("")
-        return super().focusInEvent(event)
+    def idx(self) -> int:
+        try:
+            return self.parent().intcode_widgets.index(self)
+        except ValueError:
+            # may happen during panel switch
+            return -1
+
+    def is_valid(self) -> bool:
+        text = self.text().replace("-", "")
+        return len(text) == 0 or (len(text) == 6 and text.isdigit())
 
     def focusOutEvent(self, event) -> None:
-        text = self.text().replace("-", "")
-        if len(text) == 0 or (len(text) == 6 and text.isdigit()):
-            self.setStyleSheet("")
-            self.parent().autofill()
-        else:
-            self.setStyleSheet("background-color: #F66;")
+        logger.info("focusOutEvent intcode")
+        self.parent().autofill(accept_intcode=self.idx())
         return super().focusOutEvent(event)
+
+    def focusInEvent(self, event) -> None:
+        self.parent().track_focus('intcode', self.idx())
+        self.setStyleSheet("")
+        return super().focusInEvent(event)
 
 
 class MnemonicEdit(qtw.QLineEdit):
@@ -421,12 +464,38 @@ class MnemonicEdit(qtw.QLineEdit):
 
         return super().event(event)
 
+    def idx(self) -> int:
+        try:
+            return self.parent().mnemonic_widgets.index(self)
+        except ValueError:
+            # may happen during panel switch
+            return -1
+
+    def is_valid(self) -> bool:
+        p   = self.parent()
+        idx = p.mnemonic_widgets.index(self)
+
+        try:
+            expected_byte = p.current_secret().secret_data[idx : idx + 1]
+            expected_word = mnemonic.decode_word(expected_byte)
+        except ValueError:
+            return False
+
+        word = self.text().strip()
+        return len(word) == 0 or word == expected_word
+
     def focusOutEvent(self, event) -> None:
-        self.parent().autofill()
+        logger.info("focusOutEvent mnemonic")
+        self.parent().autofill(accept_mnemonic=self.idx())
         return super().focusOutEvent(event)
 
+    def focusInEvent(self, event) -> None:
+        self.parent().track_focus('mnemonic', self.idx())
+        self.setStyleSheet("")
+        return super().focusInEvent(event)
 
-def _input_widget(parent: Panel, input_type: str) -> qtw.QLineEdit:
+
+def _input_widget(parent: Panel, input_type: str, initial_text: str) -> qtw.QLineEdit:
     if input_type == 'intcode':
         max_length = 7
     elif input_type == 'mnemonic':
@@ -437,18 +506,27 @@ def _input_widget(parent: Panel, input_type: str) -> qtw.QLineEdit:
 
     if input_type == 'intcode':
         line_edit = IntCodeEdit(parent)
-        regexp    = qt.QRegExp(r"([0-9]{,4}|[0-9]{3}-[0-9]{,3})", qt.Qt.CaseInsensitive)
+        line_edit.setText(initial_text)
         line_edit.setPlaceholderText("000-000")
+
+        regexp    = qt.QRegExp(r"([0-9]{,4}|[0-9]{3}-[0-9]{,3})", qt.Qt.CaseInsensitive)
         validator = qtg.QRegExpValidator(regexp, line_edit)
         line_edit.setValidator(validator)
     else:
         line_edit = MnemonicEdit(parent)
-        regexp    = qt.QRegExp(r"[a-zA-Z]{,8}", qt.Qt.CaseInsensitive)
+        line_edit.setText(initial_text)
+        line_edit.setPlaceholderText("-")
+
+        regexp    = qt.QRegExp(r"[a-zA-Z]{5,8}", qt.Qt.CaseInsensitive)
         validator = qtg.QRegExpValidator(regexp, line_edit)
         line_edit.setValidator(validator)
-        completer = qtw.QCompleter(mnemonic.WORDLIST, line_edit)
+
+        completer = qtw.QCompleter(mnemonic.WORDLIST, parent=line_edit)
         completer.setCaseSensitivity(qt.Qt.CaseInsensitive)
+        completer.setFilterMode(qt.Qt.MatchContains)
         line_edit.setCompleter(completer)
+        if initial_text:
+            completer.setCompletionPrefix(initial_text)
 
     line_edit.setAlignment(qtc.Qt.AlignCenter)
     line_edit.setFont(FIXED_FONT)
@@ -459,43 +537,137 @@ def _input_widget(parent: Panel, input_type: str) -> qtw.QLineEdit:
     return line_edit
 
 
-class ValidateSecretPanel(SecretPanel):
+MaybeBytes = typ.Union[bytes, None]
+
+
+def _parse_intcodes(datas: typ.List[MaybeBytes]) -> ui_common.MaybeIntCodes:
+    maybe_intcodes = []
+    pairs          = [datas[i : i + 2] for i in range(0, len(datas), 2)]
+    for i, (d1, d2) in enumerate(pairs):
+        if d1 and d2:
+            intcode = ui_common.bytes2incode_part(d1 + d2, idx_offset=i)
+            maybe_intcodes.append(intcode)
+        else:
+            maybe_intcodes.append(None)
+    return maybe_intcodes
+
+
+def _recover_datas(accepted_datas: typ.List[MaybeBytes]) -> typ.List[MaybeBytes]:
+    maybe_intcodes = _parse_intcodes(accepted_datas)
+
+    # recover
+    msg_len           = len(accepted_datas) // 2
+    accepted_data_len = sum(2 for maybe_intcode in maybe_intcodes if maybe_intcode)
+    is_recoverable    = accepted_data_len >= msg_len
+
+    if is_recoverable:
+        try:
+            recovered_data = ui_common.maybe_intcodes2bytes(maybe_intcodes, msg_len=msg_len)
+            return [recovered_data[i : i + 1] for i in range(len(recovered_data))]
+        except ecc_rs.ECCDecodeError as err:
+            logger.error(f"Recovery failed, possibly invalid inputs. {err}")
+            return accepted_datas
+    else:
+        return accepted_datas
+
+
+class VerifySecretPanel(SecretPanel):
     def __init__(self, index: int):
         self.title = "SBK - Create New Wallet"
 
-        super().__init__(index)
+        self.widget_states = {}
 
-        self.header = _header_widget()
-
-        class InputWidgets(typ.NamedTuple):
-            row    : int
-            widgets: typ.List
-
-        num_inputs = params.SHARE_LEN
-        num_rows   = num_inputs // 2
-
+        self.grid_widgets     = []
         self.intcode_widgets  = []
         self.mnemonic_widgets = []
 
-        for _ in range(num_inputs):
-            intcode_widget  = _input_widget(self, 'intcode')
-            mnemonic_widget = _input_widget(self, 'mnemonic')
+        super().__init__(index)
+
+        self.header      = _header_widget()
+        self.grid_layout = qtw.QGridLayout()
+
+        column_headers = qtw.QHBoxLayout()
+        column_headers.addStretch(6 + 9)
+        column_headers.addWidget(_label_widget(self, "Data"    ), 21 - 9)
+        column_headers.addWidget(_label_widget(self, "Mnemonic"), 24 * 2)
+        column_headers.addWidget(_label_widget(self, "ECC"     ), 21 - 1)
+        column_headers.addStretch(6 + 1)
+
+        self.layout = qtw.QVBoxLayout()
+        self.layout.addWidget(self.header)
+        self.layout.addStretch(1)
+        self.layout.addLayout(column_headers)
+        self.layout.addLayout(self.grid_layout)
+        self.layout.addStretch(3)
+
+        self.layout.addLayout(self.nav_layout)
+        self.setLayout(self.layout)
+
+    def get_or_init_state(self) -> typ.Dict[str, typ.Any]:
+        # NOTE (mb 2021-06-04): This whole state business may well be an artifact
+        #   of (ab)using the Panel classes in NavigablePanel.nav_handler
+        idx = _shared_panel_state['index']
+        if idx not in self.widget_states:
+            current_secret = self.current_secret()
+            num_inputs     = len(current_secret.secret_data)
+            if num_inputs % 2 != 0:
+                num_inputs += 1
+
+            self.widget_states[idx] = {
+                'header_text'   : current_secret.label_text,
+                'num_inputs'    : num_inputs,
+                'widget_type'   : 'mnemonic',
+                'widget_index'  : 0,
+                'intcode_texts' : [""] * num_inputs,
+                'mnemonic_texts': [""] * num_inputs,
+                # widget index -> timestamp
+                'intcodes_accepted' : [0] * num_inputs,
+                'mnemonics_accepted': [0] * num_inputs,
+            }
+            logger.debug(f"init widgets state: {self.widget_states[idx]}")
+
+        return self.widget_states[idx]
+
+    def track_focus(self, widget_type: str, widget_index: int) -> None:
+        state = self.get_or_init_state()
+        state['widget_type' ] = widget_type
+        state['widget_index'] = widget_index
+
+    def switch(self) -> None:
+        logger.info(f"switch {_shared_panel_state['index']}")
+        state = self.get_or_init_state()
+
+        self.header.setText(state['header_text'])
+
+        # initialize state from previous usage
+        for i in range(state['num_inputs']):
+            if state['intcode_texts']:
+                initial_intcode_text = state['intcode_texts'][i]
+            else:
+                initial_intcode_text = ""
+
+            if state['mnemonic_texts']:
+                initial_mnemonic_text = state['mnemonic_texts'][i]
+            else:
+                initial_mnemonic_text = ""
+
+            intcode_widget  = _input_widget(self, 'intcode' , initial_intcode_text)
+            mnemonic_widget = _input_widget(self, 'mnemonic', initial_mnemonic_text)
 
             self.intcode_widgets.append(intcode_widget)
             self.mnemonic_widgets.append(mnemonic_widget)
 
-        for i in range(1, num_inputs):
+        for i in range(1, state['num_inputs']):
             w1 = self.intcode_widgets[i - 1]
             w2 = self.intcode_widgets[i]
             self.setTabOrder(w1, w2)
 
-        for i in range(1, num_inputs):
+        for i in range(1, state['num_inputs']):
             w1 = self.mnemonic_widgets[i - 1]
             w2 = self.mnemonic_widgets[i]
             self.setTabOrder(w1, w2)
 
-        grid_layout = qtw.QGridLayout()
-
+        num_rows = state['num_inputs'] // 2
         for row in range(num_rows):
             row_num_left  = (row % num_rows) + 1
             row_num_right = (row % num_rows) + num_rows + 1
@@ -515,112 +687,169 @@ class ValidateSecretPanel(SecretPanel):
             ]
 
             for col, widget in enumerate(row_widgets):
-                grid_layout.addWidget(widget, row, col)
+                self.grid_layout.addWidget(widget, row, col)
 
-        grid_layout.setColumnStretch( 0,  2)
-        grid_layout.setColumnStretch( 1,  0)
-        grid_layout.setColumnStretch( 2, 21)
-        grid_layout.setColumnStretch( 3,  1)
-        grid_layout.setColumnStretch( 4, 24)
-        grid_layout.setColumnStretch( 5,  0)
-        grid_layout.setColumnStretch( 6, 24)
-        grid_layout.setColumnStretch( 7,  1)
-        grid_layout.setColumnStretch( 8,  0)
-        grid_layout.setColumnStretch( 9, 21)
-        grid_layout.setColumnStretch(10,  2)
+            # for cleanup later
+            self.grid_widgets.extend(row_widgets)
 
-        column_headers = qtw.QHBoxLayout()
-        column_headers.addStretch(6 + 9)
-        column_headers.addWidget(_label_widget(self, "Data"    ), 21 - 9)
-        column_headers.addWidget(_label_widget(self, "Mnemonic"), 24 * 2)
-        column_headers.addWidget(_label_widget(self, "ECC"     ), 21 - 1)
-        column_headers.addStretch(6 + 1)
+        self.grid_layout.setColumnStretch( 0,  2)
+        self.grid_layout.setColumnStretch( 1,  0)
+        self.grid_layout.setColumnStretch( 2, 21)
+        self.grid_layout.setColumnStretch( 3,  1)
+        self.grid_layout.setColumnStretch( 4, 24)
+        self.grid_layout.setColumnStretch( 5,  0)
+        self.grid_layout.setColumnStretch( 6, 24)
+        self.grid_layout.setColumnStretch( 7,  1)
+        self.grid_layout.setColumnStretch( 8,  0)
+        self.grid_layout.setColumnStretch( 9, 21)
+        self.grid_layout.setColumnStretch(10,  2)
 
-        self.layout = qtw.QVBoxLayout()
-        self.layout.addWidget(self.header)
-        self.layout.addStretch(1)
-        self.layout.addLayout(column_headers)
-        self.layout.addLayout(grid_layout)
-        self.layout.addStretch(3)
+        super().switch()
 
-        self.layout.addLayout(self.nav_layout)
-        self.setLayout(self.layout)
+        widget_type  = state['widget_type']
+        widget_index = state['widget_index']
 
-    def autofill(self) -> None:
-        intcode_texts  = [iw.text().strip() for iw in self.intcode_widgets]
-        mnemonic_texts = [mw.text().strip() for mw in self.mnemonic_widgets]
+        if widget_type == 'mnemonic':
+            self.mnemonic_widgets[widget_index].setFocus()
+        elif widget_type == 'intcode':
+            self.intcode_widgets[widget_index].setFocus()
 
-        intcode_datas : typ.List[typ.Union[bytes, None]] = []
-        mnemonic_datas: typ.List[typ.Union[bytes, None]] = []
+    def destroy_widgets(self) -> None:
+        state = self.get_or_init_state()
 
-        for i, intcode_text in enumerate(intcode_texts):
-            maybe_intcode_data = None
-            try:
-                if intcode_text:
-                    data               = ui_common.intcodes2parts([intcode_text], idx_offset=i)
-                    maybe_intcode_data = b"".join(data)
-            except ValueError as err:
-                logger.error(str(err))
+        intcode_texts = [widget.text() for widget in self.intcode_widgets]
+        if intcode_texts:
+            state['intcode_texts'] = intcode_texts
 
-            intcode_datas.append(maybe_intcode_data)
+        mnemonic_texts = [widget.text() for widget in self.mnemonic_widgets]
+        if mnemonic_texts:
+            state['mnemonic_texts'] = mnemonic_texts
 
-        for w1, w2 in zip(mnemonic_texts[::2], mnemonic_texts[1::2]):
-            if w1 and w2:
-                data = mnemonic.phrase2bytes(w1 + " " + w2)
-                mnemonic_datas.append(data)
+        for widget in self.grid_widgets:
+            self.grid_layout.removeWidget(widget)
+            widget.deleteLater()
+
+        del self.grid_widgets[:]
+        del self.intcode_widgets[:]
+        del self.mnemonic_widgets[:]
+
+    def _iter_incode_datas(self) -> typ.Iterable[MaybeBytes]:
+        expected_data     = self.current_secret().secret_data
+        expected_intcodes = ui_common.bytes2intcodes(expected_data)
+
+        for i, widget in enumerate(self.intcode_widgets):
+            intcode_text = widget.text().strip()
+            if intcode_text:
+                print("III", intcode_text)
+
+            if len(intcode_text) > 0 and intcode_text != expected_intcodes[i]:
+                widget.setStyleSheet("background-color: #F66;")
             else:
-                mnemonic_datas.append(None)
+                widget.setStyleSheet("")
 
-        print("??I", len(intcode_datas ))
-        print("??M", len(mnemonic_datas))
+            if intcode_text == expected_intcodes[i]:
+                idx = i * 2
+                yield expected_data[idx + 0 : idx + 1]
+                yield expected_data[idx + 1 : idx + 2]
+            else:
+                yield None
+                yield None
 
-        ecc_datas = intcode_datas[len() :]  # noqa
-        datas     = [(di or dm) for di, dm in zip(intcode_datas, mnemonic_datas)]
+    def _iter_mnemonic_datas(self) -> typ.Iterable[MaybeBytes]:
+        expected_data = self.current_secret().secret_data
+        if len(expected_data) % 2 != 0:
+            expected_data += b"\x00"
 
-        # for i, (d1, d2) in enumerate(zip(datas[::2], datas[1::2])):
-        #     phrase = mnemonic.bytes2phrase(d1 + d2)
+        expected_words = mnemonic.bytes2phrase(expected_data).split()
 
-        for i, data in enumerate(datas):
-            if data is None:
-                continue
+        for i, widget in enumerate(self.mnemonic_widgets):
+            word = widget.text().strip()
+            if len(word) > 0 and word != expected_words[i]:
+                widget.setStyleSheet("background-color: #F66;")
+            else:
+                widget.setStyleSheet("")
 
-            phrase  = mnemonic.bytes2phrase(data)
-            intcode = ui_common.bytes2incode_part(data, idx_offset=i)
-            print("???", (i, data, phrase, intcode))
+            if word == expected_words[i]:
+                yield expected_data[i : i + 1]
+            else:
+                yield None
 
-            w1, w2 = phrase.split()
-            self.mnemonic_widgets[i * 2].setText(w1)
-            self.mnemonic_widgets[i * 2 + 1].setText(w2)
+    def _parse_accepted_datas(self) -> typ.Iterable[MaybeBytes]:
+        state = self.get_or_init_state()
 
-            self.intcode_widgets[i].setText(intcode)
+        intcode_datas : typ.List[MaybeBytes] = list(self._iter_incode_datas())
+        mnemonic_datas: typ.List[MaybeBytes] = list(self._iter_mnemonic_datas())
 
-        print()
+        data_len = state['num_inputs']
+        ecc_len  = state['num_inputs']
+        assert len(intcode_datas) == len(mnemonic_datas) * 2
+        assert len(intcode_datas) == data_len + ecc_len
+
+        for i in range(data_len + ecc_len):
+            intcode_accept_ts = state['intcodes_accepted'][i // 2]
+            is_valid_intcode  = intcode_datas[i] is not None
+
+            if i < len(state['mnemonics_accepted']):
+                mnemonic_accept_ts = state['mnemonics_accepted'][i]
+                is_valid_mnemonic  = mnemonic_datas[i] is not None
+            else:
+                mnemonic_accept_ts = 0
+                is_valid_mnemonic  = False
+
+            if is_valid_intcode and intcode_accept_ts > mnemonic_accept_ts:
+                yield intcode_datas[i]
+            elif is_valid_mnemonic and mnemonic_accept_ts > intcode_accept_ts:
+                yield mnemonic_datas[i]
+            else:
+                yield None
+
+    def autofill(self, accept_intcode: int = -1, accept_mnemonic: int = -1) -> None:
+        state = self.get_or_init_state()
+        if accept_intcode >= 0:
+            state['intcodes_accepted'][accept_intcode] = time.time()
+        elif accept_mnemonic >= 0:
+            state['mnemonics_accepted'][accept_mnemonic] = time.time()
+        else:
+            # may happen during panel switch
+            return
+
+        accepted_datas = list(self._parse_accepted_datas())
+        recoverd_datas = list(_recover_datas(accepted_datas))
+
+        if all(recoverd_datas):
+            maybe_intcodes = ui_common.bytes2intcodes(b"".join(recoverd_datas))
+        else:
+            maybe_intcodes = _parse_intcodes(recoverd_datas)
+
+        for i, intcode in enumerate(maybe_intcodes):
+            if intcode:
+                self.intcode_widgets[i].setText(intcode)
+
+        for i, data in enumerate(recoverd_datas[: state['num_inputs']]):
+            if data:
+                word = mnemonic.decode_word(data)
+                self.mnemonic_widgets[i].setText(word)
 
     def keyPressEvent(self, event) -> None:
         super().keyPressEvent(event)
 
     @property
     def prev_panel_clazz(self) -> Panel:
+        self.destroy_widgets()
+        logger.info(f"prev test {_shared_panel_state['index']}")
         return ShowSecretPanel
 
     @property
     def next_panel_clazz(self) -> Panel:
-        _secrets_state['index'] = max(_secrets_state['index'] + 1, 0)
-        num_shares = len(self.secrets().shares)
-        if _secrets_state['index'] < num_shares + 2:
+        self.destroy_widgets()
+        logger.info(f"next test {_shared_panel_state['index']}")
+        num_shares  = len(self.secrets().shares)
+        num_secrets = num_shares + 2
+        if _shared_panel_state['index'] < num_secrets:
+            _shared_panel_state['index'] = max(_shared_panel_state['index'] + 1, 0)
             return ShowSecretPanel
         else:
             return LoadWalletPanel
-
-    def switch(self) -> None:
-        secret = self.current_secret()
-        self.header.setText("Verify " + secret.label_text)
-
-        # intcodes = list(ui_common.bytes2intcodes(secret.secret_data))
-
-        super().switch()
-
-        self.mnemonic_widgets[0].setFocus()
 
 
 class LoadWalletPanel(Panel):
@@ -635,62 +864,6 @@ class RecoverWalletPanel(Panel):
         self.title = "SBK - Recover Wallet"
 
         super().__init__(index)
-
-
-class ProgressStatus(typ.NamedTuple):
-
-    current: int
-    length : int
-
-
-def progres_status_emitter(signal) -> typ.Callable:
-    class _ProgressStatusEmitter:
-        def __init__(self, length: int) -> None:
-            self.current = 0
-            self.length  = length
-
-        def __enter__(self) -> '_ProgressStatusEmitter':
-            return self
-
-        def update(self, n_steps: int) -> None:
-            self.current += n_steps
-            status = ProgressStatus(self.current, self.length)
-            signal.emit(status)
-
-        def __exit__(self, exc_type, exc_value, tb) -> None:
-            status = ProgressStatus(self.length, self.length)
-            signal.emit(status)
-
-    return _ProgressStatusEmitter
-
-
-class ParamConfigWorker(qtc.QThread):
-
-    progress = qtc.pyqtSignal(ProgressStatus)
-    finished = qtc.pyqtSignal(params.ParamConfig)
-
-    def __init__(
-        self,
-        threshold      : int,
-        num_shares     : int,
-        target_duration: float,
-    ) -> None:
-        super().__init__()
-        self.threshold       = threshold
-        self.num_shares      = num_shares
-        self.target_duration = target_duration
-
-    def run(self) -> None:
-        param_cfg = ui_common.init_param_config(
-            target_duration=self.target_duration,
-            parallelism=None,
-            memory_cost=None,
-            time_cost=None,
-            threshold=self.threshold,
-            num_shares=self.num_shares,
-            init_progressbar=progres_status_emitter(self.progress),
-        )
-        self.finished.emit(param_cfg)
 
 
 class SeedDerivationWorker(qtc.QThread):
@@ -736,19 +909,19 @@ class SeedDerivationWorker(qtc.QThread):
             self.finished.emit(result)
             return
 
-        raw_salt, brainkey, shares = ui_common.create_secrets(self.param_cfg)
+        salt, brainkey, shares = ui_common.create_secrets(self.param_cfg)
 
         seed_data = ui_common.derive_seed(
             self.param_cfg.kdf_params,
-            raw_salt,
+            salt,
             brainkey,
             label="KDF Validation ",
-            init_progressbar=progres_status_emitter(self.progress),
+            init_progressbar=init_progres_status_emitter_clazz(self.progress),
         )
 
         result = SecretsResult(
             errmsg="",
-            raw_salt=raw_salt,
+            salt=salt,
             brainkey=brainkey,
             shares=shares,
             seed_data=seed_data,
@@ -759,9 +932,42 @@ class SeedDerivationWorker(qtc.QThread):
 def progressbar_updater(progressbar: qtw.QProgressBar) -> typ.Callable[[ProgressStatus], None]:
     def update_progressbar(status: ProgressStatus) -> None:
         progressbar.setRange(0, status.length)
-        progressbar.setValue(status.current)
+        progressbar.setValue(round(status.current))
 
     return update_progressbar
+
+
+class ParamConfigWorker(qtc.QThread):
+
+    progress = qtc.pyqtSignal(ProgressStatus)
+    finished = qtc.pyqtSignal(params.ParamConfig)
+
+    def __init__(
+        self,
+        threshold        : int,
+        num_shares       : int,
+        parallelism      : kdf.NumThreads,
+        memory_per_thread: kdf.MebiBytes,
+        target_duration  : kdf.Seconds,
+    ) -> None:
+        super().__init__()
+        self.threshold         = threshold
+        self.num_shares        = num_shares
+        self.parallelism       = parallelism
+        self.memory_per_thread = memory_per_thread
+        self.target_duration   = target_duration
+
+    def run(self) -> None:
+        param_cfg = ui_common.init_param_config(
+            target_duration=self.target_duration,
+            parallelism=self.parallelism,
+            memory_per_thread=self.memory_per_thread,
+            time_cost=None,  # auto from target_duration
+            threshold=self.threshold,
+            num_shares=self.num_shares,
+            init_progressbar=init_progres_status_emitter_clazz(self.progress),
+        )
+        self.finished.emit(param_cfg)
 
 
 class SeedDerivationPanel(Panel):
@@ -803,16 +1009,24 @@ class SeedDerivationPanel(Panel):
         # get previous panel
         create_panel = self.parent().findChild(CreateWalletParamsPanel)
 
-        threshold       = create_panel.threshold.value()
-        num_shares      = create_panel.num_shares.value()
+        threshold  = create_panel.threshold.value()
+        num_shares = create_panel.num_shares.value()
+
+        parallelism     = create_panel.parallelism.value()
+        target_memory   = create_panel.target_memory.value()
         target_duration = create_panel.target_duration.value()
 
-        logger.info(f"KDF Params: {threshold=} / {num_shares=}, {target_duration=}")
+        memory_per_thread = round(target_memory / parallelism)
+
+        _kdf_info = f"{parallelism=}, {memory_per_thread=}, {target_duration=}"
+        logger.info(f"KDF Params: {threshold=} / {num_shares=}, {_kdf_info}")
 
         self.progressbar1.setValue(0)
         self.progressbar2.setValue(0)
 
-        self.worker1 = ParamConfigWorker(threshold, num_shares, target_duration)
+        self.worker1 = ParamConfigWorker(
+            threshold, num_shares, parallelism, memory_per_thread, target_duration
+        )
         self.worker1.progress.connect(progressbar_updater(self.progressbar1))
         self.worker1.finished.connect(self.on_param_config_done)
 
@@ -848,7 +1062,8 @@ class MainGUI(qtw.QStackedWidget):
         self.setWindowTitle("SBK")
         self.setWindowIcon(qtg.QIcon(str(ICON_PATH)))
         self.setFixedSize(1200, 1000)
-        self.setGeometry(200, 200, 800, 600)
+        # self.setGeometry(200, 200, 800, 600)
+        self.setGeometry(2200, 200, 800, 600)
 
         select_command_panel = SelectCommandPanel(0)
         self.addWidget(select_command_panel)

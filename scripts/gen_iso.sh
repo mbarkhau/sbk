@@ -38,7 +38,7 @@ cat <<'EOF' > 10_ubuntu-settings.gschema.override
 notify-with-tray=false
 
 [org.gnome.shell]
-favorite-apps = ['org.gnome.Nautilus.desktop', 'gnome-control-center.desktop', 'electrum_sbk.desktop']
+favorite-apps = ['org.gnome.Nautilus.desktop', 'gnome_region_and_lang.desktop', 'electrum_sbk.desktop']
 
 [org.gnome.desktop.background]
 picture-uri = 'file:///usr/share/backgrounds/ubuntu-default-greyscale-wallpaper.png'
@@ -54,7 +54,7 @@ input-feedback-sounds = true
 session-name = "ubuntu"
 
 [org.gnome.Epiphany]
-default-search-engine = 'Google'
+default-search-engine = 'DuckDuckGo'
 search-engines = [('DuckDuckGo', 'https://duckduckgo.com/?q=%s&amp;t=canonical', '!ddg'), ('Google', 'https://www.google.com/search?client=ubuntu&channel=es&q=%s', '!g'), ('Bing', 'https://www.bing.com/search?q=%s', '!b')]
 
 [org.gnome.crypto.pgp]
@@ -243,6 +243,21 @@ gtk-theme = "Communitheme"
 theme-name = "communitheme"
 EOF
 
+cat <<'EOF' > gnome_region_and_lang.desktop
+[Desktop Entry]
+Type=Application
+Name=Region & Language
+GenericName=Region & Language
+Comment=Gnome Region & Language Settings
+Exec=/usr/bin/gnome-control-center region
+Path=/usr/bin/
+Icon=/usr/share/icons/Yaru/256x256/apps/system-settings.png
+Terminal=false
+Categories=Settings;
+Keywords=settings;language;keyboard
+StartupNotify=true
+EOF
+
 cat <<'EOF' > electrum_sbk.desktop
 [Desktop Entry]
 Type=Application
@@ -254,7 +269,7 @@ Path=/usr/local/bin/
 Icon=/opt/electrum_sbk.png
 Terminal=false
 Categories=Privacy;
-Keywords=secure;security;privacy;private;web;browser;
+Keywords=secure;security;privacy;private;bitcoin;sbk
 StartupNotify=true
 EOF
 
@@ -291,6 +306,7 @@ RUN apt-get autoremove -y && apt-get clean
 RUN rm /usr/share/applications/org.gnome.Characters.desktop
 RUN rm /usr/share/applications/gnome-language-selector.desktop
 
+ADD gnome_region_and_lang.desktop /usr/share/applications/gnome_region_and_lang.desktop
 ADD electrum_sbk.desktop /usr/share/applications/electrum_sbk.desktop
 ADD 10_ubuntu-settings.gschema.override /usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override
 ADD electrum_sbk.png /opt/electrum_sbk.png
@@ -397,3 +413,6 @@ docker run \
     -v "$(pwd):/app" \
     ubuntulive:image \
     grub-mkrescue -o /app/ubuntulive.iso /app/iso/ -- -volid UbuntuLive
+
+rm -f sbklive.iso
+mv ubuntulive.iso sbklive.iso

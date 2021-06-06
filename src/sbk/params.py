@@ -33,11 +33,18 @@ Flags = int
 
 SBK_VERSION_V1 = 1
 
-RAW_SALT_LEN      = 10
+DEFAULT_RAW_SALT_LEN = 10
+DEFAULT_BRAINKEY_LEN = 6
+
+ENV_RAW_SALT_LEN = os.getenv('SBK_DEBUG_RAW_SALT_LEN')
+ENV_BRAINKEY_LEN = os.getenv('SBK_DEBUG_BRAINKEY_LEN')
+
+RAW_SALT_LEN = int(ENV_RAW_SALT_LEN) if ENV_RAW_SALT_LEN else DEFAULT_RAW_SALT_LEN
+BRAINKEY_LEN = int(ENV_BRAINKEY_LEN) if ENV_BRAINKEY_LEN else DEFAULT_BRAINKEY_LEN
+
 PARAM_CFG_LEN     = 3
 SHARE_X_COORD_LEN = 1
 SALT_LEN          = PARAM_CFG_LEN + RAW_SALT_LEN
-BRAINKEY_LEN      = 6
 
 MASTER_KEY_LEN = RAW_SALT_LEN + BRAINKEY_LEN
 
@@ -46,10 +53,13 @@ SHARE_LEN = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + BRAINKEY_LEN
 MIN_ENTROPY      = int(os.getenv('SBK_MIN_ENTROPY'     , "16"))
 MAX_ENTROPY_WAIT = int(os.getenv('SBK_MAX_ENTROPY_WAIT', "10"))
 
-DEFAULT_KDF_TARGET_DURATION = float(os.getenv('SBK_KDF_TARGET_DURATION', "90"))
+DEFAULT_KDF_TARGET_DURATION = int(os.getenv('SBK_KDF_TARGET_DURATION', "90"))
 
 DEFAULT_THRESHOLD  = int(os.getenv('SBK_THRESHOLD' , "3"))
 DEFAULT_NUM_SHARES = int(os.getenv('SBK_NUM_SHARES', "5"))
+
+# constrained by f_threshold (4bits)
+MAX_THRESHOLD = 16
 
 
 class ParamConfig(typ.NamedTuple):
@@ -76,7 +86,7 @@ def init_param_config(
         errmsg = f"threshold must be <= num_shares, got {threshold} > {_num_shares}"
         raise ValueError(errmsg)
 
-    if not 1 <= threshold <= 16:
+    if not 1 <= threshold <= MAX_THRESHOLD:
         errmsg = f"Invalid threshold {threshold}"
         raise ValueError(errmsg)
 

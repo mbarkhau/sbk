@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Electrum SBK
+GenericName=Electrum SBK
+Comment=Electrum Bitcoin Wallet
+Exec=/usr/local/bin/electrum
+Path=/usr/local/bin/
+Icon=/opt/electrum_sbk.png
+Terminal=false
+Categories=Privacy;
+Keywords=secure;security;privacy;private;web;browser;
+StartupNotify=true

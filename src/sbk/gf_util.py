@@ -116,7 +116,12 @@ def mul_slow(a: int, b: int) -> int:
 def mul(a: int, b: int) -> int:
     assert 0 <= a < 256, a
     assert 0 <= b < 256, b
-    return gf_lut.MUL_LUT[a][b]
+
+    mul_lut = gf_lut.MUL_LUT
+    if not mul_lut:
+        gf_lut.init_mul_lut()
+
+    return mul_lut[a][b]
 
 
 def pow_slow(a: int, b: int) -> int:

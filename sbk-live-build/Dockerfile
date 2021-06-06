@@ -30,6 +30,7 @@ RUN apt-get autoremove -y && apt-get clean
 RUN rm /usr/share/applications/org.gnome.Characters.desktop
 RUN rm /usr/share/applications/gnome-language-selector.desktop
 
+ADD gnome_region_and_lang.desktop /usr/share/applications/gnome_region_and_lang.desktop
 ADD electrum_sbk.desktop /usr/share/applications/electrum_sbk.desktop
 ADD 10_ubuntu-settings.gschema.override /usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override
 ADD electrum_sbk.png /opt/electrum_sbk.png

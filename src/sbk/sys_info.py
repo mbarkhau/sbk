@@ -26,13 +26,13 @@
 # the one used during the initial derivation. Otherwise it should be
 # chosen as large as possible.
 import os
+import re
 import json
 import time
 import typing as typ
 import logging
 import pathlib as pl
-
-import argon2
+import subprocess as sp
 
 from . import kdf
 
@@ -133,7 +133,7 @@ def dump_sys_info(sys_info: SystemInfo) -> None:
         return
 
 
-def load_cached_sys_info() -> SystemInfo:
+def _load_cached_sys_info() -> SystemInfo:
     cache_path = SYSINFO_CACHE_FPATH
     try:
         with cache_path.open(mode="rb") as fobj:
@@ -152,7 +152,7 @@ def load_sys_info(use_cache: bool = True) -> SystemInfo:
         return _SYS_INFO
 
     if use_cache and SYSINFO_CACHE_FPATH.exists():
-        nfo = load_cached_sys_info()
+        nfo = _load_cached_sys_info()
     else:
         nfo = init_sys_info()
 
@@ -161,6 +161,8 @@ def load_sys_info(use_cache: bool = True) -> SystemInfo:
 
 
 def init_sys_info() -> SystemInfo:
+    import argon2
+
     num_cores = len(os.sched_getaffinity(0))
     total_mb  = mem_total()
 
@@ -181,4 +183,63 @@ def init_sys_info() -> SystemInfo:
                 raise
             initial_m = (2 * initial_m) // 3
 
-    return SystemInfo(num_cores, total_mb, initial_p, initial_m)
+    nfo = SystemInfo(num_cores, total_mb, initial_p, initial_m)
+    dump_sys_info(nfo)
+    return nfo
+
+
+# NOTE (mb 2021-06-06):
+# SBK tries to be as non-region specific as possible.
+#   no en_US, en_GB, en_AU etc.etc. just en
+#
+# I'm also not sure we'll ever support non-phonetic systems,
+# especiall for the wordlists.
+
+# initially
+SUPPORTED_LANGUAGES = {'en', 'de'}
+
+# next (PR welcome)
+# SUPPORTED_LANGUAGES |= {'es', 'pt', 'ru', 'fr', de', 'it', 'tr'}
+
+# eventually/maybe (non-phonetic systems may be a design issue for wordlists)
+# SUPPORTED_LANGUAGES |= {'ar', 'ko', 'cn', 'jp'}
+
+LAYOUT_TO_LANG = {'us': 'en', 'de': 'de'}
+
+LangCode = str
+
+
+def detect_lang() -> LangCode:
+    try:
+        output_data = sp.check_output("localectl")
+        output_text = output_data.decode("utf-8")
+
+        # We only parse the first portion on purpose.
+        lang_match = re.search(r"LANG=([a-z]+)", output_text)
+        if lang_match is None:
+            lang = "default"
+        else:
+            lang = lang_match.group(1)
+
+        if lang != 'default' and lang in SUPPORTED_LANGUAGES:
+            return lang
+
+        keyboard_match = re.search(r"X11 Layout: ([a-z]+)", output_text)
+        if keyboard_match is None:
+            layout = "default"
+        else:
+            layout = keyboard_match.group(1)
+
+        layout_lang = LAYOUT_TO_LANG.get(layout, layout)
+
+        if layout_lang != 'default' and layout_lang in SUPPORTED_LANGUAGES:
+            return layout_lang
+
+    except Exception as ex:
+        pass
+
+    return "en"
+
+
+if __name__ == '__main__':
+    print("lang:", detect_lang())

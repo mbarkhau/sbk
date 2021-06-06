@@ -164,8 +164,7 @@ PhraseLines = typ.Sequence[str]
 PartIndex = int
 PartVal   = bytes
 PartVals  = typ.Sequence[PartVal]
-# A PartVal can be an empty string to mark its value
-# is not known yet.
+# A PartVal can be b"" to mark its value is not known yet.
 
 
 BYTES_PER_INTCODE = 2
@@ -508,24 +507,24 @@ def parse_kdf_params(
 
 
 def init_param_config(
-    target_duration : kdf.Seconds,
-    parallelism     : typ.Optional[kdf.NumThreads],
-    memory_cost     : typ.Optional[kdf.MebiBytes],
-    time_cost       : typ.Optional[kdf.Iterations],
-    threshold       : int,
-    num_shares      : int,
-    init_progressbar: typ.Optional[InitProgressbar] = None,
+    target_duration  : kdf.Seconds,
+    parallelism      : typ.Optional[kdf.NumThreads],
+    memory_per_thread: typ.Optional[kdf.MebiBytes],
+    time_cost        : typ.Optional[kdf.Iterations],
+    threshold        : int,
+    num_shares       : int,
+    init_progressbar : typ.Optional[InitProgressbar] = None,
 ) -> params.ParamConfig:
-
     if init_progressbar is None:
-        _init_progressbar = ft.partial(click.progressbar, label="KDF Calibration", show_eta=True)
+        label             = "KDF Calibration"
+        _init_progressbar = ft.partial(click.progressbar, label=label, show_eta=True)
     else:
         _init_progressbar = init_progressbar
 
     kdf_params = parse_kdf_params(
         target_duration,
         parallelism,
-        memory_cost,
+        memory_per_thread,
         time_cost,
         init_progressbar=_init_progressbar,
     )
@@ -535,14 +534,6 @@ def init_param_config(
         kdf_params=kdf_params,
     )
     return param_cfg
-
-
-def init_sys_info() -> sys_info.SystemInfo:
-    init_progressbar = ft.partial(click.progressbar(label="Memory test for KDF parameters", show_eta=True))
-
-    nfo = run_with_progress_bar(sys_info.init_sys_info, eta_sec=2, init_progressbar=init_progressbar)
-    sys_info.dump_sys_info(nfo)
-    return nfo
 
 
 def get_entropy_pool_size() -> int:
@@ -601,7 +592,7 @@ def create_secrets(param_cfg: params.ParamConfig) -> typ.Tuple[RawSalt, Brainkey
     param_cfg_data = validated_param_data(param_cfg)
 
     raw_salt = urandom(params.RAW_SALT_LEN)
-    salt     = param_cfg_data + raw_salt
+    salt     = param_cfg_data + b"\xFF" + raw_salt
     brainkey = urandom(params.BRAINKEY_LEN)
 
     shares = list(shamir.split(param_cfg, raw_salt, brainkey))

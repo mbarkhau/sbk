@@ -70,6 +70,12 @@ assert wordlist_index(WORDLIST[127]) == 127
 PhraseStr = str
 
 
+def decode_word(data: bytes) -> str:
+    assert len(data) == 1
+    word_idx = enc_util.char_at(data, 0)
+    return WORDLIST[word_idx]
+
+
 def _bytes2phrase_words(data: bytes) -> typ.Iterable[str]:
     for i in range(len(data)):
         word_idx = enc_util.char_at(data, i)

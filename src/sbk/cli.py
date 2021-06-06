@@ -127,7 +127,7 @@ SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue "
 
 KDF_TARGET_DURATION_HELP = "Target duration for Argon2 KDF (unless --time-cost is specified explicitly)"
 KDF_PARALLELISM_HELP     = "Argon2 KDF Parallelism (Number of threads)"
-KDF_MEMORY_COST_HELP     = "Argon2 KDF Memory Cost (MebiBytes)"
+KDF_MEMORY_COST_HELP     = "Argon2 KDF Memory Cost per Thread (MebiBytes)"
 KDF_TIME_COST_HELP       = "Argon2 KDF Time Cost (iterations)"
 
 
@@ -142,7 +142,9 @@ _kdf_target_duration_option = click.option(
 
 _kdf_parallelism_option = click.option('-p', '--parallelism', type=int, help=KDF_PARALLELISM_HELP)
 
-_kdf_memory_cost_option = click.option('-m', '--memory-cost', type=int, help=KDF_MEMORY_COST_HELP)
+_kdf_memory_cost_option = click.option(
+    '-m', '--memory-cost', 'memory_per_thread', type=int, help=KDF_MEMORY_COST_HELP
+)
 
 _kdf_time_cost_option = click.option('-t', '--time-cost', type=int, help=KDF_TIME_COST_HELP)
 
@@ -248,17 +250,17 @@ def version() -> None:
 @_kdf_time_cost_option
 @_opt_verbose
 def kdf_test(
-    target_duration: kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    parallelism    : typ.Optional[kdf.NumThreads] = None,
-    memory_cost    : typ.Optional[kdf.MebiBytes ] = None,
-    time_cost      : typ.Optional[kdf.Iterations] = None,
-    verbose        : int = 0,
+    target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
+    parallelism      : typ.Optional[kdf.NumThreads] = None,
+    memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
+    time_cost        : typ.Optional[kdf.Iterations] = None,
+    verbose          : int = 0,
 ) -> None:
     _configure_logging(verbose)
     param_cfg = ui_common.init_param_config(
         target_duration=target_duration,
         parallelism=parallelism,
-        memory_cost=memory_cost,
+        memory_per_thread=memory_per_thread,
         time_cost=time_cost,
         threshold=2,
         num_shares=2,
@@ -371,13 +373,13 @@ def _show_created_data(
 @_kdf_time_cost_option
 @_opt_verbose
 def create(
-    scheme_arg     : str         = DEFAULT_SCHEME,
-    yes_all        : bool        = False,
-    target_duration: kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    parallelism    : typ.Optional[kdf.NumThreads] = None,
-    memory_cost    : typ.Optional[kdf.MebiBytes ] = None,
-    time_cost      : typ.Optional[kdf.Iterations] = None,
-    verbose        : int = 0,
+    scheme_arg       : str         = DEFAULT_SCHEME,
+    yes_all          : bool        = False,
+    target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
+    parallelism      : typ.Optional[kdf.NumThreads] = None,
+    memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
+    time_cost        : typ.Optional[kdf.Iterations] = None,
+    verbose          : int = 0,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
 
@@ -397,7 +399,7 @@ def create(
     param_cfg = ui_common.init_param_config(
         target_duration=target_duration,
         parallelism=parallelism,
-        memory_cost=memory_cost,
+        memory_per_thread=memory_per_thread,
         time_cost=time_cost,
         threshold=scheme.threshold,
         num_shares=scheme.num_shares,
@@ -413,8 +415,8 @@ def create(
         else:
             raise
 
-    has_manual_kdf_p = parallelism is not None
-    has_manual_kdf_m = memory_cost is not None
+    has_manual_kdf_p = parallelism       is not None
+    has_manual_kdf_m = memory_per_thread is not None
     if has_manual_kdf_p or has_manual_kdf_m:
         # Verify that derivation works before we show anything. This is for manually chosen values
         # of kdf_p and kdf_m, because they may exceed what the system is capable of. If we did not

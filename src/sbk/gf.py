@@ -147,7 +147,12 @@ class GF256:
         assert 0 <= a < 256, a
         assert 0 <= b < 256, b
 
-        val = gf_lut.MUL_LUT[a][b]
+        mul_lut = gf_lut.MUL_LUT
+
+        if not mul_lut:
+            gf_lut.init_mul_lut()
+
+        val = mul_lut[a][b]
         return ALL_GF256[val]
 
     def __pow__(self, other: Num) -> 'GF256':

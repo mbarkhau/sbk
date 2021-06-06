@@ -24,7 +24,7 @@ def test_load_sys_info():
     assert nfo.initial_m > 0
 
     assert sys_info.load_sys_info() is nfo
-    assert sys_info.load_cached_sys_info() == nfo
+    assert sys_info._load_cached_sys_info() == nfo
 
 
 def test_param_cfg2bytes_overflow():

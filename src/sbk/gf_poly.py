@@ -107,6 +107,9 @@ def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.It
     mul_lut = gf_lut.MUL_LUT
     inv_lut = gf_lut.MUL_INVERSE_LUT
 
+    if not mul_lut:
+        gf_lut.init_mul_lut()
+
     _points = tuple((p.x.val, p.y.val) for p in points)
     _xs     = tuple(px for px, py in _points)
     _at_x   = at_x.val

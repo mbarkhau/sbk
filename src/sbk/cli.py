@@ -9,15 +9,10 @@
 
 # pylint: disable=expression-not-assigned; because of idom: yes_all or ...
 
-import os
-import pwd
 import sys
 import time
 import typing as typ
 import logging
-import pathlib as pl
-import tempfile
-import subprocess as sp
 
 import click
 
@@ -27,9 +22,8 @@ from . import kdf
 from . import cli_io
 from . import params
 from . import shamir
-from . import enc_util
 from . import ui_common
-from . import electrum_mnemonic
+from . import common_types as ct
 
 try:
     import pretty_traceback
@@ -213,10 +207,6 @@ _online_mode_option = click.option(
 )
 
 
-Salt     = bytes  # prefixed with ParamConfig
-BrainKey = bytes
-
-
 def _show_secret(label: str, data: bytes, secret_type: str) -> None:
     output_lines = cli_io.format_secret_lines(secret_type, data)
 
@@ -272,8 +262,8 @@ def kdf_test(
     echo(f"Using KDF Parameters: {params_str}")
     echo()
 
-    dummy_salt     = ui_common.Salt(b"\x00" * params.RAW_SALT_LEN)
-    dummy_brainkey = ui_common.BrainKey(b"\x00" * params.BRAINKEY_LEN)
+    dummy_salt     = ct.Salt(b"\x00" * params.RAW_SALT_LEN)
+    dummy_brainkey = ct.BrainKey(b"\x00" * params.BRAINKEY_LEN)
 
     tzero = time.time()
     ui_common.derive_seed(param_cfg.kdf_params, dummy_salt, dummy_brainkey, label="kdf-test")
@@ -291,7 +281,7 @@ def _validate_data(header_text: str, data: bytes, secret_type: str) -> None:
             anykey_confirm("Invalid input. Data mismatch.")
 
 
-def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[shamir.Share]) -> bool:
+def _validate_copies(salt: ct.Salt, brainkey: ct.BrainKey, shares: ct.Shares) -> bool:
     header_text = "Validation for Salt"
     _validate_data(header_text, salt, cli_io.SECRET_TYPE_SALT)
 
@@ -309,9 +299,9 @@ def _validate_copies(salt: Salt, brainkey: BrainKey, shares: typ.Sequence[shamir
 def _show_created_data(
     yes_all  : bool,
     param_cfg: params.ParamConfig,
-    salt     : Salt,
-    brainkey : BrainKey,
-    shares   : typ.List[shamir.Share],
+    salt     : ct.Salt,
+    brainkey : ct.BrainKey,
+    shares   : ct.Shares,
 ) -> None:
     text = ui_common.SECURITY_WARNING_TEXT + ui_common.SECURITY_WARNING_QR_CODES
     yes_all or clear()
@@ -457,7 +447,7 @@ def recover(verbose: int = 0) -> None:
     """Recover Salt and BrainKey by combining Shares."""
     _configure_logging(verbose)
     param_cfg: typ.Optional[params.ParamConfig] = None
-    shares   : typ.List[shamir.Share] = []
+    shares   : typ.List[ct.Share] = []
 
     while param_cfg is None or len(shares) < param_cfg.threshold:
         share_num = len(shares) + 1
@@ -468,7 +458,7 @@ def recover(verbose: int = 0) -> None:
             header_text = f"Enter Share {share_num} of {param_cfg.threshold}."
 
         share = cli_io.prompt(cli_io.SECRET_TYPE_SHARE, header_text=header_text)
-        shares.append(share)
+        shares.append(ct.Share(share))
 
         param_cfg_data = share[: params.PARAM_CFG_LEN]
         cur_param_cfg  = params.bytes2param_cfg(param_cfg_data)
@@ -497,39 +487,6 @@ def recover(verbose: int = 0) -> None:
     echo("\n".join(brainkey_lines))
 
 
-def mk_tmp_wallet_fpath() -> pl.Path:
-    # pylint: disable=broad-except; we log it, so it's ok :-P
-
-    tempdir = tempfile.tempdir
-    try:
-        uid     = pwd.getpwnam(os.environ['USER']).pw_uid
-        uid_dir = pl.Path(f"/run/user/{uid}")
-        if uid_dir.exists():
-            tempdir = str(uid_dir)
-    except Exception as ex:
-        logger.warning(f"Error creating temp directory in /run/user/ : {ex}")
-
-    _fd, wallet_fpath_str = tempfile.mkstemp(prefix="sbk_electrum_wallet_", dir=tempdir)
-    wallet_fpath = pl.Path(wallet_fpath_str)
-    return wallet_fpath
-
-
-def _clean_wallet(wallet_fpath: pl.Path) -> None:
-    if not os.path.exists(wallet_fpath):
-        return
-
-    garbage = os.urandom(4096)
-    # On HDDs this may serve some marginal purpose.
-    # On SSDs this may be pointless, because wear leveling means that these
-    # write operations go to totally different blocks than the original file.
-    size = wallet_fpath.stat().st_size
-    with wallet_fpath.open(mode="wb") as fobj:
-        for _ in range(0, size, 4096):
-            fobj.write(garbage)
-    wallet_fpath.unlink()
-    assert not wallet_fpath.exists()
-
-
 @cli.command()
 @_wallet_name_option
 @_show_seed_option
@@ -545,6 +502,8 @@ def load_wallet(
 ) -> None:
     """Open wallet using Salt+Brainkey."""
     _configure_logging(verbose)
+    offline = not online
+
     try:
         ui_common.validate_wallet_name(wallet_name)
     except ValueError as err:
@@ -567,45 +526,24 @@ def load_wallet(
 
     yes_all or echo()
     seed_data = ui_common.derive_seed(
-        param_cfg.kdf_params, salt, brainkey, wallet_name=wallet_name, label="Deriving Wallet Seed"
+        param_cfg.kdf_params,
+        ct.Salt(salt),
+        ct.BrainKey(brainkey),
+        wallet_name=wallet_name,
+        label="Deriving Wallet Seed",
     )
 
-    seed_int    = enc_util.bytes2int(seed_data)
-    seed_phrase = electrum_mnemonic.raw_seed2phrase(seed_int)
-
-    wallet_fpath = mk_tmp_wallet_fpath()
-
-    restore_cmd = ["electrum", "restore", "--wallet", str(wallet_fpath), seed_phrase]
-    load_cmd    = ["electrum", "gui"    , "--wallet", str(wallet_fpath)]
-
-    if not online:
-        load_cmd.append("--offline")
-
     if show_seed:
-        _clean_wallet(wallet_fpath)
+        wallet_fpath, restore_cmd, load_cmd = ui_common.wallet_commands(seed_data, offline)
+        ui_common.clean_wallet(wallet_fpath)
         echo("Electrum commands:")
         echo()
         echo("\t" + " ".join(restore_cmd))
         echo("\t" + " ".join(load_cmd   ))
         echo()
-        echo("Electrum wallet seed: " + seed_phrase)
-        return
-
-    try:
-        wallet_fpath.unlink()
-        retcode = sp.call(restore_cmd)
-        if retcode != 0:
-            cmd_str = " ".join(restore_cmd[:-1] + ["<wallet seed hidden>"])
-            echo(f"Error calling '{cmd_str}'")
-            raise click.Abort()
-
-        retcode = sp.call(load_cmd)
-        if retcode != 0:
-            cmd_str = " ".join(load_cmd)
-            echo(f"Error calling '{cmd_str}'")
-            raise click.Abort()
-    finally:
-        _clean_wallet(wallet_fpath)
+        echo("Electrum wallet seed: " + ui_common.seed_data2phrase(seed_data))
+    else:
+        ui_common.load_wallet(seed_data, offline)
 
 
 if __name__ == '__main__':

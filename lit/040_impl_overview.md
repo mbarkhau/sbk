@@ -498,13 +498,14 @@ The technical criteria for the wordlist are:
 
  - The wordlist has 256 words.
  - All words must be at least 5 characters long.
- - All words must be at most 7 characters long.
+ - All words must be at most 8 characters long.
  - All words must have a unique 3 character prefix.
- - The damerau levenshtein edit distance of any two words must be at least 4.
+ - The 3 character prefix of a word may not be a part of may other word.
+ - The damerau levenshtein edit distance of any two words must be at least 3.
 
 The wordlist is composed only of commonly used concrete nouns such as animals, creatures, famous people, characters, physical objects, materials, substances and well known places/organizations. The wordlist does not contain any abstract words, adjectives, adverbs. Consider that the very first word humans ever spoke may have been have been the equivalent of "mother" or "snake", rather than words for abstract concepts such as "agency" or "ambition".
 
-> Aside: Some words on the wordlist may be provocative/obscene, such as "viagra" and "saddam", but they are used partially for that reason: provocative words are more memorable than plain and boring words, as I'm sure many parents with potty-mouthed children can attest.
+> Aside: Some words on the wordlist may be provocative/obscene, such as "dildo" and "saddam", but they are used partially for that reason: provocative words are more memorable than plain and boring words, as I'm sure many parents with potty-mouthed children can attest.
 
 Using such words makes it easier to use the [Method of Loci][href_wiki_method_of_loki] or to construct a story as a memory aid. As an example, given the following brainkey:
 

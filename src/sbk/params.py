@@ -29,11 +29,9 @@ import typing as typ
 from . import kdf
 from . import primes
 
-Flags = int
-
 SBK_VERSION_V1 = 1
 
-DEFAULT_RAW_SALT_LEN = 10
+DEFAULT_RAW_SALT_LEN = 11
 DEFAULT_BRAINKEY_LEN = 6
 
 ENV_RAW_SALT_LEN = os.getenv('SBK_DEBUG_RAW_SALT_LEN')
@@ -41,6 +39,10 @@ ENV_BRAINKEY_LEN = os.getenv('SBK_DEBUG_BRAINKEY_LEN')
 
 RAW_SALT_LEN = int(ENV_RAW_SALT_LEN) if ENV_RAW_SALT_LEN else DEFAULT_RAW_SALT_LEN
 BRAINKEY_LEN = int(ENV_BRAINKEY_LEN) if ENV_BRAINKEY_LEN else DEFAULT_BRAINKEY_LEN
+
+# linear fit evaluated with: python -m sbk.ui_common
+RAW_SALT_MIN_ENTROPY = RAW_SALT_LEN * 0.19 + 0.3
+BRAINKEY_MIN_ENTROPY = BRAINKEY_LEN * 0.19 + 0.3
 
 PARAM_CFG_LEN     = 3
 SHARE_X_COORD_LEN = 1
@@ -117,7 +119,7 @@ def bytes2param_cfg(data: bytes) -> ParamConfig:
     version     = (fields_01 >> 4) & 0xF
     f_threshold = (fields_01 >> 0) & 0xF
     if version != SBK_VERSION_V1:
-        raise Exception(f"Unsupported Version {version}")
+        raise ValueError(f"Unsupported Version {version}")
 
     threshold = f_threshold + 1
 

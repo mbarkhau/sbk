@@ -34,7 +34,9 @@ def _clear() -> bool:
 
 
 def _prompt(text: str, default: typ.Optional[str] = None) -> str:
-    return click.prompt(text, default=default, show_default=False)
+    result = click.prompt(text, default=default, show_default=False)
+    assert isinstance(result, str)
+    return result
 
 
 InputType = str

@@ -48,41 +48,45 @@ _rand       = random.SystemRandom()
 def randrange(stop: int) -> int:
     if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
         warnings.warn(DEBUG_WARN_MSG)
-        return _debug_rand.randrange(stop)
+        result = _debug_rand.randrange(stop)
     else:
-        return _rand.randrange(stop)
+        result = _rand.randrange(stop)
+    assert isinstance(result, int)
+    return result
 
 
-Coefficients = typ.List[gf.GFNum]
+Coefficients = typ.List[gf.GF256]
 
 
-class Point(typ.Generic[gf.Num]):
+class Point:
 
-    x: gf.Num
-    y: gf.Num
+    x: gf.GF256
+    y: gf.GF256
 
-    def __init__(self, x: gf.Num, y: gf.Num) -> None:
+    def __init__(self, x: gf.GF256, y: gf.GF256) -> None:
         self.x = x
         self.y = y
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Point):
+        if isinstance(other, Point):
+            result = self.x == other.x and self.y == other.y
+            assert isinstance(result, bool)
+            return result
+        else:
             raise NotImplementedError
-
-        return self.x == other.x and self.y == other.y
 
     def __repr__(self) -> str:
         return f"Point(x={self.x}, y={self.y})"
 
-    def __iter__(self) -> typ.Iterable[gf.Num]:
+    def __iter__(self) -> typ.Iterable[gf.GF256]:
         yield self.x
         yield self.y
 
 
-Points = typ.Tuple[Point[gf.Num], ...]
+Points = typ.Tuple[Point, ...]
 
 
-def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
+def prod(vals: typ.Sequence[gf.GF256]) -> gf.GF256:
     """Product of numbers.
 
     This is sometimes also denoted by Π (upper case PI).
@@ -97,9 +101,9 @@ def prod(vals: typ.Sequence[gf.Num]) -> gf.Num:
     return accu
 
 
-def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
+def _interpolation_terms_256(points: Points, at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
     # Specialization to speed up ecc_rs.decode_packets. This should return
-    # the exact same result as _interpolation_terms  in principle.
+    # the exact same result as _interpolation_terms in principle.
     assert isinstance(at_x, gf.GF256)
     assert all(isinstance(p.x, gf.GF256) for p in points)
     assert all(isinstance(p.y, gf.GF256) for p in points)
@@ -136,7 +140,7 @@ def _interpolation_terms_256(points: Points[gf.GF256], at_x: gf.GF256) -> typ.It
         yield gf.ALL_GF256[result]
 
 
-def _interpolation_terms(points: Points, at_x: gf.Num) -> typ.Iterable[gf.Num]:
+def _interpolation_terms(points: Points, at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
     for i, p in enumerate(points):
         others = points[:i] + points[i + 1 :]
         assert len(others) == len(points) - 1
@@ -147,7 +151,7 @@ def _interpolation_terms(points: Points, at_x: gf.Num) -> typ.Iterable[gf.Num]:
         yield (p.y * numer) / denum
 
 
-def interpolate(points: Points, at_x: gf.Num) -> gf.Num:
+def interpolate(points: Points, at_x: gf.GF256) -> gf.GF256:
     r"""Interpolate y value at x for a polynomial."""
     if len(points) < 2:
         raise ValueError("Cannot interpolate with fewer than two points")
@@ -182,7 +186,7 @@ def val_of(n: typ.Union[int, float, gf.GFP, gf.GF256]) -> int:
         return n.val
 
 
-def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[[int], int]:
+def poly_eval_fn(field: gf.FieldGF256, coeffs: Coefficients) -> typ.Callable[[int], int]:
     """Return function to evaluate polynomial at x."""
 
     def eval_at(at_x: int) -> int:
@@ -195,7 +199,7 @@ def poly_eval_fn(field: gf.Field[gf.Num], coeffs: Coefficients) -> typ.Callable[
     return eval_at
 
 
-def _split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int) -> Points:
+def _split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -> Points:
     # The coefficients of the polynomial are ordered in ascending
     # powers of x, so coeffs = [2, 5, 3] represents 2x° + 5x¹ + 3x²
     #
@@ -225,29 +229,25 @@ def _split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int
     return points
 
 
-def split(field: gf.Field[gf.Num], secret: int, threshold: int, num_shares: int) -> Points:
+def split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -> Points:
     """Generate points of a split secret."""
 
     if num_shares <= 1:
         raise ValueError("number of pieces too low, secret would be exposed")
-
-    if num_shares >= field.order:
+    elif num_shares >= field.order:
         raise ValueError("number of pieces too high, cannot generate distinct points")
-
-    if threshold > num_shares:
+    elif threshold > num_shares:
         raise ValueError("threshold too high, must be <= number of pieces")
-
-    if secret < 0:
+    elif secret < 0:
         raise ValueError("Invalid secret, must be a positive integer")
-
-    if field.order <= secret:
+    elif field.order <= secret:
         raise ValueError("Invalid prime for secret, must be greater than secret.")
+    else:
+        return _split(field=field, secret=secret, threshold=threshold, num_shares=num_shares)
 
-    return _split(field=field, secret=secret, threshold=threshold, num_shares=num_shares)
 
-
-def join(field: gf.Field[gf.Num], points: Points, threshold: int) -> int:
-    if len(points) < threshold:
+def join(field: gf.FieldGF256, points: Points, threshold: int) -> int:
+    if len(points) >= threshold:
+        return val_of(interpolate(points, at_x=field[0]))
+    else:
         raise ValueError("Not enough pieces to recover secret")
-
-    return val_of(interpolate(points, at_x=field[0]))

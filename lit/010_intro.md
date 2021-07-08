@@ -41,7 +41,13 @@ SBK is a tool to generate and recover Bitcoin Wallets. The goal of SBK is to kee
  - Your wallet is safe, even if you trusted some people you shouldn't have (not too many though).
  - Your wallet is safe, even if something happens to you (at least your family can still recover your bitcoin).
 
-The goal of SBK is to enable most people to live up to the security mantra of Bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_aantonop].
+The goal of SBK is to enable most people[^fnote_cant_use_computers] to live up to the security mantra of Bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_aantonop].
+
+[^fnote_cant_use_computers]: If you consider yourself [tech illiterate][href_kids_cant_use_computers], SBK may be a bit challanging. If you take your time you should be able to manage, so long as you don't blindly proceed when you don't understand what you're doing.
+
+[href_kids_cant_use_computers]: http://www.coding2learn.org/blog/2013/07/29/kids-cant-use-computers/
+
+
 
 [href_yt_aantonop]: https://www.youtube.com/watch?v=AcrEEnDLm58
 

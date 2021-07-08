@@ -7,6 +7,7 @@ import json
 import math
 import curses
 import collections
+import itertools
 
 import pylev
 
@@ -485,85 +486,6 @@ def check_things():
 
 # check_things()
 
-ALL_WORDS = set(WORDLIST1 + WORDLIST2 + WORDLIST3 + WORDLIST4 + WORDLIST5 + WORDLIST6)
-
-PLACES = WORDLIST2
-THINGS = ALL_WORDS - set(PLACES)
-
-# check for duplicates
-# assert len(ALL_WORDS) == len(WORDLIST1) + len(WORDLIST2)
-
-
-ALL_WORDS2_STR = """
-abacus     acid       admiral    alcohol    angel      antenna    artichoke  asterix
-avocado    baby       balloon    banana     barbie     battery    bazooka    beehive
-beggar     bell       bible      bicycle    bishop     bitcoin    blanket    blood
-boat       boxer      brain      bride      broccoli   buddha     buffalo    bullet
-burger     button     cabbage    caesar     cake       camera     canvas     captain
-cassette   chair      cherry     chief      chocolate  cinnamon   coconut    coffee
-columbus   computer   confucius  cookie     coupon     cowboy     crown      crystal
-darwin     dentist    devil      diamond    diesel     dildo      disc       dollar
-donut      dragon     eagle      earpiece   edison     einstein   elephant   elvis
-engineer   escort     euro       falcon     father     fire       flag       flower
-flute      football   freddie    galileo    gameboy    gandhi     garlic     geisha
-ghost      gift       gorilla    guitar     gymnast    hammer     hannibal   heart
-hepburn    hippo      holmes     honey      horse      hunter     husky      iphone
-ironman    jacket     jellyfish  jesus      jewel      jigsaw     joystick   judge
-jukebox    kafka      kangaroo   kebab      kennedy    keyboard   kidney     kimono
-kiwi       knight     koala      kurosawa   lambo      laptop     lasagna    lawyer
-leibniz    lenin      letter     lincoln    lobster    luigi      macbook    madonna
-manatee    mario      mason      meatball   mechanic   medusa     messi      miller
-mirror     miyazaki   moses      motor      mozart     muffin     muhammad   murderer
-mushroom   napoleon   necklace   needle     newton     ninja      obama      obelix
-octopus    olive      onion      orange     ostrich    pancake    papaya     parrot
-peanut     pelican    penguin    pepper     petrol     pharaoh    photo      piano
-picasso    pigeon     pilot      pineapple  pirate     pistol     pizza      plumber
-popcorn    potato     printer    prophet    pumpkin    pyramid    python     rabbit
-rainbow    raspberry  raven      razor      rhino      rock       rolex      ronaldo
-rousseau   saddam     salad      samurai    santa      satoshi    sausage    scorpion
-server     shampoo    sheriff    shrimp     sinatra    sisyphus   skull      smith
-socrates   spider     spoon      squid      stalin     steak      stone      sultan
-sushi      swan       teacup     tequila    tiger      tobacco    tofu       toilet
-torch      troll      trumpet    tshirt     turtle     tuxedo     umbrella   unicorn
-vader      viagra     violin     vladimir   vodka      waffle     walnut     wasabi
-webcam     witch      wizard     wolf       xbox       yoghurt    zebra      zombie
-
-abraham    academy    acrobat    admiral    airport    alaska     albino     amazon
-america    android    antenna    apollo     aquarium   artist     athens     atlantic
-attorney   auburn     austria    baghdad    barbeque   basket     beehive    beggar
-belfast    benjamin   berlin     bhutan     bicycle    bishop     bitcoin    blood
-boeing     bridge     broccoli   brussels   buddha     buffalo    builder    caesar
-canada     captain    caucasus   champion   chicago    church     clarinet   coconut
-colombia   computer   corsica    cowboy     crown      crystal    cyprus     damascus
-deputy     detroit    diamond    diesel     diploma    doctor     dolphin    dortmund
-dubai      edison     egypt      einstein   elephant   embassy    emperor    engine
-escort     ethiopia   fairy      ferrari    firefly    flower     football   forest
-france     freddie    gameboy    gandhi     geisha     georgia    germany    ghost
-glasgow    google     gorilla    gotham     guitar     hannibal   harvard    hawaii
-headset    heineken   hendrix    hippo      hogwarts   hospital   hotel      hubble
-hyundai    ironman    island     istanbul   italy      jakarta    jericho    jigsaw
-joystick   jukebox    julius     kangaroo   karachi    kashmir    kennedy    keyboard
-kingdom    kodak      kyoto      laptop     lasagna    leather    leibniz    leonardo
-library    lobster    london     macbook    madonna    mechanic   mercedes   messi
-mosquito   movie      muffin     muhammad   mushroom   nagasaki   nairobi    namibia
-necklace   netflix    newton     nigeria    nintendo   norway     obama      octopus
-office     okinawa    ontario    origami    orwell     ostrich    oxford     package
-pakistan   paper      pelican    peugeot    pharaoh    picasso    pilot      plumber
-podium     popcorn    porsche    potato     present    princess   prophet    pumpkin
-pyramid    python     queen      radio      rainbow    redneck    renault    reporter
-rhubarb    romania    rousseau   saddam     salmon     samurai    santiago   satoshi
-school     scorpion   seattle    server     shanghai   sheriff    siemens    simpson
-slippers   smith      socrates   soldier    sparrow    squid      stone      student
-sunlight   surgeon    suzuki     taiwan     teacup     temple     tequila    texas
-theatre    titanic    tobacco    tokyo      tolstoy    toronto    toshiba    trinidad
-trumpet    tsunami    tunisia    turkey     tuscany    tuxedo     ukraine    umbrella
-uranium    uruguay    valley     vampire    veteran    viagra     vietnam    village
-virginia   vivaldi    vladimir   volcano    voyager    waffle     walnut     warrior
-watanabe   webcam     whisky     wizard     xerox      yoghurt    yokohama   zimbabwe
-"""
-
-ALL_WORDS2 = list(sorted(re.findall(r"[a-z]+", ALL_WORDS2_STR)))
-
 
 def read_word_frequencies():
     # http://norvig.com/ngrams/
@@ -577,10 +499,12 @@ def read_word_frequencies():
     result.update(
         {
             'obama'  : 100000000,
+            'trump'  : 100000000,
             'messi'  : 100000000,
             'satoshi': 100000000,
             'lambo'  : 100000000,
             'bitcoin': 100000000,
+            'corona' : 100000000,
         }
     )
     return result
@@ -598,41 +522,42 @@ def pretty_wordlists(wordlist, min_len, max_len, label):
         n = math.log(word_frequencies[word])
         return -n
 
-    def score(word):
-        l = 10 - abs(6.5 - len(word))
-        n = math.log(word_frequencies[word])
-        d = 1 / sum(1 for w in wordlist if distances[w + ":" + word] < 5)
-        return l * 3.0 + n * 8.0 + d * 3.0
+    def penaulty(word):
+        c = sum(1 for w in wordlist if word[:3] in w)
+        l = abs(7.5 - len(word))
+        n = 1 / math.log(word_frequencies[word])
+        d = sum(1 for w in wordlist if distances[w + ":" + word] < 5)
+        p = c * 20.0 + l * 2.0 + n * 0.0 + d * 0.0
+        # print(f"{word:>9} {c * 20.0:9.2f} {l * 2.0:9.2f} {d * 0.0:9.2f} {p}")
+        return p
+
+    # lower penaulty -> better choice
+    wordlist = list(sorted(wordlist, key=penaulty))
 
     words_by_prefix = collections.defaultdict(list)
     for word in wordlist:
-        if not min_len <= len(word) <= max_len:
-            continue
-        words_by_prefix[word[:3]].append(word)
-
-    wordlist = list(reversed(sorted(wordlist, key=score)))
+        if min_len <= len(word) <= max_len:
+            words_by_prefix[word[:3]].append(word)
 
     filtered_wordlist = []
 
     for word in wordlist:
-        if not min_len <= len(word) <= max_len:
-            continue
+        if min_len <= len(word) <= max_len:
+            collisions = [
+                fword
+                for fword in filtered_wordlist
+                if fword != word and (fword[:3] in word or word[:3] in fword or distances[fword + ":" + word] < 3)
+            ]
+            if not any(collisions):
+                filtered_wordlist.append(word)
 
-        collisions = [
-            fword
-            for fword in filtered_wordlist
-            if fword != word and (word.startswith(fword[:3]) or distances[fword + ":" + word] < 4)
-        ]
-        if not any(collisions):
-            filtered_wordlist.append(word)
+    # for word in sorted(filtered_wordlist):
+    #     if len(words_by_prefix[word[:3]]) == 1:
+    #         aligned_words = [w.ljust(9) for w in words_by_prefix[word[:3]] if w != word]
+    #         print(word.ljust(9), " ".join(aligned_words))
 
-    for word in filtered_wordlist:
-        if len(words_by_prefix[word[:3]]) == 1:
-            continue
-        print(word.ljust(9), " ".join(w.ljust(9) for w in words_by_prefix[word[:3]] if w != word))
-
-    scores_by_word = {w: score(w) for w in filtered_wordlist}
-    _wordlist_diff(scores_by_word, label=label)
+    # scores_by_word = {w: score(w) for w in filtered_wordlist}
+    # _wordlist_diff(scores_by_word, label=label)
     # _pretty_wordlist(filtered_wordlist, label=label, words_per_line=16)
 
     print()
@@ -911,6 +836,7 @@ leadingly livingly madly monotonously movingly nationwide quickly sadly securely
 """
 
 SHITLIST = """
+mosquito
 # too general
 animal
 land
@@ -926,20 +852,15 @@ wall
 # ambiguous
 turkey
 swallow
-tesla
-victoria
-lotus
 apple
 hilton
 general
-phoenix
 # zodiac
 pisces gemini
-scorpio  virgo taurus
+virgo taurus
 # too big
 armada army
 # abstract
-ebola
 """
 
 ABSTRACT_NOUNS = """
@@ -977,7 +898,7 @@ def generate_filtered():
         fobj.write("word\tcount\n")
         for word, n in word_items:
             is_candidate_word = (
-                5 <= len(word) <= 7
+                5 <= len(word) <= 8
                 # and word not in results
                 and word not in ALL_WORDS
                 and word not in SHITLIST
@@ -990,9 +911,9 @@ def generate_filtered():
                 fobj.write(f"{word:<9} {math.log(n):.2f}\n")
 
 
-NEW_SHITLIST_STR = """
+SHITLIST_STR_V1 = """
 harbor sheet board ground punjab
-ocean tacoma 3halifax    garden     bedroom    square field
+ocean tacoma halifax    garden     bedroom    square field
 burgundy   valencia slovakia
 store hungary
 myanmar sirius cornell company lychee cornwall nanjing
@@ -1038,12 +959,14 @@ kentucky kenya
 chain chair chairman
 mercury merchant
 torch
+ninja
+satan
 colorado cologne
 bristol ninja portugal
 mountain antwerp
 claudius romulus
 earpiece earth
-satan saturn
+saturn
 sergent vinyl
 canberra madrid
 kinshasa salad
@@ -1107,7 +1030,36 @@ capella trailer
 cheese    chechnya  chemist
 """
 
-NEW_SHITLIST = set(sorted(re.findall(r"[a-z]+", NEW_SHITLIST_STR)))
+ALL_WORDS = set(WORDLIST1 + WORDLIST2 + WORDLIST3 + WORDLIST4 + WORDLIST5 + WORDLIST6)
+
+PLACES = WORDLIST2
+THINGS = ALL_WORDS - set(PLACES)
+
+# check for duplicates
+# assert len(ALL_WORDS) == len(WORDLIST1) + len(WORDLIST2)
+
+def read_wordlist(filepath):
+    with io.open(filepath, mode="r", encoding="utf-8") as fobj:
+        text = fobj.read()
+    return list(sorted(re.findall(r"[a-z]+", text)))
+
+
+ALL_WORDS2 = read_wordlist("wordlists/en_wordlist.txt")
+# _pretty_wordlist(sorted(set(ALL_WORDS2)), "all words")
+
+def show_candidates():
+    candidates = read_wordlist("wordlists/shitlist.txt")
+
+    chars = "abcdefghijklmnopqrstuvwxyz"
+    missing_prefixes = set(a + b + c for a, b, c in itertools.product(chars, chars, chars))
+
+    for word in ALL_WORDS2:
+        if word[:3] in missing_prefixes:
+            missing_prefixes.remove(word[:3])
+
+    for word in candidates:
+        if word[:3] in missing_prefixes:
+            print(word)
 
 
 def main():
@@ -1115,8 +1067,7 @@ def main():
     # yayornay_words()
     # pretty_wordlists(WORDLIST4, min_len=4, max_len=9, label="things")
     # pretty_wordlists(WORDLIST5, min_len=4, max_len=9, label="places")
-    NEW_WORDS    = set(ALL_WORDS2) - NEW_SHITLIST
-    chosen_words = pretty_wordlists(NEW_WORDS, min_len=5, max_len=8, label="all")
+    chosen_words = pretty_wordlists(set(ALL_WORDS2), min_len=5, max_len=8, label="all")
     _pretty_wordlist(chosen_words, label="all", words_per_line=8)
 
     # print(len(NEW_WORDS))

@@ -95,17 +95,17 @@ def bytes_repr(data: bytes) -> str:
     return 'b"' + "".join(char_reprs) + '"'
 
 
-def bytes2gfpoint(data: bytes, field: gf.Field) -> gf_poly.Point:
+def bytes2gfpoint(data: bytes, field: gf.FieldGF256) -> gf_poly.Point:
     x_data = data[:1]
     y_data = data[1:]
 
     x = bytes2int(x_data)
     y = bytes2int(y_data)
 
-    if y >= field.order:
+    if y < field.order:
+        return gf_poly.Point(field[x], field[y])
+    else:
         raise ValueError(f"Invalid data for field with order={field.order}. Too large y={y}")
-
-    return gf_poly.Point(field[x], field[y])
 
 
 def gfpoint2bytes(point: gf_poly.Point) -> bytes:

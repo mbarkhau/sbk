@@ -45,7 +45,7 @@ class ECCDecodeError(ValueError):
     pass
 
 
-def _interpolate(points: gf_poly.Points[gf.GF256], at_x: gf.GF256) -> gf.GF256:
+def _interpolate(points: gf_poly.Points, at_x: gf.GF256) -> gf.GF256:
     terms_fast = list(gf_poly._interpolation_terms_256(points, at_x=at_x))
 
     if os.getenv('SBK_VERIFY_ECC_RS_INTERPOLATION_TERMS', "0") == '1':
@@ -66,7 +66,7 @@ def _encode(msg: Message, ecc_len: int) -> Block:
         # We need at least two points (and hence bytes) to do interpolation
         msg = msg + msg
 
-    field = gf.Field[gf.GF256](256, gf.GF256)
+    field = gf.FieldGF256()
 
     data_points  = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(msg))
     ecc_x_coords = tuple(field[x] for x in range(len(msg), len(msg) + ecc_len))
@@ -131,7 +131,7 @@ def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
 
 
 def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
-    field  = gf.Field[gf.GF256](256, gf.GF256)
+    field  = gf.FieldGF256()
     points = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None)
 
     if len(points) < msg_len:
@@ -150,7 +150,6 @@ def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
                 return top
 
             (top_0, top_0_n), (_top_1, top_1_n) = candidates.most_common(2)
-            # print("???", top_0_n, "vs", top_1_n, "of", sample_num)
 
             if top_0_n > top_1_n * 10:
                 return top_0
@@ -169,11 +168,12 @@ def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
 
 def decode(block: Block, msg_len: int) -> Message:
     ecc_len = len(block) - msg_len
-    assert ecc_len >= 0
     if ecc_len == 0:
         return block
-
-    return decode_packets(list(block), msg_len)
+    elif ecc_len > 0:
+        return decode_packets(list(block), msg_len)
+    else:
+        raise AssertionError(f"Invalid {ecc_len=}")
 
 
 def _cli_encode(msg: str) -> str:

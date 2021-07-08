@@ -25,6 +25,8 @@ import typing as typ
 import hashlib
 import binascii
 
+from . import common_types as ct
+
 wordlist = [
     "abandon",
     "ability",
@@ -3850,10 +3852,7 @@ def is_new_seed(x: str, prefix: str = SEED_PREFIX) -> bool:
     return bh2u(hmac_data).startswith(prefix)
 
 
-ElectrumSeed = str
-
-
-def raw_seed2phrase(int_seed: RawSeed) -> SeedPhrase:
+def raw_seed2phrase(int_seed: RawSeed) -> ct.ElectrumSeed:
     # based on Mnemonic.make_seed
     prefix = seed_prefix('segwit')
 
@@ -3869,7 +3868,7 @@ def raw_seed2phrase(int_seed: RawSeed) -> SeedPhrase:
         if i != mnemonic_decode(seed):
             raise Exception("Cannot extract same entropy from mnemonic!")
 
-        return seed
+        return ct.ElectrumSeed(seed)
 
 
 def bytes2int(data: bytes) -> int:

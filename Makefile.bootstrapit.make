@@ -324,6 +324,14 @@ lint_fmt:
 	@printf "\e[1F\e[9C ok\n"
 
 
+## Run Linters in error only mode
+.PHONY: errlint
+errlint:
+	@$(DEV_ENV)/bin/flake8 --select E src/
+	@$(DEV_ENV)/bin/pylint --disable=C,R,W,F --rcfile=setup.cfg \
+		src/ test/
+
+
 ## Run flake8
 .PHONY: lint_flake8
 lint_flake8:

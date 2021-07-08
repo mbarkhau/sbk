@@ -35,7 +35,7 @@ def test_intcode_fuzz():
         data_len = i % 20 + 4
         data     = os.urandom(data_len)
         intcodes = bytes2intcodes(data)
-        decoded  = intcodes2bytes(intcodes)
+        decoded  = intcodes2bytes(intcodes, data_len)
         assert decoded == data
         for intcode in intcodes:
             assert intcode.count("-") == 1
@@ -64,18 +64,18 @@ def test_intcode_fuzz_loss(data_len):
     for _ in range(5):
         data     = TEST_DATA[:data_len]
         intcodes = bytes2intcodes(data)
-        decoded  = intcodes2bytes(intcodes)
+        decoded  = intcodes2bytes(intcodes, data_len)
         assert decoded == data
 
         parts     = intcodes[:]
         clear_idx = random.randrange(0, len(parts))
         parts[clear_idx] = None
-        decoded = maybe_intcodes2bytes(parts)
+        decoded = maybe_intcodes2bytes(parts, data_len)
         assert decoded == data
 
 
 def test_intcode_odd_data_len():
-    in_data = b"\x11\x00\x004444444444"
+    in_data = b"\x11\x00\x0044444444444"
     assert len(in_data) == sbk.params.SALT_LEN
     expected_inputs = [
         "004-352",
@@ -84,14 +84,14 @@ def test_intcode_odd_data_len():
         "209-972",
         "275-508",
         "341-044",
-        "406-586",
-        "507-031",
-        "572-636",
-        "615-112",
-        "665-113",
-        "754-258",
-        "787-637",
-        "003-921",
+        "406-580",
+        "499-845",
+        "551-018",
+        "619-194",
+        "682-864",
+        "755-571",
+        "844-783",
+        "035-178",
     ]
 
     inputs = bytes2intcodes(in_data)
@@ -105,7 +105,7 @@ def test_intcode_odd_data_len():
 def test_intcode_order_fail(data_len):
     data     = os.urandom(data_len)
     intcodes = bytes2intcodes(data)
-    decoded  = intcodes2bytes(intcodes)
+    decoded  = intcodes2bytes(intcodes, data_len)
     assert decoded == data
 
     for _ in range(len(data)):
@@ -118,13 +118,13 @@ def test_intcode_order_fail(data_len):
         if i % 13 == j % 13:
             # In this case the ecc data should either save us or fail
             try:
-                decoded = intcodes2bytes(intcodes_kaputt)
+                decoded = intcodes2bytes(intcodes_kaputt, data_len)
                 assert decoded == data
             except sbk.ecc_rs.ECCDecodeError:
                 pass
         else:
             try:
-                intcodes2bytes(intcodes_kaputt)
+                intcodes2bytes(intcodes_kaputt, data_len)
                 # should have raised ValueError
                 assert False
             except ValueError as err:
@@ -142,7 +142,7 @@ def test_format_secret(data_len):
     assert phrase2bytes(" ".join(parsed.words)) == data
     intcodes = parsed.data_codes + parsed.ecc_codes
     assert len(intcodes) * 2 == block_len
-    decoded = maybe_intcodes2bytes(intcodes)
+    decoded = maybe_intcodes2bytes(intcodes, data_len)
     assert decoded == data
 
     packets = intcodes2parts(parsed.data_codes)
@@ -166,7 +166,7 @@ def test_parse_formatted_secret():
     formatted = sbk.cli_io.format_secret('salt', data)
     parsed    = parse_formatted_secret(formatted)
 
-    assert parsed.words[0].lower() == "abraham"
+    assert parsed.words[0].lower() == "abacus"
     assert parsed.words[0].lower() == WORDLIST[0]
     assert parsed.words[1].lower() == WORDLIST[1]
     assert parsed.words[2].lower() == WORDLIST[2]
@@ -237,65 +237,67 @@ DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
 
         Data          Mnemonic               ECC
-   01: 004-352   auburn    abraham     11: 713-070
-   02: 065-537   abraham   academy     12: 754-573
-   03: 180-933   seattle   sheriff     13: 805-186
-   04: 252-115   theatre   taiwan      14: 036-834
-   05: 317-161   tequila   uruguay     15: 078-867
-
-   06: 388-327   veteran   umbrella    16: 192-110
-   07: 457-469   whisky    yoghurt     17: 227-392
-   08: 520-331   virginia  muffin      18: 325-188
-   09: 560-769   nagasaki  library     19: 366-108
-   10: 623-775   macbook   oxford      20: 451-601
+   01: 004-352   bicycle   abacus      12: 782-590
+   02: 065-537   abacus    abraham     13: 788-738
+   03: 180-933   salmon    satoshi     14: 053-154
+   04: 252-115   teacup    squid       15: 067-360
+   05: 317-161   surgeon   unesco      16: 187-741
+   06: 388-327   victoria  ukraine     17: 201-515
+   07: 457-469   wizard    yokohama    18: 302-383
+   08: 520-331   vladimir  mozart      19: 378-444
+   09: 560-769   mumbai    meatball    20: 439-361
+   10: 623-775   mercury   oxford      21: 476-517
+   11: 692-765   nairobi   cabbage     22: 563-717
 
                      Share 2/3
 
         Data          Mnemonic               ECC
-   01: 004-352   auburn    abraham     11: 662-110
-   02: 065-538   abraham   acrobat     12: 734-756
-   03: 181-197   server    squid       13: 841-650
-   04: 260-065   warrior   tsunami     14: 032-863
-   05: 322-453   vampire   nintendo    15: 072-100
+   01: 004-352   bicycle   abacus      12: 741-213
+   02: 065-538   abacus    academy     13: 789-358
+   03: 181-197   samurai   slippers    14: 023-683
+   04: 260-065   watanabe  trumpet     15: 113-665
+   05: 322-453   vampire   necklace    16: 141-514
 
-   06: 368-521   oxford    mosquito    16: 167-279
-   07: 439-229   queen     salmon      17: 199-935
-   08: 501-585   pilot     freddie     18: 278-018
-   09: 547-653   gotham    embassy     19: 372-396
-   10: 610-169   forest    kingdom     20: 419-446
+   06: 368-521   oxford    moldova     17: 250-919
+   07: 439-229   printer   rhubarb     18: 321-242
+   08: 501-585   pepper    gymnast     19: 345-415
+   09: 547-653   hunter    football    20: 429-469
+   10: 610-169   gorilla   lebanon     21: 462-716
+   11: 680-743   jigsaw    coffee      22: 582-560
 
                      Share 3/3
 
         Data          Mnemonic               ECC
-   01: 004-352   auburn    abraham     11: 703-054
-   02: 065-539   abraham   admiral     12: 764-995
-   03: 144-700   crown     diesel      13: 808-162
-   04: 203-526   berlin    albino      14: 034-100
-   05: 264-520   android   escort      15: 066-249
+   01: 004-352   bicycle   abacus      12: 774-972
+   02: 065-539   abacus    acrobat     13: 851-018
+   03: 144-700   donut     egypt       14: 011-676
+   04: 203-526   buffalo   alcohol     15: 120-094
+   05: 264-520   attorney  fujitsu     16: 162-638
 
-   06: 345-946   engine    gorilla     16: 175-257
-   07: 425-332   lasagna   kangaroo    17: 204-899
-   08: 484-334   hendrix   vietnam     18: 298-953
-   09: 582-128   tsunami   virginia    19: 347-957
-   10: 655-314   zimbabwe  suzuki      20: 399-522
+   06: 345-946   freddie   hitachi     17: 221-219
+   07: 425-332   lobster   kurosawa    18: 315-273
+   08: 484-334   jigsaw    virginia    19: 380-343
+   09: 582-128   trumpet   vladimir    20: 432-672
+   10: 655-314   zimbabwe  spider      21: 508-034
+   11: 705-841   satoshi   detroit     22: 540-099
 
                        Salt
 
         Data          Mnemonic               ECC
-   01: 004-352   auburn    abraham     08: 507-031
-   02: 065-588   abraham   cowboy      09: 572-636
-   03: 144-436   cowboy    cowboy      10: 615-112
-   04: 209-972   cowboy    cowboy      11: 665-113
-   05: 275-508   cowboy    cowboy      12: 754-258
-   06: 341-044   cowboy    cowboy      13: 787-637
-   07: 406-586   cowboy    detroit     14: 003-921
+   01: 004-352   bicycle    abacus       08: 499-845
+   02: 065-588   abacus     dolphin      09: 551-018
+   03: 144-436   dolphin    dolphin      10: 619-194
+   04: 209-972   dolphin    dolphin      11: 682-864
+   05: 275-508   dolphin    dolphin      12: 755-571
+   06: 341-044   dolphin    dolphin      13: 844-783
+   07: 406-580   dolphin    dolphin      14: 035-178
 
                      Brainkey
 
         Data          Mnemonic               ECC
-   01: 013-364   cowboy    cowboy      04: 209-972
-   02: 078-900   cowboy    cowboy      05: 275-508
-   03: 144-436   cowboy    cowboy      06: 341-044
+   01: 013-364   dolphin    dolphin      04: 209-972
+   02: 078-900   dolphin    dolphin      05: 275-508
+   03: 144-436   dolphin    dolphin      06: 341-044
 """
 
 
@@ -490,7 +492,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("08: 507-031 <=") == 1
+    assert result.output.count("08: 499-845 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -511,7 +513,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("08: 507-031 <=") == 1
+    assert result.output.count("08: 499-845 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):

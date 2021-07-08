@@ -42,7 +42,7 @@ logger = logging.getLogger("sbk.sys_info")
 Seconds = float
 
 DEFAULT_KDF_THREADS_RATIO = 2
-DEFAULT_KDF_MEM_RATIO     = 0.9
+DEFAULT_KDF_MEM_RATIO     = int(os.getenv('SBK_MEM_PERCENT', "90")) / 100
 
 # Fallback value for systems on which total memory cannot be detected
 FALLBACK_MEM_TOTAL_MB = int(os.getenv("SBK_FALLBACK_MEM_TOTAL_MB", "1024"))
@@ -235,7 +235,7 @@ def detect_lang() -> LangCode:
         if layout_lang != 'default' and layout_lang in SUPPORTED_LANGUAGES:
             return layout_lang
 
-    except Exception as ex:
+    except Exception:
         pass
 
     return "en"

@@ -15,38 +15,38 @@ import pylev
 from . import enc_util
 
 WORDLIST_STR = """
-abraham    academy    acrobat    admiral    airport    alaska     albino     amazon
-america    android    antenna    apollo     aquarium   artist     athens     atlantic
-attorney   auburn     austria    baghdad    barbeque   basket     bazooka    beehive
-beggar     belfast    benjamin   berlin     bhutan     bicycle    bishop     bitcoin
-blood      boeing     bridge     broccoli   brussels   buddha     buffalo    builder
-caesar     canada     captain    caucasus   champion   chicago    church     clarinet
-coconut    colombia   computer   corsica    cowboy     crown      crystal    cyprus
-damascus   deputy     detroit    diamond    diesel     diploma    doctor     dolphin
-dubai      edison     egypt      einstein   elephant   embassy    emperor    engine
-escort     ethiopia   fairy      ferrari    firefly    flower     football   forest
-france     freddie    gameboy    gandhi     geisha     georgia    germany    ghost
-glasgow    google     gorilla    gotham     guitar     gymnast    hannibal   harvard
-hawaii     headset    heineken   hendrix    hippo      hogwarts   hospital   hotel
-hubble     hyundai    ironman    island     istanbul   italy      jakarta    jericho
-jigsaw     joystick   jukebox    julius     kangaroo   karachi    kashmir    kennedy
-keyboard   kingdom    kodak      kyoto      laptop     lasagna    leather    leibniz
-leonardo   library    lobster    london     macbook    madonna    mechanic   mercedes
-messi      mosquito   movie      muffin     muhammad   mushroom   nagasaki   nairobi
-namibia    necklace   netflix    newton     nigeria    nintendo   norway     obama
-octopus    office     okinawa    ontario    origami    orwell     ostrich    oxford
-package    pakistan   paper      pelican    peugeot    pharaoh    picasso    pilot
-plumber    podium     popcorn    porsche    potato     present    princess   prophet
-pumpkin    pyramid    python     queen      radio      rainbow    redneck    renault
-reporter   rhubarb    romania    rousseau   saddam     salmon     samurai    satoshi
-school     scorpion   seattle    server     shanghai   sheriff    siemens    simpson
-slippers   smith      socrates   soldier    sparrow    squid      stone      student
-sunlight   surgeon    suzuki     taiwan     teacup     temple     tequila    texas
-theatre    titanic    tobacco    tokyo      tolstoy    toronto    toshiba    trinidad
-trumpet    tsunami    tunisia    turkey     tuscany    tuxedo     ukraine    umbrella
-uranium    uruguay    valley     vampire    veteran    viagra     vietnam    village
-virginia   vivaldi    vladimir   volcano    voyager    waffle     walnut     warrior
-watanabe   webcam     whisky     wizard     xerox      yoghurt    yokohama   zimbabwe
+abacus     abraham    academy    acrobat    admiral    albino     alcohol    aquarium
+atlantic   attorney   augustus   avocado    bazooka    beehive    beirut     benjamin
+bible      bicycle    bismarck   blanket    boeing     bohemia    bolivia    bridge
+broccoli   brussels   budapest   buffalo    button     cabbage    caesar     captain
+carolina   caucasus   cherry     church     cinnamon   claudius   coconut    coffee
+computer   cookie     coupon     cowboy     crystal    cyprus     darwin     dentist
+deputy     detroit    diploma    doctor     dolphin    donut      dortmund   dracula
+dublin     eagle      earpiece   edison     egypt      elephant   elvis      embassy
+ethiopia   fairy      ferrari    firefly    flower     football   france     freddie
+fujitsu    galileo    gameboy    geisha     ghost      glasgow    google     gorilla
+gotham     gymnast    halifax    harvard    hawaii     headset    heineken   helsinki
+hendrix    hepburn    hitachi    hunter     hyundai    indiana    iphone     island
+jacket     jakarta    jericho    jigsaw     joystick   judge      jukebox    julius
+kabul      kafka      kangaroo   kashmir    keyboard   kidney     kimono     knight
+koala      kodak      kolkata    kosovo     kurosawa   laptop     latvia     lawyer
+leather    lebanon    leibniz    lenin      library    lobster    lunatic    macbook
+mason      meatball   mechanic   medusa     mercury    messi      michigan   miller
+miyazaki   moldova    movie      mozart     muffin     muhammad   mumbai     mushroom
+myanmar    nagasaki   nairobi    nanjing    napoleon   necklace   needle     netflix
+newton     normandy   obelix     onion      ontario    oregon     orwell     oxford
+package    pakistan   pancake    papaya     peanut     pelican    penguin    pepper
+peugeot    picasso    pigeon     pilot      pistol     pizza      plumber    podium
+popcorn    potato     present    printer    prophet    pumpkin    pyramid    python
+queen      rabbit     radio      renault    reporter   rhubarb    romania    ronaldo
+rousseau   saddam     salmon     samurai    santiago   satoshi    sausage    school
+server     sheriff    siemens    simpson    sisyphus   slippers   slovakia   socrates
+soldier    sparrow    spider     squid      sultan     sunlight   surgeon    suzuki
+teacup     temple     tequila    texas      titanic    tobacco    toilet     tokyo
+trinidad   trumpet    tshirt     tunisia    turtle     tuxedo     twitter    ukraine
+ulysses    unesco     uruguay    vampire    victoria   violin     virginia   vivaldi
+vladimir   volcano    voyager    waffle     walnut     warrior    wasabi     watanabe
+webcam     whisky     wizard     xerox      yoghurt    yokohama   zambia     zimbabwe
 """
 
 
@@ -62,7 +62,7 @@ assert len({w[:3] for w in WORDLIST}) == 256
 WORD_INDEXES   = {w: i for i, w in enumerate(WORDLIST)}
 wordlist_index = WORD_INDEXES.__getitem__
 
-assert wordlist_index("abraham" ) == 0
+assert wordlist_index("abacus"  ) == 0
 assert wordlist_index("zimbabwe") == 255
 assert wordlist_index(WORDLIST[127]) == 127
 
@@ -70,7 +70,7 @@ assert wordlist_index(WORDLIST[127]) == 127
 PhraseStr = str
 
 
-def decode_word(data: bytes) -> str:
+def byte2word(data: bytes) -> str:
     assert len(data) == 1
     word_idx = enc_util.char_at(data, 0)
     return WORDLIST[word_idx]
@@ -102,7 +102,9 @@ def bytes2phrase(data: bytes) -> PhraseStr:
 
 def fuzzy_match(word: str) -> str:
     def dist_fn(wl_word: str) -> int:
-        return pylev.damerau_levenshtein(word, wl_word)
+        dist = pylev.damerau_levenshtein(word, wl_word)
+        assert isinstance(dist, int)
+        return dist
 
     dist, wl_word = min((dist_fn(wl_word), wl_word) for wl_word in WORDLIST)
     if dist < 4:

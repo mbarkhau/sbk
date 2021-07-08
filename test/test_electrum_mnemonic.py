@@ -60,4 +60,4 @@ def test_electrum_mnemonic():
 def test_raw_seed2phrase():
     raw_seed = gen_raw_seed(128)
     phrase   = raw_seed2phrase(raw_seed)
-    assert len(phrase.split(" ")) == 12
+    assert len(str(phrase).split(" ")) == 12

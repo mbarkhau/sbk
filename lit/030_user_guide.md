@@ -4,7 +4,7 @@ The great thing about Bitcoin is that *you have complete control* of your own mo
 
 Unlike traditional financial systems, if your bitcoin is lost or stolen, you have no recourse to any institution whatsoever. No government, no bank, no company and no programmer has any obligation or even any ability to help you if something goes wrong.
 
-The goal of SBK is to make it more easy for you to bear this burden of responsibility. SBK is designed for individuals[^fnote_joint_custody] who want to take **personal custody** of their bitcoin while mitigating the risk of loss or theft.
+The goal of SBK is to make it more easy for you to bear this burden of responsibility. SBK is designed for individuals who want to take **personal custody**[^fnote_joint_custody] of their bitcoin while mitigating the risk of loss or theft.
 
 [^fnote_joint_custody]: SBK is not designed for institutions where more than one person will usually have joint custody over bitcoin belonging to a treasury. For this use-case you should look into a multi-signature setup.
 
@@ -366,9 +366,9 @@ Suffice it to say, I recommend you do not trust your printer farther than you ca
 
 [href_dkriesel_xerox_fail]: http://www.dkriesel.com/en/blog/2013/0802_xerox-workcentres_are_switching_written_numbers_when_scanning
 
-[href_share_template_a4]: https://mbarkhau.keybase.pub/sbk/template_a4.pdf
+[href_share_template_a4]: https://sbk.dev/downloads/template_a4.pdf
 
-[href_share_template_usletter]: https://mbarkhau.keybase.pub/sbk/template_us_letter.pdf
+[href_share_template_usletter]: https://sbk.dev/downloads/template_us_letter.pdf
 
 
 

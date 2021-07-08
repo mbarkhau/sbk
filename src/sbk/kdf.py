@@ -71,7 +71,7 @@ HASH_LEN = 128
 # if we chose b = 1.0625, then s = 16 and o = -15
 
 
-def curve_params(base: float) -> typ.Tuple[int, int]:
+def curve_params(base: float) -> typ.Tuple[float, float]:
     s = 1 / (base - 1)
     o = 1 - s
     return (s, o)
@@ -94,7 +94,7 @@ def log(raw_val: int, base: float) -> FieldVal:
     return math.floor(math.log((raw_val - o) / s) / math.log(base))
 
 
-def exp(field_val: FieldVal, base: float) -> float:
+def exp(field_val: FieldVal, base: float) -> int:
     s, o = curve_params(base)
     return math.ceil(o + s * base ** field_val)
 
@@ -139,18 +139,18 @@ class KDFParams(typ.NamedTuple):
 
     @staticmethod
     def decode(fields: int) -> 'KDFParams':
-        if not 0 <= fields < 2 ** 16:
+        if 0 <= fields < 2 ** 16:
+            f_p = (fields >> 12) & 0xF
+            f_m = (fields >>  6) & 0x3F
+            f_t = (fields >>  0) & 0x3F
+
+            p = exp(f_p, base=P_BASE) * MIN_P
+            m = exp(f_m, base=M_BASE) * MIN_M
+            t = exp(f_t, base=T_BASE) * MIN_T
+            return KDFParams(p, m, t)
+        else:
             errmsg = f"Invalid fields, out of bounds: {fields}"
             raise AssertionError(errmsg)
-
-        f_p = (fields >> 12) & 0xF
-        f_m = (fields >>  6) & 0x3F
-        f_t = (fields >>  0) & 0x3F
-
-        p = exp(f_p, base=P_BASE) * MIN_P
-        m = exp(f_m, base=M_BASE) * MIN_M
-        t = exp(f_t, base=T_BASE) * MIN_T
-        return KDFParams(p, m, t)
 
     def _verify_encoding(self) -> None:
         """Validator for serialization.
@@ -219,7 +219,7 @@ def _hash_pyargon2(
     # NOTE: only used for testing/validation
     import pyargon2
 
-    return pyargon2.hash(
+    result = pyargon2.hash(
         password=data,
         salt=data,
         encoding='raw',
@@ -230,6 +230,8 @@ def _hash_pyargon2(
         variant='id',
         version=19,
     )
+    assert isinstance(result, bytes)
+    return result
 
 
 def _hash_argon2_cffi(
@@ -243,7 +245,7 @@ def _hash_argon2_cffi(
     version = argon2.low_level.ARGON2_VERSION
     assert version == 19, version
 
-    return argon2.low_level.hash_secret_raw(
+    result = argon2.low_level.hash_secret_raw(
         secret=data,
         salt=data,
         hash_len=HASH_LEN,
@@ -253,6 +255,8 @@ def _hash_argon2_cffi(
         type=argon2.low_level.Type.ID,
         version=version,
     )
+    assert isinstance(result, bytes)
+    return result
 
 
 _hash = _hash_argon2_cffi
@@ -287,7 +291,7 @@ class ProgressSmoother:
         self._thread = threading.Thread(target=fake_progress)
         self._thread.start()
 
-    def total_incr(self):
+    def total_incr(self) -> float:
         return sum(self.increments) + max(self.increments) * 0.55
 
     def progress_cb(self, incr: Increment) -> None:

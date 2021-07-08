@@ -8,13 +8,20 @@
 
 import os
 import re
+import pwd
+import math
 import time
 import typing as typ
+import logging
 import pathlib as pl
+import tempfile
 import functools as ft
 import threading
+import subprocess as sp
+import collections
 
 import click
+import mypy_extensions as mypyext
 
 from . import kdf
 from . import ecc_rs
@@ -22,6 +29,11 @@ from . import params
 from . import shamir
 from . import enc_util
 from . import sys_info
+from . import common_types as ct
+from . import electrum_mnemonic
+
+logger = logging.getLogger("sbk.ui_common")
+
 
 SECURITY_WARNING_TEXT = """
 Security Warning
@@ -196,7 +208,10 @@ def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> typ.Iterable[IntCod
 
 
 def bytes2incode_part(data: bytes, idx_offset: int = 0) -> IntCode:
-    """Parse a single intcode from two bytes."""
+    """Parse a single intcode from two bytes.
+
+    idx_offset: The intcode index offset (2*bytes index offset)
+    """
     assert len(data) == 2
     intcodes = list(bytes2intcode_parts(data, idx_offset))
     assert len(intcodes) == 1
@@ -215,7 +230,14 @@ def bytes2intcodes(data: bytes) -> IntCodes:
 
     ecc_len       = _total_len - len(data)
     data_with_ecc = ecc_rs.encode(data, ecc_len=ecc_len)
-    return list(bytes2intcode_parts(data_with_ecc))
+    intcodes      = list(bytes2intcode_parts(data_with_ecc))
+
+    decoded_data = intcodes2bytes(intcodes, msg_len=len(data))
+    if decoded_data == data:
+        return intcodes
+    else:
+        errmsg = "Round trip failed: intcodes2bytes(bytes2intcodes(...))"
+        raise AssertionError(errmsg)
 
 
 def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
@@ -257,20 +279,16 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
     return part_vals
 
 
-def maybe_intcodes2bytes(intcodes: MaybeIntCodes, msg_len: typ.Optional[int] = None) -> bytes:
+def maybe_intcodes2bytes(intcodes: MaybeIntCodes, msg_len: int) -> bytes:
     data_with_ecc = intcodes2parts(intcodes)
-    if msg_len is None:
-        _msg_len = len(data_with_ecc) // 2
-    else:
-        _msg_len = msg_len
 
     assert all(len(part) <= 1 for part in data_with_ecc)
     maybe_packets = [part[0] if part else None for part in data_with_ecc]
-    return ecc_rs.decode_packets(maybe_packets, _msg_len)
+    return ecc_rs.decode_packets(maybe_packets, msg_len)
 
 
-def intcodes2bytes(intcodes: IntCodes) -> bytes:
-    return maybe_intcodes2bytes(intcodes)
+def intcodes2bytes(intcodes: IntCodes, msg_len: int) -> bytes:
+    return maybe_intcodes2bytes(intcodes, msg_len=msg_len)
 
 
 class ParsedSecret(typ.NamedTuple):
@@ -354,7 +372,7 @@ class ThreadRunner(threading.Thread, typ.Generic[T]):
         self.daemon = True
 
     def run(self) -> None:
-        tgt = typ.cast(typ.Callable[[], T], self._target)
+        tgt = self._target
         assert tgt is not None
         try:
             self._return = tgt()
@@ -387,11 +405,6 @@ class ThreadRunner(threading.Thread, typ.Generic[T]):
 
 Seconds = typ.NewType('Seconds', float)
 
-Salt     = typ.NewType('Salt'    , bytes)
-BrainKey = typ.NewType('BrainKey', bytes)
-SeedData = typ.NewType('SeedData', bytes)
-
-
 DEFAULT_WALLET_NAME = "empty"
 
 SEED_DATA_LEN = 16
@@ -408,22 +421,23 @@ class ProgressbarUpdater(typ.Protocol):
         ...
 
 
-Length = int
+InitProgressbar = typ.Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpdater]
 
-InitProgressbar = typ.Callable[[Length], ProgressbarUpdater]
+
+def click_progressbar(label: str) -> InitProgressbar:
+    return ft.partial(click.progressbar, label=label, show_eta=True)
 
 
 def derive_seed(
     kdf_params      : kdf.KDFParams,
-    salt            : Salt,
-    brainkey        : BrainKey,
+    salt            : ct.Salt,
+    brainkey        : ct.BrainKey,
     label           : str,
     wallet_name     : str = DEFAULT_WALLET_NAME,
     init_progressbar: typ.Optional[InitProgressbar] = None,
-) -> SeedData:
-
+) -> ct.SeedData:
     if init_progressbar is None:
-        _init_progressbar = ft.partial(click.progressbar, label=label, show_eta=True)
+        _init_progressbar = click_progressbar(label)
     else:
         _init_progressbar = init_progressbar
 
@@ -446,7 +460,7 @@ def derive_seed(
         # Always the ThreadRunner so that Ctrl-C is not blocked.
         runner    = ThreadRunner[bytes](digester_fn)
         seed_data = runner.start_and_join()
-    return seed_data
+    return ct.SeedData(seed_data)
 
 
 def run_with_progress_bar(
@@ -516,8 +530,7 @@ def init_param_config(
     init_progressbar : typ.Optional[InitProgressbar] = None,
 ) -> params.ParamConfig:
     if init_progressbar is None:
-        label             = "KDF Calibration"
-        _init_progressbar = ft.partial(click.progressbar, label=label, show_eta=True)
+        _init_progressbar = click_progressbar("KDF Calibration")
     else:
         _init_progressbar = init_progressbar
 
@@ -552,6 +565,26 @@ def urandom(size: int) -> bytes:
         return os.urandom(size)
 
 
+# https://stackoverflow.com/a/47348423/62997
+def entropy(data: bytes) -> float:
+    probabilities     = [n_x / len(data) for x, n_x in collections.Counter(data).items()]
+    entropy_fractions = [-p_x * math.log(p_x, 2) for p_x in probabilities]
+    return sum(entropy_fractions)
+
+
+def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
+    # sanity check
+    if entropy(raw_salt) < params.RAW_SALT_MIN_ENTROPY:
+        entropy_avail = get_entropy_pool_size()
+        errmsg        = f"Entropy check failed for salt. entropy_avail={entropy_avail}"
+        raise AssertionError(errmsg)
+
+    if entropy(brainkey) < params.BRAINKEY_MIN_ENTROPY:
+        entropy_avail = get_entropy_pool_size()
+        errmsg        = f"Entropy check failed for brainkey. entropy_avail={entropy_avail}"
+        raise AssertionError(errmsg)
+
+
 def validated_param_data(param_cfg: params.ParamConfig) -> bytes:
     # validate encoding round trip before we use param_cfg
     param_cfg_data    = params.param_cfg2bytes(param_cfg)
@@ -583,17 +616,15 @@ def validate_wallet_name(wallet_name: str) -> None:
     raise ValueError(errmsg)
 
 
-RawSalt  = bytes
-Brainkey = bytes
-Shares   = typ.List[bytes]
-
-
-def create_secrets(param_cfg: params.ParamConfig) -> typ.Tuple[RawSalt, Brainkey, Shares]:
+def create_secrets(param_cfg: params.ParamConfig) -> typ.Tuple[ct.Salt, ct.BrainKey, ct.Shares]:
     param_cfg_data = validated_param_data(param_cfg)
 
-    raw_salt = urandom(params.RAW_SALT_LEN)
-    salt     = param_cfg_data + b"\xFF" + raw_salt
-    brainkey = urandom(params.BRAINKEY_LEN)
+    raw_salt = ct.RawSalt(urandom(params.RAW_SALT_LEN))
+    salt     = ct.Salt(param_cfg_data + raw_salt)
+    brainkey = ct.BrainKey(urandom(params.BRAINKEY_LEN))
+
+    if os.getenv('SBK_DEBUG_RANDOM') is None:
+        _check_entropy(raw_salt, brainkey)
 
     shares = list(shamir.split(param_cfg, raw_salt, brainkey))
 
@@ -605,3 +636,111 @@ def create_secrets(param_cfg: params.ParamConfig) -> typ.Tuple[RawSalt, Brainkey
     else:
         errmsg = "CRITICAL ERROR - Please report this at sbk.dev"
         raise ValueError(errmsg)
+
+
+def mk_tmp_wallet_fpath() -> pl.Path:
+    # pylint: disable=broad-except; we log it, so it's ok :-P
+
+    tempdir = tempfile.tempdir
+    try:
+        uid     = pwd.getpwnam(os.environ['USER']).pw_uid
+        uid_dir = pl.Path(f"/run/user/{uid}")
+        if uid_dir.exists():
+            tempdir = str(uid_dir)
+    except Exception as ex:
+        logger.warning(f"Error creating temp directory in /run/user/ : {ex}")
+
+    _fd, wallet_fpath_str = tempfile.mkstemp(prefix="sbk_electrum_wallet_", dir=tempdir)
+    wallet_fpath = pl.Path(wallet_fpath_str)
+    return wallet_fpath
+
+
+def clean_wallet(wallet_fpath: pl.Path) -> None:
+    if not os.path.exists(wallet_fpath):
+        return
+
+    garbage = os.urandom(4096)
+    # On HDDs this may serve some marginal purpose.
+    # On SSDs this may be pointless, because wear leveling means that these
+    # write operations go to totally different blocks than the original file.
+    size = wallet_fpath.stat().st_size
+    with wallet_fpath.open(mode="wb") as fobj:
+        for _ in range(0, size, 4096):
+            fobj.write(garbage)
+    wallet_fpath.unlink()
+    assert not wallet_fpath.exists()
+
+
+Command = typ.List[str]
+
+
+def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
+    seed_int = enc_util.bytes2int(seed_data)
+    return electrum_mnemonic.raw_seed2phrase(seed_int)
+
+
+def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> typ.Tuple[pl.Path, Command, Command]:
+    wallet_fpath = mk_tmp_wallet_fpath()
+
+    restore_cmd = [
+        "electrum",
+        "restore",
+        "--forgetconfig",
+        "--wallet",
+        str(wallet_fpath),
+        "--offline",
+        seed_data2phrase(seed_data),
+    ]
+    load_cmd = ["electrum", "gui", "--forgetconfig", "--wallet", str(wallet_fpath)]
+
+    if offline:
+        load_cmd.append("--offline")
+
+    return (wallet_fpath, restore_cmd, load_cmd)
+
+
+def load_wallet(seed_data: ct.SeedData, offline: bool = False) -> None:
+    wallet_fpath, restore_cmd, load_cmd = wallet_commands(seed_data, offline)
+    try:
+        wallet_fpath.unlink()
+        retcode = sp.call(restore_cmd)
+        if retcode != 0:
+            cmd_str = " ".join(restore_cmd[:-1] + ["<wallet seed hidden>"])
+            errmsg  = f"Error calling '{cmd_str}' retcode: {retcode}"
+            raise RuntimeError(errmsg)
+
+        retcode = sp.call(load_cmd)
+        if retcode != 0:
+            cmd_str = " ".join(load_cmd)
+            errmsg  = f"Error calling '{cmd_str}' retcode: {retcode}"
+            raise RuntimeError(errmsg)
+    finally:
+        clean_wallet(wallet_fpath)
+
+
+def _debug_entropy_check() -> None:
+    """Determine params.RAW_SALT_MIN_ENTROPY and params.BRAINKEY_MIN_ENTROPY ."""
+    print(" N   MIN_E   low_e   headroom")
+
+    a = 0.3
+    b = 0.19
+
+    for n in range(2, 13):
+        min_e    = a + n * b
+        fails    = 0
+        low_e    = entropy(urandom(n))
+        headroom = 999.0
+        for _ in range(10_000):
+            e = entropy(urandom(n))
+            if e < low_e:
+                low_e = (low_e + e) / 2
+            if e < min_e:
+                fails += 1
+
+        headroom = low_e - min_e
+
+        print(f"{n:>2} {min_e:7.3f} {low_e:7.3f} {headroom:7.3f} {fails:>6}")
+
+
+if __name__ == '__main__':
+    _debug_entropy_check()

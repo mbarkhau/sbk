@@ -31,6 +31,8 @@ def test_wordlist_constraints():
     assert all(5 <= len(w) <= 8 for w in WORDLIST)
     # unique 3 letter prefixes
     assert len({w[:3] for w in WORDLIST}) == 256
+    # no 3 letter prefix a substring of another word
+    assert all(w1 == w2 or w1[:3] not in w2 for w1, w2 in itertools.product(WORDLIST, WORDLIST))
     # no duplicates
     assert len(set(WORDLIST)) == 256
 
@@ -38,10 +40,9 @@ def test_wordlist_constraints():
 @pytest.mark.skipif("slow" in os.getenv('PYTEST_SKIP', ""), reason="Basically this can't fail")
 def test_wordlist_distances():
     for w1, w2 in itertools.product(WORDLIST, WORDLIST):
-        if w1 == w2:
-            continue
-        d = pylev.damerau_levenshtein(w1, w2)
-        assert d >= 4, (w1, w2)
+        if w1 != w2:
+            d = pylev.damerau_levenshtein(w1, w2)
+            assert d >= 3, (w1, w2)
 
 
 def test_bytes2phrase_fail():
@@ -53,11 +54,11 @@ def test_bytes2phrase_fail():
 
 
 def test_phrase2bytes_fail():
-    assert phrase2bytes("abraham academy"  ) == b"\x00\x01"
-    assert phrase2bytes("abbrahame akadimy") == b"\x00\x01"
+    assert phrase2bytes("abacus abraham"   ) == b"\x00\x01"
+    assert phrase2bytes("abbakus abbrahame") == b"\x00\x01"
 
     try:
-        phrase2bytes("abbakuss akadimy")
+        phrase2bytes("abbakuss xanadu")
         assert False, "Expected ValueError"
     except ValueError as ex:
         assert "Unknown word" in str(ex)
@@ -123,4 +124,4 @@ def test_phrase_hardcoded():
     wl_text = " ".join(WORDLIST)
     assert wl_text.count(" ") == 255
     wl_digest = hashlib.sha1(wl_text.encode("ascii")).hexdigest()
-    assert wl_digest == "f65545bcc55d66efe1894f7f8c944f9557a70f99"
+    assert wl_digest == "0f897109a5bf74607418c64c6dd85baaa2c210d2"

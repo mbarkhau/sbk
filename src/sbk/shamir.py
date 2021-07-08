@@ -14,13 +14,9 @@ from . import gf
 from . import params
 from . import gf_poly
 from . import enc_util
+from . import common_types as ct
 
-RawSalt   = bytes
-BrainKey  = bytes
-MasterKey = bytes
-
-RawShare = bytes  # only the encoded GFPoint
-Share    = bytes  # RawShare but prefixed with ParamConfig data
+RawShares = typ.Sequence[ct.RawShare]
 
 
 def _split_data_gf_p(
@@ -28,21 +24,23 @@ def _split_data_gf_p(
     threshold : int,
     num_shares: int,
     prime     : int,
-) -> typ.Iterable[RawShare]:
+) -> typ.Iterable[ct.RawShare]:
     secret_int = enc_util.bytes2int(data)
     assert secret_int < prime
 
     field    = gf.init_field(prime)
-    gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)
+    gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)  # type: ignore
     for gfpoint in gfpoints:
-        yield enc_util.gfpoint2bytes(gfpoint)
+        _raw_share = enc_util.gfpoint2bytes(gfpoint)
+        yield ct.RawShare(_raw_share)
 
 
-def _join_gf_p(raw_shares: typ.List[RawShare], threshold: int, prime: int) -> MasterKey:
-    field      = gf.init_field(order=prime)
-    points     = tuple(enc_util.bytes2gfpoint(share, field) for share in raw_shares)
-    secret_int = gf_poly.join(field, points, threshold)
-    return enc_util.int2bytes(secret_int, zfill_bytes=math.ceil(math.log2(prime) / 8))
+def _join_gf_p(raw_shares: RawShares, threshold: int, prime: int) -> ct.MasterKey:
+    field       = gf.init_field(order=prime)
+    points      = tuple(enc_util.bytes2gfpoint(share, field) for share in raw_shares)  # type: ignore
+    secret_int  = gf_poly.join(field, points, threshold)  # type: ignore
+    _master_key = enc_util.int2bytes(secret_int, zfill_bytes=math.ceil(math.log2(prime) / 8))
+    return ct.MasterKey(_master_key)
 
 
 #     i=  0   1   2   3   4   5   6   7
@@ -54,8 +52,8 @@ XCoord  = int
 YCoords = typ.Dict[typ.Tuple[XCoord, Index], int]
 
 
-def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> typ.Iterable[RawShare]:
-    field = gf.Field[gf.GF256](256, gf.GF256)
+def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> typ.Iterable[ct.RawShare]:
+    field = gf.FieldGF256()
 
     y_coords: YCoords = {}
     for i, secret_int in enumerate(data):
@@ -71,13 +69,13 @@ def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> typ.Iter
     for x_coord in x_coords:
         y_values  = [y_coords[x_coord, i] for i in range(len(data))]
         raw_share = bytes([x_coord]) + bytes(y_values)
-        yield raw_share
+        yield ct.RawShare(raw_share)
 
 
-def _join_gf_256(raw_shares: typ.List[RawShare], threshold: int) -> MasterKey:
+def _join_gf_256(raw_shares: RawShares, threshold: int) -> ct.MasterKey:
     assert len(raw_shares) >= threshold
 
-    field = gf.Field[gf.GF256](256, gf.GF256)
+    field = gf.FieldGF256()
 
     y_coords: YCoords = {}
     for raw_share in raw_shares:
@@ -92,22 +90,23 @@ def _join_gf_256(raw_shares: typ.List[RawShare], threshold: int) -> MasterKey:
 
     secret_ints: typ.List[int] = []
     for i in range(data_len):
-        gfpoints: typ.List[gf_poly.Point[gf.GF256]] = []
+        gfpoints: typ.List[gf_poly.Point] = []
         for x_coord in x_coords:
             y_coord  = y_coords[x_coord, i]
             gf_point = gf_poly.Point(field[x_coord], field[y_coord])
             gfpoints.append(gf_point)
         secret_ints.append(gf_poly.join(field, tuple(gfpoints), threshold=threshold))
 
-    return bytes(secret_ints)
+    _master_key = bytes(secret_ints)
+    return ct.MasterKey(_master_key)
 
 
 def split(
     param_cfg: params.ParamConfig,
-    raw_salt : RawSalt,
-    brainkey : BrainKey,
+    raw_salt : ct.RawSalt,
+    brainkey : ct.BrainKey,
     use_gf_p : bool = False,
-) -> typ.Iterable[Share]:
+) -> typ.Iterable[ct.Share]:
     if len(raw_salt) != params.RAW_SALT_LEN:
         errmsg = f"{len(raw_salt)} != {params.RAW_SALT_LEN}"
         raise Exception(errmsg)
@@ -133,18 +132,18 @@ def split(
         if len(raw_share) != params.MASTER_KEY_LEN + 1:
             errmsg = f"{len(raw_share)} != {params.MASTER_KEY_LEN + 1}"
             raise ValueError(errmsg)
-
-        if len(share_data) != params.SHARE_LEN:
+        elif len(share_data) != params.SHARE_LEN:
             errmsg = f"{len(share_data)} != {params.SHARE_LEN}"
             raise ValueError(errmsg)
-
-        yield share_data
+        else:
+            yield ct.Share(share_data)
 
 
 def join(
-    param_cfg: params.ParamConfig, shares: typ.List[Share], use_gf_p: bool = False
-) -> typ.Tuple[RawSalt, BrainKey]:
-    raw_shares = [share[params.PARAM_CFG_LEN :] for share in shares]
+    param_cfg: params.ParamConfig, shares: ct.Shares, use_gf_p: bool = False
+) -> typ.Tuple[ct.RawSalt, ct.BrainKey]:
+    # strip off params
+    raw_shares : RawShares = [ct.RawShare(share[params.PARAM_CFG_LEN :]) for share in shares]
     if use_gf_p:
         master_key = _join_gf_p(raw_shares, param_cfg.threshold, param_cfg.prime)
     else:
@@ -157,15 +156,14 @@ def join(
     salt_end = params.RAW_SALT_LEN
     bk_start = params.RAW_SALT_LEN
 
-    raw_salt = master_key[:salt_end]
-    brainkey = master_key[bk_start:]
+    raw_salt = ct.RawSalt(bytes(master_key)[:salt_end])
+    brainkey = ct.BrainKey(bytes(master_key)[bk_start:])
 
     if len(raw_salt) != params.RAW_SALT_LEN:
         errmsg = f"Invalid raw_salt {len(raw_salt)}"
         raise ValueError(errmsg)
-
-    if len(brainkey) != params.BRAINKEY_LEN:
+    elif len(brainkey) != params.BRAINKEY_LEN:
         errmsg = f"Invalid brainkey {len(brainkey)}"
         raise ValueError(errmsg)
-
-    return (raw_salt, brainkey)
+    else:
+        return (raw_salt, brainkey)

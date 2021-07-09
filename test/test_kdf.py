@@ -1,4 +1,5 @@
 import random
+import importlib
 
 import pytest
 
@@ -148,6 +149,11 @@ def test_argon2_fuzz():
     # Compare two implementations. Ostensibly they both use
     # the same implementation underneath, so there should
     # be absolutely no difference
+    try:
+        importlib.import_module('pyargon2')
+    except ImportError:
+        return
+
     r = random.Random(0)
 
     for _ in range(10):

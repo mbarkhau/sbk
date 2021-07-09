@@ -8,6 +8,7 @@
 import math
 import time
 import typing as typ
+import importlib
 import threading
 
 NumThreads = int
@@ -217,7 +218,7 @@ def _hash_pyargon2(
     t   : Iterations,
 ) -> bytes:
     # NOTE: only used for testing/validation
-    import pyargon2
+    pyargon2 = importlib.import_module('pyargon2')
 
     result = pyargon2.hash(
         password=data,

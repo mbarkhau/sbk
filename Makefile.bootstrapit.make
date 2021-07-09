@@ -189,7 +189,7 @@ help:
 
 	@if [[ ! -f $(DEV_ENV_PY) ]]; then \
 	echo "Missing python interpreter at $(DEV_ENV_PY) !"; \
-	echo "You problably want to first setup the virtual environments:"; \
+	echo "You probably want to first setup the virtual environments:"; \
 	echo ""; \
 	echo "    make conda"; \
 	echo ""; \
@@ -198,7 +198,7 @@ help:
 
 	@if [[ ! -f $(CONDA_BIN) ]]; then \
 	echo "No conda installation found!"; \
-	echo "You problably want to first setup the virtual environments:"; \
+	echo "You probably want to first setup the virtual environments:"; \
 	echo ""; \
 	echo "    make conda"; \
 	echo ""; \

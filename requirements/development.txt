@@ -33,7 +33,7 @@ snakeviz
 # add one after you've tested it and found it to be actually useful.
 
 ipython     # nuff said
-
+ipdb
 
 # A command line utility to display dependency tree of the installed Python packages
 # https://github.com/naiquevin/pipdeptree
@@ -46,6 +46,3 @@ graphviz
 
 # run failed tests first
 pytest-cache
-
-# to help maintain hashes in requirements/pypi.txt
-hashin

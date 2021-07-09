@@ -164,7 +164,7 @@ def num_cores() -> int:
     if hasattr(os, 'sched_getaffinity'):
         return len(os.sched_getaffinity(0))
     else:
-        return os.cpu_count()
+        return os.cpu_count() or 1
 
 
 def init_sys_info() -> SystemInfo:

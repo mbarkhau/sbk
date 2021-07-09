@@ -47,5 +47,6 @@ graphviz
 # run failed tests first
 pytest-cache
 
-# for validation
-pyargon2
+# only for validation
+# pyargon2
+

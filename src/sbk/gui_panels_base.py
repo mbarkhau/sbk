@@ -10,7 +10,6 @@
 # pylint: disable=too-many-return-statements
 
 """GUI Baseclasses for Panels of SBK."""
-import os
 import time
 import typing as typ
 import logging

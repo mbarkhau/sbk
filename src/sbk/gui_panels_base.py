@@ -229,7 +229,8 @@ class NavigablePanel(Panel):
 
 class IntCodeEdit(qtw.QLineEdit):
     def event(self, event) -> bool:
-        # TODO (mb 2021-07-08): Fix select all behavior
+        if self.hasSelectedText():
+            return super().event(event)
 
         if event.type() != qtc.QEvent.KeyPress:
             return super().event(event)
@@ -670,8 +671,7 @@ class EnterSecretPanel(NavigablePanel):
                     parts = ui_common.intcodes2parts([intcode], idx_offset=idx)
                     yield parts[0]
                     yield parts[1]
-                except ValueError as err:
-                    print("###", err)
+                except ValueError:
                     widget.setStyleSheet("background-color: #F66;")
                     yield None
                     yield None

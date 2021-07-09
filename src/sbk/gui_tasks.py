@@ -14,7 +14,6 @@ import PyQt5.QtCore as qtc
 
 from . import kdf
 from . import params
-from . import shamir
 from . import ui_common
 from . import common_types as ct
 from . import gui_panels_base as gpb
@@ -91,6 +90,10 @@ class SeedGenerationTask(qtc.QThread):
 
         salt, brainkey, shares = ui_common.create_secrets(self.param_cfg)
 
+        # NOTE (mb 2021-07-09): We could do this later in theory, but
+        #   if the derivation of seed_data fails, the user would have
+        #   written down their shares that are useless. Better to
+        #   provoke any such error early on.
         seed_data = ui_common.derive_seed(
             self.param_cfg.kdf_params,
             salt,
@@ -115,19 +118,18 @@ class SeedDerivationTask(qtc.QThread):
     def __init__(
         self,
         param_cfg: params.ParamConfig,
-        shares   : ct.Shares,
         salt     : ct.Salt,
         brainkey : ct.BrainKey,
     ) -> None:
         super().__init__()
         self.param_cfg = param_cfg
-        self.shares    = shares
         self.salt      = salt
         self.brainkey  = brainkey
 
     def run(self) -> None:
         try:
-            param_cfg_data = ui_common.validated_param_data(self.param_cfg)
+            # provoke error for invalid data
+            ui_common.validated_param_data(self.param_cfg)
         except ValueError as err:
             if err.args and isinstance(err.args[0], list):
                 bad_checks = err.args[0]
@@ -138,16 +140,8 @@ class SeedDerivationTask(qtc.QThread):
             self.finished.emit(errmsg)
             return
 
-        print("salt     ", self.salt)
-        print("brainkey ", self.brainkey)
-        print("shares   ", self.shares)
-
-        if self.salt and self.brainkey:
-            brainkey = self.brainkey
-            salt     = self.salt
-        else:
-            raw_salt, brainkey = shamir.join(self.param_cfg, self.shares)
-            salt = ct.Salt(param_cfg_data + raw_salt)
+        brainkey = self.brainkey
+        salt     = self.salt
 
         seed_data = ui_common.derive_seed(
             self.param_cfg.kdf_params,
@@ -157,10 +151,10 @@ class SeedDerivationTask(qtc.QThread):
             init_progressbar=init_progres_status_emitter_clazz(self.progress),
         )
 
-        gpb.shared_panel_state['salt'     ] = salt
-        gpb.shared_panel_state['brainkey' ] = brainkey
-        gpb.shared_panel_state['shares'   ] = self.shares
-        gpb.shared_panel_state['seed_data'] = seed_data
+        state = gpb.shared_panel_state
+        state['salt'     ] = salt
+        state['brainkey' ] = brainkey
+        state['seed_data'] = seed_data
 
         self.finished.emit("ok")
 

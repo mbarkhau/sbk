@@ -101,7 +101,7 @@ def _join_gf_256(raw_shares: RawShares, threshold: int) -> ct.MasterKey:
     return ct.MasterKey(_master_key)
 
 
-def split(
+def _split(
     param_cfg: params.ParamConfig,
     raw_salt : ct.RawSalt,
     brainkey : ct.BrainKey,
@@ -137,6 +137,15 @@ def split(
             raise ValueError(errmsg)
         else:
             yield ct.Share(share_data)
+
+
+def split(
+    param_cfg: params.ParamConfig,
+    raw_salt : ct.RawSalt,
+    brainkey : ct.BrainKey,
+    use_gf_p : bool = False,
+) -> typ.Sequence[ct.Share]:
+    return list(_split(param_cfg, raw_salt, brainkey, use_gf_p))
 
 
 def join(

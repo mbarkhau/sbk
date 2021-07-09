@@ -38,7 +38,7 @@ logger = logging.getLogger("sbk.ui_common")
 SECURITY_WARNING_TEXT = """
 Security Warning
 
-Please Ensure:
+Please make sure:
 
  - You are the only person who can currently view your screen.
  - Your computer is not connected to any network.
@@ -105,8 +105,8 @@ SHARE_INFO_TEXT = """
 Keep this Share hidden in a safe place or give it to a trustee
 for them to keep safe. A trustee must trustworthy in two senses:
 
-  1. They are trusted to not collude with others and steal from you.
-  2. They are competent to keep this "Share" safe and secure.
+  1. You must trust them to not collude with others and steal from you.
+  2. You must trust that they are competent to keep this "Share" safe and secure.
 """
 
 # NOTE (mb 2021-05-14): Probably not needed now that we have docs

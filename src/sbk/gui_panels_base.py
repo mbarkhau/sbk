@@ -90,12 +90,11 @@ def get_state() -> PanelState:
     if state['sys_info'] is None:
         _sys_info = sys_info.init_sys_info()
         state['sys_info'] = _sys_info
-        num_cores      = len(os.sched_getaffinity(0))
-        parallelism    = num_cores           * 2
+        parallelism    = _sys_info.num_cores * 2
         default_memory = _sys_info.initial_m * _sys_info.initial_p
 
         state['parallelism'      ] = parallelism
-        state['max_parallelism'  ] = num_cores * 4
+        state['max_parallelism'  ] = _sys_info.num_cores * 4
         state['target_memory'    ] = default_memory
         state['memory_per_thread'] = round(default_memory / parallelism)
         state['max_memory'       ] = _sys_info.total_mb

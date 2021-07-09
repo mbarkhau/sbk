@@ -160,14 +160,20 @@ def load_sys_info(use_cache: bool = True) -> SystemInfo:
     return nfo
 
 
+def num_cores() -> int:
+    if hasattr(os, 'sched_getaffinity'):
+        return len(os.sched_getaffinity(0))
+    else:
+        return os.cpu_count()
+
+
 def init_sys_info() -> SystemInfo:
     import argon2
 
-    num_cores = len(os.sched_getaffinity(0))
-    total_mb  = mem_total()
+    total_mb = mem_total()
 
-    initial_p = int(num_cores * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb  * DEFAULT_KDF_MEM_RATIO    ) // initial_p
+    initial_p = int(num_cores() * DEFAULT_KDF_THREADS_RATIO)
+    initial_m = int(total_mb * DEFAULT_KDF_MEM_RATIO) // initial_p
 
     while True:
         try:
@@ -183,7 +189,7 @@ def init_sys_info() -> SystemInfo:
                 raise
             initial_m = (2 * initial_m) // 3
 
-    nfo = SystemInfo(num_cores, total_mb, initial_p, initial_m)
+    nfo = SystemInfo(num_cores(), total_mb, initial_p, initial_m)
     dump_sys_info(nfo)
     return nfo
 

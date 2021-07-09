@@ -503,7 +503,7 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
 
             if param_cfg and salt and brainkey:
                 param_cfg = param_cfg._replace(num_shares=state['num_shares'])
-                raw_salt  = ct.RawSalt(bytes(salt)[params.PARAM_CFG_LEN :])  # type: ignore
+                raw_salt  = ct.RawSalt(bytes(salt)[params.PARAM_CFG_LEN :])
                 shares    = shamir.split(param_cfg, raw_salt, brainkey)
                 state['shares'] = shares
 

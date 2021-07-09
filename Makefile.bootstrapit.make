@@ -612,19 +612,10 @@ dist_publish: bump_version dist_build dist_upload
 ##   4. You're using WSL but didn't do export DOCKER_HOST="tcp://localhost:2375"
 .PHONY: docker_build
 docker_build:
-	@if [[ -f "$(RSA_KEY_PATH)" ]]; then \
-		$(DOCKER) build \
-			--build-arg SSH_PRIVATE_RSA_KEY="$$(cat '$(RSA_KEY_PATH)')" \
-			--file docker_base.Dockerfile \
-			--tag $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION) \
-			--tag $(DOCKER_BASE_IMAGE) \
-			.; \
-	else \
-		$(DOCKER) build \
-			--file docker_base.Dockerfile \
-			--tag $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION) \
-			--tag $(DOCKER_BASE_IMAGE) \
-			.; \
-	fi
+	$(DOCKER) build \
+		--file docker_base.Dockerfile \
+		--tag $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION) \
+		--tag $(DOCKER_BASE_IMAGE) \
+		.;
 
 	$(DOCKER) push $(DOCKER_BASE_IMAGE)

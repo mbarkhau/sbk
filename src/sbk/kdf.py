@@ -220,7 +220,7 @@ def _hash_pyargon2(
     # NOTE: only used for testing/validation
     pyargon2 = importlib.import_module('pyargon2')
 
-    result = pyargon2.hash(
+    result = pyargon2.hash(  # type: ignore
         password=data,
         salt=data,
         encoding='raw',

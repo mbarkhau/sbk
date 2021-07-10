@@ -407,7 +407,7 @@ test:
 		--junitxml reports/pytest.xml \
 		-k "$${PYTEST_FILTER-$${FLTR}}" \
 		$(shell cd src/ && ls -1 */__init__.py | awk '{ sub(/\/__init__.py/, "", $$1); print "--cov "$$1 }') \
-		test/ src/;
+		test/;
 
 	# Next we install the package and run the test suite against it.
 
@@ -534,7 +534,7 @@ devtest:
 		--exitfirst \
 		--failed-first \
 		-k "$${PYTEST_FILTER-$${FLTR}}" \
-		test/ src/;
+		test/;
 
 	@rm -rf "src/__pycache__";
 	@rm -rf "test/__pycache__";

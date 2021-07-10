@@ -11,6 +11,7 @@
 
 """GUI Panels for SBK."""
 import os
+import re
 import time
 import typing as typ
 import logging
@@ -304,14 +305,6 @@ WARNING_TEXT = f"""
 </body></html>
 """
 
-SECRET_TMPL = """
-<html><head/><body>
-<p style="font-family:monospace;white-space:pre-wrap;">
-{content}
-<p>
-</body></html>
-"""
-
 
 class SecurityWarningPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
@@ -344,29 +337,47 @@ class ShowKeysPanel(gpb.NavigablePanel):
         self.header = gpb.header_widget()
         self.text   = qtw.QLabel()
 
-        text_wrap = qtw.QHBoxLayout()
-        text_wrap.addStretch(1)
-        text_wrap.addWidget(self.text)
-        text_wrap.addStretch(1)
+        self.grid_widgets: typ.List[qtw.QWidget] = []
+        self.grid_layout = qtw.QGridLayout()
 
         self._layout = qtw.QVBoxLayout()
         self._layout.addWidget(self.header)
-        self._layout.addStretch(1)
-        self._layout.addLayout(text_wrap)
-        self._layout.addStretch(3)
+        self._layout.addLayout(gpb.column_headers(self))
+        self._layout.addLayout(self.grid_layout)
 
+        self._layout.addStretch(1)
         self._layout.addLayout(self.nav_layout)
         self.setLayout(self._layout)
 
     def switch(self) -> None:
+        self.trace(f"switch {type(self).__name__} {gpb.shared_panel_state['panel_index']}")
+
         self.header.setText(gpb.get_label_text())
 
-        secret       = gpb.get_current_secret()
-        output_lines = cli_io.format_secret_lines(secret.secret_type, secret.secret_data)
+        secret = gpb.get_current_secret()
 
-        content = "\n".join(output_lines) + "\n"
-        text    = SECRET_TMPL.format(content=content)
-        self.text.setText(text)
+        # TODO (mb 2021-07-10): kinda hacky to go through the format secret logic
+        #    and parse it back out
+        output_lines = cli_io.format_secret_lines(secret.secret_type, secret.secret_data)
+        content      = "\n".join(line[3:] for line in output_lines)
+        all_row_widgets: gpb.RowWidgets = []
+        intcodes  = iter(re.findall(r"\b([0-9]{3}-[0-9]{3})\b", content))
+        mnemonics = iter(re.findall(r"\b([a-z]{5,8})\b"       , content))
+
+        while True:
+            try:
+                row_widgets = (
+                    gpb._label_widget(self, next(intcodes ), bold=True),
+                    gpb._label_widget(self, next(mnemonics), bold=True),
+                    gpb._label_widget(self, next(mnemonics), bold=True),
+                    gpb._label_widget(self, next(intcodes ), bold=True),
+                )
+                all_row_widgets.append(row_widgets)
+            except StopIteration:
+                break
+
+        new_widgets = gpb.init_grid(self, self.grid_layout, all_row_widgets)
+        self.grid_widgets.extend(new_widgets)
 
         super().switch()
 
@@ -389,6 +400,15 @@ class ShowKeysPanel(gpb.NavigablePanel):
             return ShowKeysPanel
         else:
             return SelectCommandPanel
+
+    def destroy_panel(self) -> None:
+        for widget in self.grid_widgets:
+            self.grid_layout.removeWidget(widget)
+            widget.deleteLater()
+
+        del self.grid_widgets[:]
+
+        super().destroy_panel()
 
 
 class CreateKeysShowPanel(ShowKeysPanel):

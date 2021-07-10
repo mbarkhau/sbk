@@ -20,3 +20,28 @@ The recommended approach to using `pylint-ignore` is:
 3. If a message is a false positive, add a comment of this form to your code:
    `# pylint:disable=<symbol> ; explain why this is a false positive`
 
+
+# Overview
+
+ - [W0511: fixme (1x)](#w0511-fixme)
+
+
+# W0511: fixme
+
+## File src/sbk/gui_panels.py - Line 358 - W0511 (fixme)
+
+- `message: TODO (mb 2021-07-10): kinda hacky to go through the format secret logic`
+- `author : Manuel Barkhau <mbarkhau@gmail.com>`
+- `date   : 2021-07-10T22:37:44`
+
+```
+  351:     def switch(self) -> None:
+  ...
+  356:         secret = gpb.get_current_secret()
+  357:
+> 358:         # TODO (mb 2021-07-10): kinda hacky to go through the format secret logic
+  359:         #    and parse it back out
+  360:         output_lines = cli_io.format_secret_lines(secret.secret_type, secret.secret_data)
+```
+
+

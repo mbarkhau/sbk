@@ -63,13 +63,6 @@ static_files: \
 	cp logo* $(KBFS_DIR)
 
 
-.PHONY: sbk-live-workdir/sbklive_x64.iso
-sbk-live-workdir/sbklive_x64.iso:
-	bash sbk-live-remaster.sh
-
-	# dd status=progress if=sbk-live-workdir/sbklive_x64.iso of=/dev/sdx
-
-
 ## Create release iso
 ## createds venv with validated dependencies
 .PHONY: release
@@ -77,14 +70,6 @@ release:
 	rm -rf $(ENV_PREFIX)/sbk_release_py37/;
 	$(CONDA_BIN) create --yes --name sbk_release_py37 python=3.7;
 	$(ENV_PREFIX)/sbk_release_py37/bin/python -m pip install -r requirements/pypi.txt;
-
-
-## Create a remastered iso based on tails
-##
-## Based on https://tails.boum.org/contribute/build/#index5h1
-.PHONY: remaster
-remaster:
-	bash sbk-live-remaster.sh
 
 
 ## Add sign-off to requirements/pypi.txt
@@ -101,4 +86,4 @@ signoff-deps:
 
 .PHONY: aspell
 aspell:
-	aspell -l en-uk -c READMEv2.md
+	aspell -l en-us -c README.md

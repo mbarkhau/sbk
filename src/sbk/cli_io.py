@@ -105,12 +105,10 @@ def _init_blank_inputs(secret_type: str) -> Inputs:
 
 
 def _newline_mod(num_lines: int) -> int:
-    if num_lines in (6, 8, 10, 12, 14, 16):
+    if num_lines in (12, 16):
+        newline_mod = 4
+    elif num_lines in (6, 8, 10, 14):
         newline_mod = (num_lines + 1) // 2
-        # newline_mod = 3
-        # for n in range(3, 6):
-        #     if num_lines % n == 0 or 0 < num_lines % newline_mod < num_lines % n:
-        #         newline_mod = n
     else:
         newline_mod = 99
     return newline_mod

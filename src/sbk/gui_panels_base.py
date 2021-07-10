@@ -157,7 +157,13 @@ def get_padded_secret() -> bytes:
         raise AssertionError("Integrity check failed")
 
 
-FIXED_FONT = qtg.QFontDatabase.systemFont(qtg.QFontDatabase.FixedFont)
+MONO_FONT = qtg.QFont()
+MONO_FONT.setFamily("monospace")
+MONO_FONT.setBold(False)
+
+MONO_FONT_BOLD = qtg.QFont()
+MONO_FONT_BOLD.setFamily("monospace")
+MONO_FONT_BOLD.setBold(True)
 
 
 class Panel(qtw.QWidget):
@@ -352,22 +358,25 @@ class MnemonicEdit(qtw.QLineEdit):
         return super().focusInEvent(event)
 
 
-def _label_widget(parent: Panel, text: str) -> qtw.QLabel:
+def _label_widget(parent: qtw.QWidget, text: str, bold: bool = False) -> qtw.QLabel:
     label = qtw.QLabel(text, parent)
     label.setAlignment(qtc.Qt.AlignCenter)
-    label.setFont(FIXED_FONT)
+    if bold:
+        label.setFont(MONO_FONT_BOLD)
+    else:
+        label.setFont(MONO_FONT)
     return label
 
 
 def _set_styles(line_edit: qtw.QLineEdit, max_length: int) -> None:
     line_edit.setAlignment(qtc.Qt.AlignCenter)
-    line_edit.setFont(FIXED_FONT)
+    line_edit.setFont(MONO_FONT)
     line_edit.setMaxLength(max_length)
     line_edit.setFixedWidth(max_length * 22)
     # line_edit.setStyleSheet("background-color: #F44;")
 
 
-def _intcode_widget(parent: Panel, initial_text: str) -> IntCodeEdit:
+def _intcode_widget(parent: qtw.QWidget, initial_text: str) -> IntCodeEdit:
     widget = IntCodeEdit(parent)
     widget.setText(initial_text)
     widget.setPlaceholderText("000-000")
@@ -380,7 +389,7 @@ def _intcode_widget(parent: Panel, initial_text: str) -> IntCodeEdit:
     return widget
 
 
-def _mnemonic_widget(parent: Panel, initial_text: str) -> MnemonicEdit:
+def _mnemonic_widget(parent: qtw.QWidget, initial_text: str) -> MnemonicEdit:
     widget = MnemonicEdit(parent)
     widget.setText(initial_text)
     widget.setPlaceholderText("-")
@@ -451,6 +460,73 @@ def _recover_datas(valid_datas: typ.Sequence[MaybeBytes], msg_len: int) -> typ.S
         return valid_datas
 
 
+def column_headers(parent: qtw.QWidget) -> qtw.QHBoxLayout:
+    headers = qtw.QHBoxLayout()
+    headers.addStretch(26)
+    headers.addWidget(_label_widget(parent, "Data"    ), 42 - 15)
+    headers.addWidget(_label_widget(parent, "Mnemonic"), 48 * 2)
+    headers.addWidget(_label_widget(parent, "ECC"     ), 42 + 10)
+    headers.addStretch(5)
+    return headers
+
+
+RowWidgets = typ.List[typ.Tuple[qtw.QWidget, qtw.QWidget, qtw.QWidget, qtw.QWidget]]
+
+
+def init_grid(
+    parent         : qtw.QWidget,
+    grid_layout    : qtw.QGridLayout,
+    all_row_widgets: RowWidgets,
+) -> typ.Sequence[qtw.QWidget]:
+    all_widgets: typ.List[qtw.QWidget] = []
+
+    num_rows = len(all_row_widgets)
+    for row, (i1, m1, m2, i2) in enumerate(all_row_widgets):
+        grid_row = row + row // 4
+
+        row_num_left  = (row % num_rows) + 1
+        row_num_right = (row % num_rows) + num_rows + 1
+
+        row_widgets = [
+            _label_widget(parent, ""),  # 0
+            _label_widget(parent, f"{row_num_left:02}:"),  # 1
+            i1,  # 2
+            _label_widget(parent, ""),  # 3
+            m1,  # 4
+            _label_widget(parent, ""),  # 5
+            m2,  # 6
+            _label_widget(parent, ""),  # 7
+            _label_widget(parent, f"{row_num_right:02}:"),  # 8
+            i2,  # 9
+            _label_widget(parent, ""),  # 10
+        ]
+
+        for col, widget in enumerate(row_widgets):
+            grid_layout.addWidget(widget, grid_row, col)
+
+        all_widgets.extend(row_widgets)
+        grid_layout.setRowMinimumHeight(grid_row, 43)
+
+    for row in [4, 9]:
+        col    = 0
+        widget = qtw.QLabel(" ", parent)
+        grid_layout.addWidget(widget, row, col)
+
+    grid_layout.setColumnStretch( 0,  2)
+    grid_layout.setColumnStretch( 1,  0)
+    grid_layout.setColumnStretch( 2, 21)
+    grid_layout.setColumnStretch( 3,  1)
+    grid_layout.setColumnStretch( 4, 24)
+    grid_layout.setColumnStretch( 5,  0)
+    grid_layout.setColumnStretch( 6, 24)
+    grid_layout.setColumnStretch( 7,  1)
+    grid_layout.setColumnStretch( 8,  0)
+    grid_layout.setColumnStretch( 9, 21)
+    grid_layout.setColumnStretch(10,  2)
+
+    return all_widgets
+
+
 class EnterSecretPanel(NavigablePanel):
 
     widget_states   : typ.Dict[int, typ.Dict[str, typ.Any]]
@@ -470,20 +546,12 @@ class EnterSecretPanel(NavigablePanel):
         self.header      = header_widget()
         self.grid_layout = qtw.QGridLayout()
 
-        column_headers = qtw.QHBoxLayout()
-        column_headers.addStretch(6 + 9)
-        column_headers.addWidget(_label_widget(self, "Data"    ), 21 - 9)
-        column_headers.addWidget(_label_widget(self, "Mnemonic"), 24 * 2)
-        column_headers.addWidget(_label_widget(self, "ECC"     ), 21 - 1)
-        column_headers.addStretch(6 + 1)
-
         self._layout = qtw.QVBoxLayout()
         self._layout.addWidget(self.header)
-        self._layout.addStretch(1)
-        self._layout.addLayout(column_headers)
+        self._layout.addLayout(column_headers(self))
         self._layout.addLayout(self.grid_layout)
-        self._layout.addStretch(3)
 
+        self._layout.addStretch(1)
         self._layout.addLayout(self.nav_layout)
         self.setLayout(self._layout)
 
@@ -560,42 +628,22 @@ class EnterSecretPanel(NavigablePanel):
             mw2 = self.mnemonic_widgets[i]
             self.setTabOrder(mw1, mw2)
 
+        all_row_widgets: RowWidgets = []
+
         num_rows = state['num_inputs'] // 2
         for row in range(num_rows):
-            row_num_left  = (row % num_rows) + 1
-            row_num_right = (row % num_rows) + num_rows + 1
+            row_widgets = (
+                self.intcode_widgets[row],
+                self.mnemonic_widgets[row * 2],
+                self.mnemonic_widgets[row * 2 + 1],
+                self.intcode_widgets[row + num_rows],
+            )
+            all_row_widgets.append(row_widgets)
 
-            row_widgets = [
-                _label_widget(self, ""),  # 0
-                _label_widget(self, f"{row_num_left:02}:"),  # 1
-                self.intcode_widgets[row],  # 2
-                _label_widget(self, ""),  # 3
-                self.mnemonic_widgets[row * 2],  # 4
-                _label_widget(self, ""),  # 5
-                self.mnemonic_widgets[row * 2 + 1],  # 6
-                _label_widget(self, ""),  # 7
-                _label_widget(self, f"{row_num_right:02}:"),  # 8
-                self.intcode_widgets[row + num_rows],  # 9
-                _label_widget(self, ""),  # 10
-            ]
+        new_widgets = init_grid(self, self.grid_layout, all_row_widgets)
 
-            for col, widget in enumerate(row_widgets):
-                self.grid_layout.addWidget(widget, row, col)
-
-            # for cleanup later
-            self.grid_widgets.extend(row_widgets)
-
-        self.grid_layout.setColumnStretch( 0,  2)
-        self.grid_layout.setColumnStretch( 1,  0)
-        self.grid_layout.setColumnStretch( 2, 21)
-        self.grid_layout.setColumnStretch( 3,  1)
-        self.grid_layout.setColumnStretch( 4, 24)
-        self.grid_layout.setColumnStretch( 5,  0)
-        self.grid_layout.setColumnStretch( 6, 24)
-        self.grid_layout.setColumnStretch( 7,  1)
-        self.grid_layout.setColumnStretch( 8,  0)
-        self.grid_layout.setColumnStretch( 9, 21)
-        self.grid_layout.setColumnStretch(10,  2)
+        # for cleanup later
+        self.grid_widgets.extend(new_widgets)
 
         super().switch()
 

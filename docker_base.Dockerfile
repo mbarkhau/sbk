@@ -39,13 +39,13 @@ RUN conda clean --all --yes && \
     find /opt/conda/ -name "__pycache__" | xargs rm -rf && \
     rm -rf /opt/conda/pkgs/
 
+FROM registry.gitlab.com/mbarkhau/bootstrapit/root
+
+COPY --from=builder /opt/conda/ /opt/conda/
+COPY --from=builder /vendor/ /vendor
+
 RUN apt-get update;
 RUN apt-get install -y libglib2.0-0
 RUN apt-get install -y libgl1-mesa-glx
 # provoke error for any missing system dependencies
 RUN opt/conda/envs/sbk_py39/bin/python -c "import PyQt5.QtGui"
-
-FROM registry.gitlab.com/mbarkhau/bootstrapit/root
-
-COPY --from=builder /opt/conda/ /opt/conda/
-COPY --from=builder /vendor/ /vendor

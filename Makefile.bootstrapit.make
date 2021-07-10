@@ -398,7 +398,7 @@ test:
 	ENV=$${ENV-dev} \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		PATH=$(DEV_ENV)/bin:$$PATH \
-		PYTEST_SKIP=slow \
+		PYTEST_SKIP=slow,ci \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--verbose \
@@ -423,7 +423,7 @@ test:
 		$${env_py} -m pip uninstall --yes $(PKG_NAME); \
 		$${env_py} -m pip install --upgrade --force-reinstall build/test_wheel/*.whl; \
 		PYTHONPATH="" ENV=$${ENV-dev} \
-		PYTEST_SKIP=slow \
+		PYTEST_SKIP=ci \
 		$${env_py} -m pytest \
 		-k "$${PYTEST_FILTER-$${FLTR}}" \
 		test/; \
@@ -620,4 +620,5 @@ docker_build:
 		--tag $(DOCKER_BASE_IMAGE) \
 		.;
 
+	$(DOCKER) push $(DOCKER_BASE_IMAGE):$(DOCKER_IMAGE_VERSION)
 	$(DOCKER) push $(DOCKER_BASE_IMAGE)

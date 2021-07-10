@@ -1,11 +1,14 @@
 import os
 
+import pytest
+
 import sbk.gui_panels as gp
 import sbk.gui_panels_base as gpb
 from sbk import params
 from sbk import ui_common
 
 
+@pytest.mark.skipif("ci" in os.getenv('PYTEST_SKIP', ""), reason="GUI tests broken on CI")
 def test_panel(qtbot):
     os.environ['SBK_PROGRESS_BAR'] = "0"
 
@@ -37,8 +40,11 @@ def test_panel(qtbot):
     gpb.shared_panel_state['shares'   ] = shares
     gpb.shared_panel_state['seed_data'] = seed_data
 
+    # from sbk import gui
+    # main_gui = gui.MainGUI()
+    # qtbot.addWidget(main_gui)
+
     panel = gp.SelectCommandPanel(0)
-    qtbot.addWidget(panel)
     panel.switch()
 
     panel = gp.OptionsPanel(0)
@@ -65,17 +71,14 @@ def test_panel(qtbot):
     qtbot.addWidget(panel)
     panel.switch()
 
-    # print("RecoverKeysPanel")
-    # panel = gp.RecoverKeysPanel(0)
-    # qtbot.addWidget(panel)
-    # panel.switch()
+    panel = gp.RecoverKeysPanel(0)
+    qtbot.addWidget(panel)
+    panel.switch()
 
-    # print("LoadKeysPanel")
     # panel = gp.LoadKeysPanel(0)
     # qtbot.addWidget(panel)
     # panel.switch()
 
-    # print("OpenWalletPanel")
     # panel = gp.OpenWalletPanel(0)
     # qtbot.addWidget(panel)
     # panel.switch()

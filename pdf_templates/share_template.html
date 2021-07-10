@@ -11,7 +11,7 @@
 
   body {
     font-size: 10pt;
-    line-height: 1.4em;
+    line-height: 1.35em;
     font-family: Bitter, serif;
     margin: 0;
     padding: 0;
@@ -20,39 +20,38 @@
   .logo, .qrcode, .infotext {
     position: absolute;
   }
-  .logo {
-    top: 18mm;
+  .qrcode {
+    top: 10mm;
+    right: 50%;
+    margin-right: 5mm;
   }
   .logo {
-    left: 22mm;
+    top: 10mm;
+    left: 15mm;
     width: 35mm;
   }
   .logo .logotext {
     float: right;
     width: 15mm;
-    font-size: 11pt;
-    line-height: 1.2em;
+    font-size: 12pt;
+    line-height: 1.1em;
     font-family: sans-serif;
     font-style: italic;
     font-weight: bold;
   }
   .logo img {
     float: left;
-    height: 18mm;
-  }
-  .qrcode {
-    top: 18mm;
-    left: 65mm;
+    height: 15mm;
   }
   .qrcode img {
-    height: 18mm;
+    height: 20mm;
   }
 
   .shareinfo {
-    font-size: 11pt;
-    line-height: 1.4em;
+    font-size: 10pt;
+    line-height: 1.3em;
     position: absolute;
-    top: 15mm;
+    top: 10mm;
     left: {{ w // 2 - 2 }}mm;
     width: {{ w // 2 }}mm;
   }
@@ -73,7 +72,7 @@
 
   .infotext {
     font-size: 9pt;
-    line-height: 1.4em;
+    line-height: 1.35em;
     word-spacing: 0.1em;
     letter-spacing: -0.01em;
     width: {{ w }}mm;
@@ -81,17 +80,16 @@
   .infotext .left,
   .infotext .right {
     position: absolute;
-    width: {{ (w - 50) / 2 }}mm;
+    width: {{ (w - 35) / 2 }}mm;
   }
   .infotext .left {
-    left: 18mm;
+    top: 30mm;
+    left: 12mm;
     line-height: 1.3em;
   }
   .infotext .right {
-    right: 15mm;
-  }
-  .infotext {
-    top: 38mm;
+    top: 30mm;
+    right: 12mm;
   }
   .infotext p {
     margin: 0.7em 0 0 0;
@@ -102,11 +100,12 @@
     margin-left: -2.0em;
   }
   .infotext li {
-    margin: 0.25em 0;
+    margin: 0.1em 0;
     padding: 0;
   }
 
   .fold-marks {
+    display: none;
     position: absolute;
     width: 100%;
     height: 100%;
@@ -119,11 +118,14 @@
   .fold-v {width: 1px; height: 10mm;}
 
   .fold-marks div.fold-m.fold-v {
-    display: none;
     top: 0;
     left: 50%;
     height: {{h}}mm;
   }
+
+  .fold-m.fold-h.fold-25 {left: 50%; top: 25%; margin-left: -5mm;}
+  .fold-m.fold-h.fold-50 {left: 50%; top: 50%; margin-left: -5mm;}
+  .fold-m.fold-h.fold-75 {left: 50%; top: 75%; margin-left: -5mm;}
 
   .fold-m.fold-h.fold-33 {left: 50%; top: 33.33%; margin-left: -5mm;}
   .fold-m.fold-h.fold-66 {left: 50%; top: 66.66%; margin-left: -5mm;}
@@ -142,8 +144,8 @@
     font-size: 11pt;
     display: block;
     position: absolute;
-    padding: 8mm 0;
-    top: 33.33%;
+    padding: 12mm 0 0 0;
+    top: 25%;
   }
   .wordlist.left {
     left: 20mm;
@@ -158,10 +160,10 @@
     display: inline-block;
     vertical-align: baseline;
     white-space: pre;
-    height: {{ (h / 3 - 16) / (wc / 4) }}mm;
-    line-height: {{ (h / 3 - 16) / (wc / 4) }}mm;
+    height: {{ (h / 3 - 24) / (wc / 4) }}mm;
+    line-height: {{ (h / 3 - 24) / (wc / 4) }}mm;
     text-align: center;
-    letter-spacing: 0.8mm;
+    letter-spacing: 0.6mm;
   }
   .wordlist > code {
     width: 48mm;
@@ -170,14 +172,16 @@
     width: {{w - (40 + 2 * 48)}}mm;
   }
   .wordlist.left > span:after {
-    content: "_ _ _ _ _ _ _    _ _ _ _ _ _ _";
+    content: "_ _ _ _ _ _ _          _ _ _ _ _ _ _";
   }
   .wordlist > code:after {
     content: " _ _ _ - _ _ _";
   }
-  .wordlist.left > :nth-child( {{ (wc - 1) // 2 }} ),
-  .wordlist.right > :nth-child( {{ (wc + 1) // 4 }} )  {
-    margin-bottom: 12mm;
+  .wordlist.left > :nth-child( {{ 1 * (wc - 1) // 3 }} ),
+  .wordlist.left > :nth-child( {{ 2 * (wc - 1) // 3 }} ),
+  .wordlist.right > :nth-child( {{ 1 * (wc + 1) // 6 }} ),
+  .wordlist.right > :nth-child( {{ 2 * (wc + 1) // 6 }} )  {
+    margin-bottom: 25mm;
   }
 </style>
 <title>SBK Share Template</title>
@@ -194,7 +198,12 @@
   <div class="fold-l fold-h fold-33"></div>
   <div class="fold-r fold-h fold-33"></div>
 
-  <div class="fold-m fold-h fold-33"></div>
+  <!-- <div class="fold-m fold-h fold-33"></div> -->
+  <!-- <div class="fold-m fold-h fold-66"></div> -->
+
+  <div class="fold-m fold-h fold-25"></div>
+  <div class="fold-m fold-h fold-50"></div>
+  <div class="fold-m fold-h fold-75"></div>
   <div class="fold-m fold-v"></div>
 </div>
 <div class="shareinfo">
@@ -217,11 +226,10 @@
       <li>Keep it safe, secret and secure.</li>
       <li>Leave it in its sealed condition.</li>
       <li>Return it to the owner if they request it.</li>
-      <li>Use it to help the owner or their agent<br/>to recover the wallet, but only
+      <li>Use it to help the owner recover their wallet, but only if
         <ol>
-          <li>if you can verify their identity and legitimacy,</li>
-          <li>if you are acting in the owners interest,</li>
-          <li>if you are following the instructions (scan QR).</li>
+          <li>you can verify the identity of the owner,</li>
+          <li>you are following the instructions (scan QR).</li>
         </ol>
       </li>
     </ul>

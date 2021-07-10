@@ -411,10 +411,10 @@ SEED_DATA_LEN = 16
 
 
 class ProgressbarUpdater(typ.Protocol):
-    def __enter__(self) -> typ.Any:
+    def update(self, n_steps: int) -> None:
         ...
 
-    def update(self, n_steps: int) -> None:
+    def __enter__(self) -> typ.Any:
         ...
 
     def __exit__(self, exc_type, exc_value, tb) -> None:
@@ -424,11 +424,17 @@ class ProgressbarUpdater(typ.Protocol):
 InitProgressbar = typ.Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpdater]
 
 
-class DummyProgressbar:
+class DummyProgressbar(ProgressbarUpdater):
     def __init__(self, length: int) -> None:
+        super().__init__()
+
+    def update(self, n_steps: int) -> None:
         pass
 
-    def update(self, steps: int) -> None:
+    def __enter__(self) -> typ.Any:
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb) -> None:
         pass
 
 

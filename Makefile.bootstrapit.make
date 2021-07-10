@@ -398,6 +398,7 @@ test:
 	ENV=$${ENV-dev} \
 		PYTHONPATH=src/:vendor/:$$PYTHONPATH \
 		PATH=$(DEV_ENV)/bin:$$PATH \
+		PYTEST_SKIP=slow \
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--verbose \
@@ -420,8 +421,9 @@ test:
 	for i in $${!env_py_paths[@]}; do \
 		env_py=$${env_py_paths[i]}; \
 		$${env_py} -m pip uninstall --yes $(PKG_NAME); \
-		$${env_py} -m pip install --upgrade build/test_wheel/*.whl; \
+		$${env_py} -m pip install --upgrade --force-reinstall build/test_wheel/*.whl; \
 		PYTHONPATH="" ENV=$${ENV-dev} \
+		PYTEST_SKIP=slow \
 		$${env_py} -m pytest \
 		-k "$${PYTEST_FILTER-$${FLTR}}" \
 		test/; \

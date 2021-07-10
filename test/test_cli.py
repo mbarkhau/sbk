@@ -75,7 +75,7 @@ def test_intcode_fuzz_loss(data_len):
 
 
 def test_intcode_odd_data_len():
-    in_data = b"\x11\x00\x0044444444444"
+    in_data = b"\x11\x00\x004444444444444"
     assert len(in_data) == sbk.params.SALT_LEN
     expected_inputs = [
         "004-352",
@@ -85,13 +85,15 @@ def test_intcode_odd_data_len():
         "275-508",
         "341-044",
         "406-580",
-        "499-845",
-        "551-018",
-        "619-194",
-        "682-864",
-        "755-571",
-        "844-783",
-        "035-178",
+        "472-116",
+        "541-542",
+        "620-229",
+        "677-537",
+        "772-367",
+        "806-086",
+        "003-160",
+        "117-840",
+        "144-371",
     ]
 
     inputs = bytes2intcodes(in_data)
@@ -237,60 +239,66 @@ DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      12: 782-590
-   02: 065-537   abacus    abraham     13: 788-738
-   03: 180-933   salmon    satoshi     14: 053-154
-   04: 252-115   teacup    squid       15: 067-360
-   05: 317-161   surgeon   unesco      16: 187-741
-   06: 388-327   victoria  ukraine     17: 201-515
-   07: 457-469   wizard    yokohama    18: 302-383
-   08: 520-331   vladimir  mozart      19: 378-444
-   09: 560-769   mumbai    meatball    20: 439-361
-   10: 623-775   mercury   oxford      21: 476-517
-   11: 692-765   nairobi   cabbage     22: 563-717
+   01: 004-352   bicycle   abacus      13: 802-163
+   02: 065-537   abacus    abraham     14: 051-183
+   03: 180-933   salmon    satoshi     15: 079-837
+   04: 252-115   teacup    squid       16: 166-340
+   05: 317-161   surgeon   unesco      17: 261-881
+   06: 388-327   victoria  ukraine     18: 306-464
+
+   07: 457-469   wizard    yokohama    19: 337-714
+   08: 520-331   vladimir  mozart      20: 419-340
+   09: 560-769   mumbai    meatball    21: 509-915
+   10: 623-775   mercury   oxford      22: 587-094
+   11: 692-885   nairobi   necklace    23: 645-494
+   12: 763-950   peugeot   darwin      24: 713-813
 
                      Share 2/3
 
-        Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      12: 741-213
-   02: 065-538   abacus    academy     13: 789-358
-   03: 181-197   samurai   slippers    14: 023-683
-   04: 260-065   watanabe  trumpet     15: 113-665
-   05: 322-453   vampire   necklace    16: 141-514
+     Data          Mnemonic               ECC
+   01: 004-352   bicycle   abacus      13: 800-059
+   02: 065-538   abacus    academy     14: 024-298
+   03: 181-197   samurai   slippers    15: 084-694
+   04: 260-065   watanabe  trumpet     16: 178-809
+   05: 322-453   vampire   necklace    17: 205-545
+   06: 368-521   oxford    moldova     18: 314-825
 
-   06: 368-521   oxford    moldova     17: 250-919
-   07: 439-229   printer   rhubarb     18: 321-242
-   08: 501-585   pepper    gymnast     19: 345-415
-   09: 547-653   hunter    football    20: 429-469
-   10: 610-169   gorilla   lebanon     21: 462-716
-   11: 680-743   jigsaw    coffee      22: 582-560
+   07: 439-229   printer   rhubarb     19: 372-120
+   08: 501-585   pepper    gymnast     20: 415-345
+   09: 547-653   hunter    football    21: 484-605
+   10: 610-169   gorilla   lebanon     22: 550-348
+   11: 680-813   jigsaw    kidney      23: 621-201
+   12: 726-863   bridge    gorilla     24: 712-000
 
                      Share 3/3
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      12: 774-972
-   02: 065-539   abacus    acrobat     13: 851-018
-   03: 144-700   donut     egypt       14: 011-676
-   04: 203-526   buffalo   alcohol     15: 120-094
-   05: 264-520   attorney  fujitsu     16: 162-638
+   01: 004-352   bicycle   abacus      13: 836-611
+   02: 065-539   abacus    acrobat     14: 010-729
+   03: 144-700   donut     egypt       15: 090-406
+   04: 203-526   buffalo   alcohol     16: 174-866
+   05: 264-520   attorney  fujitsu     17: 237-328
+   06: 345-946   freddie   hitachi     18: 322-919
 
-   06: 345-946   freddie   hitachi     17: 221-219
-   07: 425-332   lobster   kurosawa    18: 315-273
-   08: 484-334   jigsaw    virginia    19: 380-343
-   09: 582-128   trumpet   vladimir    20: 432-672
-   10: 655-314   zimbabwe  spider      21: 508-034
-   11: 705-841   satoshi   detroit     22: 540-099
+   07: 425-332   lobster   kurosawa    19: 336-638
+   08: 484-334   jigsaw    virginia    20: 411-226
+   09: 582-128   trumpet   vladimir    21: 460-054
+   10: 655-314   zimbabwe  spider      22: 529-850
+   11: 705-996   satoshi   sisyphus    23: 596-940
+   12: 756-633   mozart    normandy    24: 707-258
 
                        Salt
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle    abacus       08: 499-845
-   02: 065-588   abacus     dolphin      09: 551-018
-   03: 144-436   dolphin    dolphin      10: 619-194
-   04: 209-972   dolphin    dolphin      11: 682-864
-   05: 275-508   dolphin    dolphin      12: 755-571
-   06: 341-044   dolphin    dolphin      13: 844-783
-   07: 406-580   dolphin    dolphin      14: 035-178
+   01: 004-352   bicycle   abacus      09: 541-542
+   02: 065-588   abacus    dolphin     10: 620-229
+   03: 144-436   dolphin   dolphin     11: 677-537
+   04: 209-972   dolphin   dolphin     12: 772-367
+
+   05: 275-508   dolphin   dolphin     13: 806-086
+   06: 341-044   dolphin   dolphin     14: 003-160
+   07: 406-580   dolphin   dolphin     15: 117-840
+   08: 472-116   dolphin   dolphin     16: 144-371
 
                      Brainkey
 
@@ -492,7 +500,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("08: 499-845 <=") == 1
+    assert result.output.count("09: 541-542 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -513,7 +521,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("08: 499-845 <=") == 1
+    assert result.output.count("09: 541-542 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -530,8 +538,9 @@ def test_cli_recover_salt_from_ecc():
         interaction(expect=r".*Enter code/words at 05: ", send="next"),
         interaction(expect=r".*Enter code/words at 06: ", send="next"),
         interaction(expect=r".*Enter code/words at 07: ", send="next"),
-        interaction(expect=r".*Enter code at 08: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
-        interaction(expect=r".*Enter code at 12: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
+        interaction(expect=r".*Enter code/words at 08: ", send="next"),
+        interaction(expect=r".*Enter code at 09: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
+        interaction(expect=r".*Enter code at 13: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)

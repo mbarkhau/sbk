@@ -166,8 +166,10 @@ class Panel(qtw.QWidget):
         self.index = index
 
     def switch(self) -> None:
-        self.parent().setWindowTitle(self.title)
-        self.parent().setCurrentIndex(self.index)
+        parent = self.parent()
+        if parent:
+            parent.setWindowTitle(self.title)
+            parent.setCurrentIndex(self.index)
 
     def trace(self, message: str) -> None:
         instance_idx = self.index

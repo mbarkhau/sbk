@@ -512,8 +512,11 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
 
 def progressbar_updater(progressbar: qtw.QProgressBar) -> typ.Callable[[gt.ProgressStatus], None]:
     def update_progressbar(status: gt.ProgressStatus) -> None:
-        progressbar.setRange(0, status.length)
-        progressbar.setValue(round(status.current))
+        try:
+            progressbar.setRange(0, status.length)
+            progressbar.setValue(round(status.current))
+        except RuntimeError:
+            pass
 
     return update_progressbar
 

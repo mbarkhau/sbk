@@ -61,7 +61,7 @@ def test_lut_vs_slip0039_reference():
 
 def test_mul_inverse_lut():
     for n in range(256):
-        assert inverse_slow(n) == sbk.gf_lut.MUL_INVERSE_LUT[n], n
+        assert inverse_slow(n) == inverse(n), n
 
 
 # Case 3: xgcd(240, 46)

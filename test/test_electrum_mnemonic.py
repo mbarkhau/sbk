@@ -1,5 +1,6 @@
 # pylint: disable=wildcard-import
 # pylint: disable=unused-wildcard-import
+import math
 
 from sbk.electrum_mnemonic import *
 
@@ -58,6 +59,12 @@ def test_electrum_mnemonic():
 
 
 def test_raw_seed2phrase():
-    raw_seed = gen_raw_seed(128)
-    phrase   = raw_seed2phrase(raw_seed)
-    assert len(str(phrase).split(" ")) == 12
+    for _ in range(10):
+        raw_seed = gen_raw_seed(128)
+        phrase   = raw_seed2phrase(raw_seed)
+        words = str(phrase).split(" ")
+
+        if math.log2(raw_seed) >= 122:
+            assert len(words) == 12
+        else:
+            assert len(words) <= 11

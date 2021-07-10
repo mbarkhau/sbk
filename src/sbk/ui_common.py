@@ -424,8 +424,20 @@ class ProgressbarUpdater(typ.Protocol):
 InitProgressbar = typ.Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpdater]
 
 
-def click_progressbar(label: str) -> InitProgressbar:
-    return ft.partial(click.progressbar, label=label, show_eta=True)
+class DummyProgressbar:
+
+    def __init__(self, length: int) -> None:
+        pass
+
+    def update(self, steps: int) -> None:
+        pass
+
+
+def fallback_progressbar(label: str) -> InitProgressbar:
+    if os.getenv('SBK_PROGRESS_BAR', "1") == '1':
+        return ft.partial(click.progressbar, label=label, show_eta=True)
+    else:
+        return DummyProgressbar
 
 
 def derive_seed(
@@ -437,7 +449,7 @@ def derive_seed(
     init_progressbar: typ.Optional[InitProgressbar] = None,
 ) -> ct.SeedData:
     if init_progressbar is None:
-        _init_progressbar = click_progressbar(label)
+        _init_progressbar = fallback_progressbar(label)
     else:
         _init_progressbar = init_progressbar
 
@@ -530,7 +542,7 @@ def init_param_config(
     init_progressbar : typ.Optional[InitProgressbar] = None,
 ) -> params.ParamConfig:
     if init_progressbar is None:
-        _init_progressbar = click_progressbar("KDF Calibration")
+        _init_progressbar = fallback_progressbar("KDF Calibration")
     else:
         _init_progressbar = init_progressbar
 

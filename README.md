@@ -18,12 +18,11 @@ Project/Repo:
 [![MIT License][license_img]][license_ref]
 [![Supported Python Versions][pyversions_img]][pyversions_ref]
 [![CalVer 2021.1001-beta][version_img]][version_ref]
-[![PyPI Version][pypi_img]][pypi_ref]
-[![PyPI Downloads][downloads_img]][downloads_ref]
 
 Code Quality/CI:
 
-[![Build Status][build_img]][build_ref]
+[![GitHub CI Status][github_build_img]][github_build_ref]
+[![GitLab CI Status][gitlab_build_img]][gitlab_build_ref]
 [![Type Checked with mypy][mypy_img]][mypy_ref]
 [![Code Coverage][codecov_img]][codecov_ref]
 [![Code Style: sjfmt][style_img]][style_ref]
@@ -31,6 +30,7 @@ Code Quality/CI:
 | Name                                | role              | since   | until |
 | ----------------------------------- | ----------------- | ------- | ----- |
 | Manuel Barkhau (mbarkhau@gmail.com) | author/maintainer | 2019-01 | -     |
+
 
 ## Development/Testing
 
@@ -42,13 +42,16 @@ $ make lint mypy test
 ```
 
 
-[docs_img]: https://mbarkhau.keybase.pub/sbk/litprog_badge.svg
-[docs_ref]: https://mbarkhau.gitlab.io/sbk/docs
+[docs_img]: https://img.shields.io/badge/LitProg-Docs-white
+[docs_ref]: https://sbk.dev/docs
 
 [repo_ref]: https://gitlab.com/mbarkhau/sbk
 
-[build_img]: https://gitlab.com/mbarkhau/sbk/badges/master/pipeline.svg
-[build_ref]: https://gitlab.com/mbarkhau/sbk/pipelines
+[github_build_img]: https://github.com/mbarkhau/sbk/workflows/CI/badge.svg
+[github_build_ref]: https://github.com/mbarkhau/sbk/actions?query=workflow%3ACI
+
+[gitlab_build_img]: https://gitlab.com/mbarkhau/sbk/badges/master/pipeline.svg
+[gitlab_build_ref]: https://gitlab.com/mbarkhau/sbk/pipelines
 
 [codecov_img]: https://gitlab.com/mbarkhau/sbk/badges/master/coverage.svg
 [codecov_ref]: https://mbarkhau.gitlab.io/sbk/cov
@@ -61,12 +64,6 @@ $ make lint mypy test
 
 [style_img]: https://img.shields.io/badge/code%20style-%20sjfmt-f71.svg
 [style_ref]: https://gitlab.com/mbarkhau/straitjacket/
-
-[pypi_img]: https://img.shields.io/badge/PyPI-wheels-green.svg
-[pypi_ref]: https://pypi.org/project/sbk/#files
-
-[downloads_img]: https://pepy.tech/badge/sbk/month
-[downloads_ref]: https://pepy.tech/project/sbk
 
 [version_img]: https://img.shields.io/badge/CalVer-2021.1001--beta-blue.svg
 [version_ref]: https://pypi.org/project/pycalver/

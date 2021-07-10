@@ -173,8 +173,8 @@
   .wordlist > code:after {
     content: " _ _ _ - _ _ _";
   }
-  .wordlist.left > code:nth-child( {{ (wc - 1) // 2 }} ),
-  .wordlist.right > code:nth-child( {{ (wc + 1) // 4 }} )  {
+  .wordlist.left > :nth-child( {{ (wc - 1) // 2 }} ),
+  .wordlist.right > :nth-child( {{ (wc + 1) // 4 }} )  {
     margin-bottom: 12mm;
   }
 </style>

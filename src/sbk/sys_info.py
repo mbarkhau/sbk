@@ -162,6 +162,7 @@ def load_sys_info(use_cache: bool = True) -> SystemInfo:
 
 def num_cores() -> int:
     if hasattr(os, 'sched_getaffinity'):
+        # pylint: disable=no-member    ; macos doesn't have this
         return len(os.sched_getaffinity(0))
     else:
         return os.cpu_count() or 1

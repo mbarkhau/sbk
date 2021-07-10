@@ -62,7 +62,7 @@ def test_raw_seed2phrase():
     for _ in range(10):
         raw_seed = gen_raw_seed(128)
         phrase   = raw_seed2phrase(raw_seed)
-        words = str(phrase).split(" ")
+        words    = str(phrase).split(" ")
 
         if math.log2(raw_seed) >= 122:
             assert len(words) == 12

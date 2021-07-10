@@ -425,7 +425,6 @@ InitProgressbar = typ.Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpd
 
 
 class DummyProgressbar:
-
     def __init__(self, length: int) -> None:
         pass
 

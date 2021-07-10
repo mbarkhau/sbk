@@ -1,18 +1,17 @@
 import os
 
-from sbk import params
-from sbk import ui_common
-
 import sbk.gui_panels as gp
 import sbk.gui_panels_base as gpb
+from sbk import params
+from sbk import ui_common
 
 
 def test_panel(qtbot):
     os.environ['SBK_PROGRESS_BAR'] = "0"
 
     param_cfg = params.bytes2param_cfg(b"\x11\x00\x00")
-    state = gpb.shared_panel_state
-    state['param_cfg'] = param_cfg
+    state     = gpb.shared_panel_state
+    state['param_cfg'        ] = param_cfg
     state['threshold'        ] = 2
     state['num_shares'       ] = 3
     state['parallelism'      ] = 1

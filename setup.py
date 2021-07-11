@@ -34,7 +34,7 @@ setuptools.setup(
     author="Manuel Barkhau",
     author_email="mbarkhau@gmail.com",
     url="https://github.com/mbarkhau/sbk",
-    version="2021.1001a0",
+    version="2021.1002b0",
     keywords="ssss shamir split share secret bitcoin electrum seed brainkey crypto",
     description="Wallet seed generation from a brainkey with Shamir Secret Shares as Backup.",
     long_description=long_description,

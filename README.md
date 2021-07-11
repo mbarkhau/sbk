@@ -21,7 +21,7 @@ Project/Repo:
 [![LitProg Documentation][docs_img]][docs_ref]
 [![MIT License][license_img]][license_ref]
 [![Supported Python Versions][pyversions_img]][pyversions_ref]
-[![CalVer 2021.1001-beta][version_img]][version_ref]
+[![CalVer 2021.1002-beta][version_img]][version_ref]
 
 Code Quality/CI:
 
@@ -69,7 +69,7 @@ $ make lint mypy devtest
 [style_img]: https://img.shields.io/badge/code%20style-%20sjfmt-f71.svg
 [style_ref]: https://gitlab.com/mbarkhau/straitjacket/
 
-[version_img]: https://img.shields.io/badge/CalVer-2021.1001--beta-blue.svg
+[version_img]: https://img.shields.io/badge/CalVer-2021.1002--beta-blue.svg
 [version_ref]: https://pypi.org/project/pycalver/
 
 [pyversions_img]: https://img.shields.io/pypi/pyversions/sbk.svg

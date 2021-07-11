@@ -80,16 +80,16 @@
   .infotext .left,
   .infotext .right {
     position: absolute;
-    width: {{ (w - 35) / 2 }}mm;
+    width: {{ (w - 45) / 2 }}mm;
   }
   .infotext .left {
     top: 30mm;
-    left: 12mm;
+    left: 15mm;
     line-height: 1.3em;
   }
   .infotext .right {
     top: 30mm;
-    right: 12mm;
+    right: 15mm;
   }
   .infotext p {
     margin: 0.7em 0 0 0;
@@ -134,6 +134,11 @@
   .fold-top.fold-l.fold-h {top: 8mm; left: 5mm;}
   .fold-top.fold-r.fold-v {top: 5mm; right: 8mm;}
   .fold-top.fold-r.fold-h {top: 8mm; right: 5mm;}
+
+  .fold-l.fold-v.fold-25 {left: 8mm; top: 25%; margin-top: -13mm;}
+  .fold-r.fold-v.fold-25 {right: 8mm; top: 25%; margin-top: -13mm;}
+  .fold-l.fold-h.fold-25 {left: 5mm; top: 25%; margin-top: -8mm;}
+  .fold-r.fold-h.fold-25 {right: 5mm; top: 25%; margin-top: -8mm;}
 
   .fold-l.fold-v.fold-33 {left: 8mm; top: 33%; margin-top: -13mm;}
   .fold-r.fold-v.fold-33 {right: 8mm; top: 33%; margin-top: -13mm;}
@@ -193,10 +198,10 @@
   <div class="fold-r fold-h fold-top"></div>
   <div class="fold-r fold-v fold-top"></div>
 
-  <div class="fold-l fold-v fold-33"></div>
-  <div class="fold-r fold-v fold-33"></div>
-  <div class="fold-l fold-h fold-33"></div>
-  <div class="fold-r fold-h fold-33"></div>
+  <div class="fold-l fold-v fold-25"></div>
+  <div class="fold-r fold-v fold-25"></div>
+  <div class="fold-l fold-h fold-25"></div>
+  <div class="fold-r fold-h fold-25"></div>
 
   <!-- <div class="fold-m fold-h fold-33"></div> -->
   <!-- <div class="fold-m fold-h fold-66"></div> -->
@@ -207,10 +212,13 @@
   <div class="fold-m fold-v"></div>
 </div>
 <div class="shareinfo">
+  <div> <div>Share Info: </div> </div>
+  <!--
   <div> <div>trustee: </div><div></div> </div>
   <div> <div>owner: </div><div></div> </div>
   <div> <div>contact: </div><div></div> </div>
   <div> <div> </div><div></div> </div>
+  -->
 </div>
 <div class="logo">
     <img src="../logo_1024.png" />
@@ -221,7 +229,7 @@
 </div>
 <div class="infotext">
   <div class="left">
-    <p> This is one share of a Split Bitcoin Key. </p>
+    <p> This is a Backup Share of a Split Bitcoin Key. </p>
     <ul>
       <li>Do not open it. Do not break its seal.</li>
       <li>Keep it safe, secret and secure.</li>
@@ -235,12 +243,12 @@
   </div>
   <div class="right">
     <p>
-    This SBK Backup Share is given to you (the above named trustee) to keep <b>safe</b> (protected from damage) <b>secret</b> (only the owner and you should know about it) and <b>secure</b> (you should be the only person who can access it).
+    This share is given to you as a trustee. Keep it <b>safe</b> (undamaged) <b>secret</b> (only you should know about it) and <b>secure</b> (nobody else should have access to it).
     </p>
     <p>
-    Please contact the owner of this share,
+    Contact the owner of this share,
     <ul>
-      <li>if the seal has been opened or tampered with.</li>
+      <li>if the seal has been tampered with.</li>
       <li>if you are not the above named trustee.</li>
     </ul>
     </p>

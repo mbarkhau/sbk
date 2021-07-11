@@ -64,7 +64,10 @@ def test_raw_seed2phrase():
         phrase   = raw_seed2phrase(raw_seed)
         words    = str(phrase).split(" ")
 
-        if math.log2(raw_seed) >= 122:
+        if math.log2(raw_seed) > 121:
             assert len(words) == 12
+        elif math.log2(raw_seed) > 110:
+            assert len(words) == 11
         else:
-            assert len(words) <= 11
+            # exceedingly unlikely, false positive
+            assert len(words) == 10

@@ -11,7 +11,6 @@
 
 """GUI Panels for SBK."""
 import os
-import re
 import time
 import typing as typ
 import logging
@@ -22,7 +21,6 @@ import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
-from . import cli_io
 from . import params
 from . import shamir
 from . import gui_tasks as gt
@@ -356,21 +354,25 @@ class ShowKeysPanel(gpb.NavigablePanel):
 
         secret = gpb.get_current_secret()
 
-        # TODO (mb 2021-07-10): kinda hacky to go through the format secret logic
-        #    and parse it back out
-        output_lines = cli_io.format_secret_lines(secret.secret_type, secret.secret_data)
-        content      = "\n".join(line[3:] for line in output_lines)
-        all_row_widgets: gpb.RowWidgets = []
-        intcodes  = iter(re.findall(r"\b([0-9]{3}-[0-9]{3})\b", content))
-        mnemonics = iter(re.findall(r"\b([a-z]{5,8})\b"       , content))
+        intcodes  = ui_common.bytes2intcodes(secret.secret_data)
+        mnemonics = ui_common.intcodes2mnemonics(intcodes)
 
+        num_rows = len(intcodes) // 2
+        assert num_rows * 2 == len(intcodes)
+
+        lr_intcodes = list(sum(zip(intcodes[:num_rows], intcodes[num_rows:]), ()))
+
+        _lr_intcodes = iter(lr_intcodes)
+        _mnemonics   = iter(mnemonics)
+
+        all_row_widgets: gpb.RowWidgets = []
         while True:
             try:
                 row_widgets = (
-                    gpb._label_widget(self, next(intcodes ), bold=True),
-                    gpb._label_widget(self, next(mnemonics), bold=True),
-                    gpb._label_widget(self, next(mnemonics), bold=True),
-                    gpb._label_widget(self, next(intcodes ), bold=True),
+                    gpb._label_widget(self, next(_lr_intcodes), bold=True),
+                    gpb._label_widget(self, next(_mnemonics  ), bold=True),
+                    gpb._label_widget(self, next(_mnemonics  ), bold=True),
+                    gpb._label_widget(self, next(_lr_intcodes), bold=True),
                 )
                 all_row_widgets.append(row_widgets)
             except StopIteration:

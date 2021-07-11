@@ -1,11 +1,15 @@
+<div align="center">
+<p align="center">
+  <a href="https://github.com/mbarkhau/sbk">
+    <img src="https://sbk.dev/logo_1024.png" height=128 style="background: white;">
+  </a>
+</p>
+</div>
+
 # [SBK: Split Bitcoin Keys][repo_ref]
 
 <p align="center">
-<b>SBK is still ALPHA quality software, please only use if you want to contribute.</b>
-</p>
-
-<p align="center">
-<img src="https://mbarkhau.keybase.pub/sbk/logo_128.png" height=128 style="background: white;">
+<b>SBK is ALPHA quality software, please only use if you want to contribute.</b>
 </p>
 
 SBK is a program to generate and recover Bitcoin wallets. The goal of SBK is to enable most people to live up to the security mantra of Bitcoin: [Your keys, your coins; not your keys, not your coins][href_yt_held_storing_btc].
@@ -37,8 +41,8 @@ Code Quality/CI:
 ```bash
 $ git clone https://gitlab.com/mbarkhau/sbk
 $ cd sbk
-$ make install
-$ make lint mypy test
+$ make conda
+$ make lint mypy devtest
 ```
 
 

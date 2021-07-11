@@ -358,21 +358,25 @@ class MnemonicEdit(qtw.QLineEdit):
         return super().focusInEvent(event)
 
 
-def _label_widget(parent: qtw.QWidget, text: str, bold: bool = False) -> qtw.QLabel:
-    label = qtw.QLabel(text, parent)
+def _label_widget(parent: qtw.QWidget, text: str, bold: bool = False, debug: bool = False) -> qtw.QLabel:
+    label = qtw.QLabel(text.strip(), parent)
     label.setAlignment(qtc.Qt.AlignCenter)
     if bold:
         label.setFont(MONO_FONT_BOLD)
     else:
         label.setFont(MONO_FONT)
+    if debug:
+        label.setFrameStyle(qtw.QFrame.Panel | qtw.QFrame.Plain)
+        label.setLineWidth(1)
     return label
 
 
 def _set_styles(line_edit: qtw.QLineEdit, max_length: int) -> None:
     line_edit.setAlignment(qtc.Qt.AlignCenter)
-    line_edit.setFont(MONO_FONT)
+    line_edit.setFont(MONO_FONT_BOLD)
     line_edit.setMaxLength(max_length)
-    line_edit.setFixedWidth(max_length * 22)
+    # line_edit.setFixedWidth(max_length * 22)
+    # line_edit.setFrame(False)
     # line_edit.setStyleSheet("background-color: #F44;")
 
 
@@ -512,17 +516,17 @@ def init_grid(
         widget = qtw.QLabel(" ", parent)
         grid_layout.addWidget(widget, row, col)
 
-    grid_layout.setColumnStretch( 0,  2)
-    grid_layout.setColumnStretch( 1,  0)
-    grid_layout.setColumnStretch( 2, 21)
-    grid_layout.setColumnStretch( 3,  1)
-    grid_layout.setColumnStretch( 4, 24)
-    grid_layout.setColumnStretch( 5,  0)
-    grid_layout.setColumnStretch( 6, 24)
-    grid_layout.setColumnStretch( 7,  1)
-    grid_layout.setColumnStretch( 8,  0)
-    grid_layout.setColumnStretch( 9, 21)
-    grid_layout.setColumnStretch(10,  2)
+    grid_layout.setColumnStretch(0, 3)
+    grid_layout.setColumnMinimumWidth(1,  30)
+    grid_layout.setColumnMinimumWidth(2, 170)
+    grid_layout.setColumnStretch(3, 1)
+    grid_layout.setColumnMinimumWidth(4, 190)
+    grid_layout.setColumnStretch(5, 1)
+    grid_layout.setColumnMinimumWidth(6, 190)
+    grid_layout.setColumnStretch(7, 1)
+    grid_layout.setColumnMinimumWidth(8,  30)
+    grid_layout.setColumnMinimumWidth(9, 170)
+    grid_layout.setColumnStretch(10, 3)
 
     return all_widgets
 

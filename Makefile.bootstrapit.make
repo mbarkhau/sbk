@@ -402,6 +402,7 @@ test:
 		$(DEV_ENV_PY) -m pytest -v \
 		--doctest-modules \
 		--verbose \
+		--cov-config setup.cfg \
 		--cov-report "html:reports/testcov/" \
 		--cov-report term \
 		--html=reports/pytest/index.html \

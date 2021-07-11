@@ -28,6 +28,7 @@ from . import ecc_rs
 from . import params
 from . import shamir
 from . import enc_util
+from . import mnemonic
 from . import sys_info
 from . import common_types as ct
 from . import electrum_mnemonic
@@ -277,6 +278,12 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
         expected_chk_idx = next_chk_idx
 
     return part_vals
+
+
+def intcodes2mnemonics(intcodes: typ.Sequence[str]) -> typ.Sequence[str]:
+    data_with_ecc = intcodes2parts(intcodes)
+    parts         = data_with_ecc[: len(data_with_ecc) // 2]
+    return mnemonic.bytes2phrase(b"".join(parts)).split()
 
 
 def maybe_intcodes2bytes(intcodes: MaybeIntCodes, msg_len: int) -> bytes:

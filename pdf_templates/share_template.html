@@ -21,13 +21,13 @@
     position: absolute;
   }
   .qrcode {
-    top: 10mm;
+    top: 8mm;
     right: 50%;
-    margin-right: 5mm;
+    margin-right: 8mm;
   }
   .logo {
     top: 10mm;
-    left: 15mm;
+    left: 12mm;
     width: 35mm;
   }
   .logo .logotext {
@@ -44,30 +44,23 @@
     height: 15mm;
   }
   .qrcode img {
-    height: 20mm;
+    height: 22mm;
   }
 
-  .shareinfo {
-    font-size: 10pt;
-    line-height: 1.3em;
+  .contactinfo hr {
+    border: none;
+    border-top: 1px dashed black;
+    right: 0;
+    width: 70%;
+  }
+
+  .contactinfo {
+    font-size: 9pt;
+    line-height: 1.2em;
     position: absolute;
-    top: 10mm;
-    left: {{ w // 2 - 2 }}mm;
-    width: {{ w // 2 }}mm;
-  }
-  .shareinfo > div > div {
-    display: inline-block;
-  }
-  .shareinfo > div > div:nth-child(1) {
-    width: 25mm;
-    padding-right: 2mm;
-    text-align: right;
-  }
-  .shareinfo > div > div:nth-child(2) {
-    width: 60mm;
-    margin-left: 2mm;
-    border-bottom: 1px dashed #888;
-    margin-bottom: -1mm;
+    top: 8mm;
+    right: 10mm;
+    width: {{ w // 2 - 15 }}mm;
   }
 
   .infotext {
@@ -211,17 +204,13 @@
   <div class="fold-m fold-h fold-75"></div>
   <div class="fold-m fold-v"></div>
 </div>
-<div class="shareinfo">
-  <div> <div>Share Info: </div> </div>
-  <!--
-  <div> <div>trustee: </div><div></div> </div>
-  <div> <div>owner: </div><div></div> </div>
-  <div> <div>contact: </div><div></div> </div>
-  <div> <div> </div><div></div> </div>
-  -->
+<div class="contactinfo">
+  <div>Owner<br>Contact</div>
+  <hr>
+  <div>Trustee<br>Contact</div>
 </div>
 <div class="logo">
-    <img src="../logo_1024.png" />
+    <img src="../src/sbk/assets/nostroke_logo_1024.png" />
     <div class="logotext"> Split Bitcoin Keys </div>
 </div>
 <div class="qrcode">
@@ -255,10 +244,10 @@
   </div>
 </div>
 <div class="wordlist left">
-  {% for i in range(0, wc // 2) %}<code>{{ "%02d" % (i + 1) }}: </code><span></span>{% endfor %}
+  {% for i in range(0, wc, 2) %}<code>{{ "%02d" % (i + 1) }}: </code><span></span>{% endfor %}
 </div>
 <div class="wordlist right">
-  {% for i in range(wc // 2, wc) %}<code>{{ "%02d" % (i + 1) }}: </code>{% endfor %}
+  {% for i in range(1, wc, 2) %}<code>{{ "%02d" % (i + 1) }}: </code>{% endfor %}
 </div>
 </body>
 </html>

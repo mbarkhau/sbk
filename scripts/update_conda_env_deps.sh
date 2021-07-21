@@ -19,7 +19,7 @@ for i in ${!env_py_paths[@]}; do
 
     ${env_path_python} -m pip install \
         --disable-pip-version-check --upgrade --quiet \
-        --requirement=requirements/pypi.txt;
+        --requirement=requirements/pypi*.txt;
 
     echo "updating ${env_name} vendor deps ...";
 

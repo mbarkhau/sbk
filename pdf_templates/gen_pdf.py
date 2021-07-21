@@ -8,7 +8,8 @@ import qrcode
 import weasyprint
 import qrcode.image.svg
 
-STATIC_DIR = pl.Path(__file__).parent
+
+TEMPLATES_DIR = pl.Path(__file__).parent.absolute()
 
 
 def qr_img_b64(text: str) -> str:
@@ -23,7 +24,7 @@ def qr_img_b64(text: str) -> str:
 
 
 def read_html(tmpl, **kwargs) -> str:
-    fpath = STATIC_DIR / f"{tmpl}_template.html"
+    fpath = TEMPLATES_DIR / f"{tmpl}_template.html"
     with fpath.open(mode="r", encoding="utf-8") as fobj:
         html_tmpl = fobj.read()
 
@@ -48,20 +49,25 @@ CONTEXTS = [
 
 
 def main() -> int:
+    out_paths = {pl.Path(path).absolute() for path in sys.argv[1:]}
     for ctx in CONTEXTS:
         if ctx['fmt'] == 'usletter':
             ctx['w'] *= 25.4
             ctx['h'] *= 25.4
 
-        html_text = read_html(**ctx)
-        wp_ctx    = weasyprint.HTML(string=html_text, base_url=str(STATIC_DIR))
+        out_path_html = TEMPLATES_DIR / "{tmpl}_{fmt}.html".format(**ctx)
+        out_path_pdf = TEMPLATES_DIR / "{tmpl}_{fmt}.pdf".format(**ctx)
 
-        out_path_html = STATIC_DIR / "{tmpl}_{fmt}.html".format(**ctx)
+        if out_paths and out_path_pdf not in out_paths:
+            continue
+
+        html_text = read_html(**ctx)
+        wp_ctx    = weasyprint.HTML(string=html_text, base_url=str(TEMPLATES_DIR))
+
         with out_path_html.open(mode="w", encoding="utf-8") as fobj:
             fobj.write(html_text)
         print("wrote", str(out_path_html.absolute()))
 
-        out_path_pdf = STATIC_DIR / "{tmpl}_{fmt}.pdf".format(**ctx)
         with out_path_pdf.open(mode="wb") as fobj:
             wp_ctx.write_pdf(fobj)
         print("wrote", str(out_path_pdf.absolute()))

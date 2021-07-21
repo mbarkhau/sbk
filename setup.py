@@ -1,10 +1,11 @@
 # This file is part of the sbk project
 # https://gitlab.com/mbarkhau/sbk
 #
-# Copyright (c) 2019 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 import os
+import sys
 import setuptools
 
 
@@ -14,8 +15,8 @@ def project_path(*sub_paths):
 
 
 def read(*sub_paths):
-    with open(project_path(*sub_paths), mode="rb") as fh:
-        return fh.read().decode("utf-8")
+    with open(project_path(*sub_paths), mode="rb") as fobj:
+        return fobj.read().decode("utf-8")
 
 
 install_requires = [
@@ -25,7 +26,31 @@ install_requires = [
 ]
 
 
+package_data_globs = [
+    "assets/*"
+]
+
 long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
+
+package_dir={"": "src"}
+
+if any(arg.startswith("bdist") for arg in sys.argv):
+    try:
+        import lib3to6
+        package_dir = lib3to6.fix(
+            package_dir,
+            target_version="3.7",
+            install_requires=install_requires,
+            default_mode='enabled',
+        )
+    except ImportError:
+        if sys.version_info < (3, 9):
+            raise
+        else:
+            sys.stderr.write((
+                "WARNING: Creating non-universal bdist, "
+                "this should only be used for development.\n"
+            ))
 
 
 setuptools.setup(
@@ -39,14 +64,17 @@ setuptools.setup(
     description="Wallet seed generation from a brainkey with Shamir Secret Shares as Backup.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=["sbk"],
-    package_dir={"": "src"},
+    packages=["sbk", "sbk.assets"],
+    package_dir=package_dir,
+    include_package_data=True,
+    package_data={'sbk': package_data_globs},
     install_requires=install_requires,
     entry_points="""
         [console_scripts]
         sbk=sbk.cli:cli
+        sbk-gui=sbk.gui:main
     """,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     zip_safe=True,
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
@@ -61,7 +89,10 @@ setuptools.setup(
         # "Operating System :: MacOS :: MacOS X",
         # "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Software Development :: Libraries",

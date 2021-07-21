@@ -79,6 +79,7 @@ build/miniconda3.sh
 
 sbk-live-build/iso/
 sbk-live-workdir/
+sbk-live-build/
 *.iso
 *.squashfs
 newfilesystem.tar

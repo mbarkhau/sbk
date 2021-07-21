@@ -2,5 +2,9 @@ include LICENSE
 include README.md
 include CHANGELOG.md
 include requirements/pypi.txt
+include src/sbk/assets/*.svg
+include src/sbk/assets/*.png
+include src/sbk/assets/*.pdf
 recursive-exclude sbk-live-data *
+recursive-exclude sbk-live-build *
 recursive-exclude sbk-live-workdir *

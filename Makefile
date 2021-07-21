@@ -25,9 +25,6 @@ include Makefile.bootstrapit.make
 ## -- Extra/Custom/Project Specific Tasks --
 
 
-KBFS_DIR = "/run/user/1000/keybase/kbfs/public/mbarkhau/sbk/"
-
-
 ## Regen TOC in README.md
 .PHONY: mdtoc
 mdtoc:
@@ -35,32 +32,57 @@ mdtoc:
 
 
 pdf_templates/%.pdf: \
+		src/sbk/assets/nostroke*.png \
 		pdf_templates/share_template.html \
 		pdf_templates/auth_template.html \
 		pdf_templates/grid_template.html \
 		pdf_templates/gen_pdf.py
-	$(DEV_ENV_PY) pdf_templates/gen_pdf.py
+	$(DEV_ENV_PY) pdf_templates/gen_pdf.py $@
+	cp $@ src/sbk/assets/
 
 
-doc/%.svg : doc/%.bob
-	svgbob --output $@ $<
+svg2png := inkscape --without-gui --export-area-page --file
+res = $(subst .png,,$(subst landingpage/,,$(subst src/sbk/assets/,,$(subst logo_,,$(subst nostroke_,,$(subst favico_,,$@))))))
 
-## Regen doc/*.bob -> doc/*.svg
-.PHONY: static_files
-static_files: \
+
+src/sbk/assets/logo%.png: src/sbk/assets/logo.svg
+	$(svg2png) src/sbk/assets/logo.svg --export-png $@ -w $(res)
+
+
+src/sbk/assets/nostroke_logo%.png: src/sbk/assets/logo.svg
+	cat src/sbk/assets/logo.svg \
+		| sed "s/stroke-width:32/stroke-width:0/g" \
+		> src/sbk/assets/nostroke_logo.svg
+	$(svg2png) src/sbk/assets/nostroke_logo.svg --export-png $@ -w $(res)
+
+
+src/sbk/assets/favico_%.png: src/sbk/assets/logo.svg
+	$(svg2png) src/sbk/assets/logo.svg --export-png $@ -w $(res)
+
+
+.PHONY: assets
+assets: \
+		src/sbk/assets/logo_128.png \
+		src/sbk/assets/logo_256.png \
+		src/sbk/assets/logo_1024.png \
+		src/sbk/assets/nostroke_logo_64.png \
+		src/sbk/assets/nostroke_logo_128.png \
+		src/sbk/assets/nostroke_logo_256.png \
+		src/sbk/assets/nostroke_logo_1024.png \
+		src/sbk/assets/favico_24.png \
+		src/sbk/assets/favico_32.png \
+		src/sbk/assets/favico_48.png \
+		src/sbk/assets/favico_96.png \
+		src/sbk/assets/nostroke_logo_256.png \
+		landingpage/favico_24.png \
+		landingpage/favico_32.png \
+		landingpage/favico_48.png \
+		landingpage/favico_96.png \
 		pdf_templates/share_a4.pdf \
 		pdf_templates/auth_a4.pdf \
-		doc/sbk_overview.svg \
-		doc/sbk_dataflow_diagram.svg \
-		doc/sbk_dataflow_diagram_v2.svg \
-		doc/sss_diagram_1.svg \
-		doc/sss_diagram_2.svg \
-		doc/sss_diagram_3.svg \
-		doc/raw_share_diagram.svg \
-		doc/share_diagram.svg
-	cp pdf_templates/*.pdf $(KBFS_DIR)
-	cp doc/*.svg $(KBFS_DIR)
-	cp logo* $(KBFS_DIR)
+		pdf_templates/share_usletter.pdf \
+		pdf_templates/auth_usletter.pdf
+	cp src/sbk/assets/*.png landingpage/
 
 
 ## Create release iso
@@ -87,3 +109,27 @@ signoff-deps:
 .PHONY: aspell
 aspell:
 	aspell -l en-us -c README.md
+
+
+.PHONY: debug_gui
+debug_gui:
+	SBK_MEM_PERCENT=1 \
+	SBK_DEBUG_RANDOM=DANGER \
+	SBK_DEBUG_RAW_SALT_LEN=1 \
+	SBK_DEBUG_BRAINKEY_LEN=2 \
+	SBK_NUM_SHARES=3 \
+	SBK_THRESHOLD=2 \
+	SBK_KDF_TARGET_DURATION=1 \
+	$(DEV_ENV_PY) -m sbk.gui
+
+
+.PHONY: debug_cli
+debug_cli:
+	SBK_MEM_PERCENT=1 \
+	SBK_DEBUG_RANDOM=DANGER \
+	SBK_DEBUG_RAW_SALT_LEN=1 \
+	SBK_DEBUG_BRAINKEY_LEN=2 \
+	SBK_NUM_SHARES=3 \
+	SBK_THRESHOLD=2 \
+	SBK_KDF_TARGET_DURATION=1 \
+	$(DEV_ENV_PY) -m sbk.cli create --yes-all

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   width="256px"
+   height="256px"
+   viewBox="0 0 1024 1024"
+   version="1.1">
+  <defs>
+    <path id="piece" d="m 96 16 l 0 800 q 0 24 28 23 l 250 -16 q 49 -7 58 35 q 11 32 -19 49 q -50 28 -41 65 q 16 51 185 14 q 102 -25 60 -109 q -28 -63 28 -58 l 226 23 q 33 5 33 -35 l 1 -249 q -1 -62 -41 -29 q -48 44 -95 42 q -107 -10 -109 -161 q -3 -144 93 -145 q 58 4 102 52 q 43 39 46 -9 l -3 -276 q 0 -16 -22 -16 z"
+        />
+   <path id="B-main" d="m 170 595 h 65 v -360 h -65 v -79 h 100 v -66 h 60 v 66 h 44 v -66 h 60 v 68 q 128 3 134 121 q 1 101 -66 115 v 2 q 75 33 75 130 q 1 138 -143 143 v 68 h -60 v -66 h -44 v 66 h -60 v -66 h -100 z"/>
+   <path id="B-inner" d="m 0 0 c 0 -52 -29 -70 -81 -70 h -73 v 139 h 70 c 56 0 84 -16 84 -69 z"/>
+  </defs>
+  <g>
+    <use xlink:href="#piece" style="fill:#000000; stroke:#ffffff; stroke-width:0"/>
+    <use xlink:href="#B-main"  style="fill:#ffffff;" />
+    <g style="fill:#000000">
+      <use xlink:href="#B-inner" transform="translate(475 305) "/>
+      <use xlink:href="#B-inner" transform="translate(490 525) scale(1.1 1)"/>
+    </g>
+  </g>
+</svg>

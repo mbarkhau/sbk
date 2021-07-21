@@ -5,9 +5,18 @@
 # apt-get install p7zip-full grub2-common mtools xorriso squashfs-tools-ng
 
 mkdir -p sbk-live-build
+
+cp dist/*.tar.gz sbk-live-build/
+cp static/* sbk-live-build/
+cp sbk-live-data/* sbk-live-build/
+
+# gpg --import sbk-live-build/ThomasV.asc
+# gpg --sign-key 6694D8DE7BE8EE5631BED9502BD5824B7F9470E6
+# gpg --import sbk-live-build/sombernight_releasekey.asc
+# gpg --sign-key 0EEDCFD5CAFB459067349B23CA9EEEC43DF911DC
+
 cd sbk-live-build
 
-# ISO_PATH=tails-amd64-4.18.iso
 ISO_PATH=ubuntu-20.04.2.0-desktop-amd64.iso
 
 if [[ ! -f $ISO_PATH ]]; then
@@ -16,6 +25,16 @@ if [[ ! -f $ISO_PATH ]]; then
     echo "93bdab204067321ff131f560879db46bee3b994bf24836bb78538640f689e58f *${ISO_PATH}" \
         | shasum -a 256 --check;
 fi
+
+ELECTRUM_PATH=Electrum-4.1.5.tar.gz
+if [[ ! -f $ELECTRUM_PATH ]]; then
+    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz -O $ELECTRUM_PATH
+    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.ThomasV.asc
+    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.sombernight_releasekey.asc
+fi
+
+gpg --verify Electrum-4.1.5.tar.gz.ThomasV.asc $ELECTRUM_PATH
+gpg --verify Electrum-4.1.5.tar.gz.sombernight_releasekey.asc $ELECTRUM_PATH
 
 # create a directory to build the ISO from
 rm -rf iso
@@ -38,7 +57,7 @@ cat <<'EOF' > 10_ubuntu-settings.gschema.override
 notify-with-tray=false
 
 [org.gnome.shell]
-favorite-apps = ['org.gnome.Nautilus.desktop', 'gnome_region_and_lang.desktop', 'electrum_sbk.desktop']
+favorite-apps = ['sbk.desktop', 'electrum.desktop', 'org.gnome.Nautilus.desktop', 'gnome_region_and_lang.desktop']
 
 [org.gnome.desktop.background]
 picture-uri = 'file:///usr/share/backgrounds/ubuntu-default-greyscale-wallpaper.png'
@@ -251,26 +270,53 @@ GenericName=Region & Language
 Comment=Gnome Region & Language Settings
 Exec=/usr/bin/gnome-control-center region
 Path=/usr/bin/
-Icon=/usr/share/icons/Yaru/256x256/apps/system-settings.png
+Icon=/usr/share/icons/Yaru/256x256/categories/preferences-desktop-locale.png
 Terminal=false
 Categories=Settings;
 Keywords=settings;language;keyboard
 StartupNotify=true
+StartupWMClass=gnome-control-center
 EOF
 
-cat <<'EOF' > electrum_sbk.desktop
+cat <<'EOF' > electrum.desktop
+# If you want Electrum to appear in a Linux app launcher ("start menu"), install this by doing:
+# sudo desktop-file-install electrum.desktop
+
 [Desktop Entry]
-Type=Application
-Name=Electrum SBK
-GenericName=Electrum SBK
-Comment=Electrum Bitcoin Wallet
-Exec=/usr/local/bin/electrum
-Path=/usr/local/bin/
-Icon=/opt/electrum_sbk.png
+Comment=Lightweight Bitcoin Client
+Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum %u"
+GenericName[en_US]=Bitcoin Wallet
+GenericName=Bitcoin Wallet
+Icon=/opt/electrum/electrum/gui/icons/electrum.png
+Name[en_US]=Electrum Bitcoin Wallet
+Name=Electrum Bitcoin Wallet
+Categories=Finance;Network;
+StartupNotify=true
+StartupWMClass=electrum
 Terminal=false
-Categories=Privacy;
+Type=Application
+MimeType=x-scheme-handler/bitcoin;
+Actions=Testnet;
+
+[Desktop Action Testnet]
+Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum --testnet %u"
+Name=Testnet mode
+EOF
+
+cat <<'EOF' > sbk.desktop
+[Desktop Entry]
+Name=SBK
+GenericName=SBK
+Comment=SBK: Split Bitcoin Keys
+Exec=/usr/local/bin/sbk-gui
+Path=/usr/local/bin
+Icon=/opt/sbk/src/sbk/assets/logo_256.png
+Terminal=false
+Type=Application
+Categories=Finance;Privacy;Network;
 Keywords=secure;security;privacy;private;bitcoin;sbk
 StartupNotify=true
+StartupWMClass=sbk-gui
 EOF
 
 cat <<'EOF' > Dockerfile
@@ -281,8 +327,6 @@ FROM ubuntulive:base
 # these variables will only be set in Docker, not in the resultant image
 ENV DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical
 
-RUN apt-get update
-
 # install packages needed to repack the ISO (we'll be using this image to repack itself)
 # grub-pc-bin needed for BIOS support
 # grub-egi-amd64-bin and grub-efi-amd64-signed for EFI support
@@ -291,15 +335,31 @@ RUN apt-get update
 RUN add-apt-repository "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) universe"
 RUN apt-get install -y grub2-common grub-pc-bin grub-efi-amd64-bin grub-efi-amd64-signed mtools xorriso
 
+# install electrum dependencies
+RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-pyqt5
+
+RUN python3 -m pip install lib3to6 argon2-cffi
+
+# install electrum
+ADD Electrum-4.1.5.tar.gz /opt/
+RUN mv /opt/Electrum-4.1.5 /opt/electrum
+RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
+
+# install sbk
+ADD sbk-2021.1002b0.tar.gz /opt/
+RUN mv /opt/sbk-2021.1002b0 /opt/sbk
+RUN bash -c "cd /opt/sbk; python3 -m pip install ."
+
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp
 
-# install electrum dependencies
-RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-pyqt5
-RUN python3 -m pip install argon2-cffi
-RUN wget https://download.electrum.org/4.1.2/Electrum-4.1.2.tar.gz -O /opt/Electrum-4.1.2.tar.gz
-RUN bash -c "cd /opt;tar xzf Electrum-4.1.2.tar.gz"
-RUN bash -c "cd /opt/Electrum-4.1.2; python3 -m pip install .[gui]"
+RUN apt-get remove -y --purge gnome-calendar
+RUN apt-get remove -y --purge spice-vdagent
+RUN apt-get remove -y --purge snapd
+RUN apt-get remove -y --purge update-notifier
+
+# needed (apparently)
+# RUN apt-get remove -y --purge evolution-data-server
 
 RUN apt-get autoremove -y && apt-get clean
 
@@ -307,9 +367,9 @@ RUN rm /usr/share/applications/org.gnome.Characters.desktop
 RUN rm /usr/share/applications/gnome-language-selector.desktop
 
 ADD gnome_region_and_lang.desktop /usr/share/applications/gnome_region_and_lang.desktop
-ADD electrum_sbk.desktop /usr/share/applications/electrum_sbk.desktop
+ADD electrum.desktop /usr/share/applications/electrum.desktop
+ADD sbk.desktop /usr/share/applications/sbk.desktop
 ADD 10_ubuntu-settings.gschema.override /usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override
-ADD electrum_sbk.png /opt/electrum_sbk.png
 ADD watermark.png /usr/share/plymouth/themes/spinner/watermark.png
 ADD watermark.png /usr/share/plymouth/ubuntu-logo.png
 
@@ -341,20 +401,15 @@ fi
 set menu_color_normal=white/black
 set menu_color_highlight=black/light-gray
 
-set timeout=3
+set timeout=2
 menuentry "SBK Live (Ubuntu 20.04 LTS)" {
     set gfxpayload=keep
-    linux   /casper/vmlinuz  file=/cdrom/preseed/ubuntu.seed maybe-ubiquity quiet splash ---
+    linux   /casper/vmlinuz  file=/cdrom/preseed/ubuntu.seed maybe-ubiquity fsck.mode=skip quiet splash ---
     initrd  /casper/initrd
 }
 menuentry "SBK Live (Ubuntu 20.04 LTS - safe graphics)" {
     set gfxpayload=keep
     linux   /casper/vmlinuz  file=/cdrom/preseed/ubuntu.seed maybe-ubiquity quiet splash nomodeset ---
-    initrd  /casper/initrd
-}
-menuentry "OEM install (for manufacturers)" {
-    set gfxpayload=keep
-    linux   /casper/vmlinuz  file=/cdrom/preseed/ubuntu.seed only-ubiquity quiet splash oem-config/enable=true ---
     initrd  /casper/initrd
 }
 grub_platform
@@ -389,7 +444,7 @@ docker exec "${CONTAINER_ID}" dpkg-query -W --showformat='${Package} ${Version}\
 # kill the container instance of the Docker image
 docker rm -f "${CONTAINER_ID}"
 # convert the image tarball into a squashfs image
-tar2sqfs --quiet newfilesystem.squashfs < newfilesystem.tar
+tar2sqfs --quiet --compressor zstd newfilesystem.squashfs < newfilesystem.tar
 
 # extract the contents of the ISO to the directory, except the original squashfs image
 7z x '-xr!filesystem.squashfs' -oiso "$ISO_PATH"
@@ -416,3 +471,5 @@ docker run \
 
 rm -f sbklive.iso
 mv ubuntulive.iso sbklive.iso
+echo "wrote sbk-live-build/sbklive.iso"
+

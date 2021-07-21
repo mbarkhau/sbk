@@ -21,13 +21,13 @@
     position: absolute;
   }
   .qrcode {
-    top: 10mm;
+    top: 8mm;
     right: 50%;
-    margin-right: 5mm;
+    margin-right: 8mm;
   }
   .logo {
     top: 10mm;
-    left: 15mm;
+    left: 12mm;
     width: 35mm;
   }
   .logo .logotext {
@@ -44,30 +44,23 @@
     height: 15mm;
   }
   .qrcode img {
-    height: 20mm;
+    height: 22mm;
   }
 
-  .shareinfo {
-    font-size: 10pt;
-    line-height: 1.3em;
+  .contactinfo hr {
+    border: none;
+    border-top: 1px dashed black;
+    right: 0;
+    width: 70%;
+  }
+
+  .contactinfo {
+    font-size: 9pt;
+    line-height: 1.2em;
     position: absolute;
-    top: 10mm;
-    left: 105.0mm;
-    width: 107.0mm;
-  }
-  .shareinfo > div > div {
-    display: inline-block;
-  }
-  .shareinfo > div > div:nth-child(1) {
-    width: 25mm;
-    padding-right: 2mm;
-    text-align: right;
-  }
-  .shareinfo > div > div:nth-child(2) {
-    width: 60mm;
-    margin-left: 2mm;
-    border-bottom: 1px dashed #888;
-    margin-bottom: -1mm;
+    top: 8mm;
+    right: 10mm;
+    width: 92.0mm;
   }
 
   .infotext {
@@ -211,17 +204,13 @@
   <div class="fold-m fold-h fold-75"></div>
   <div class="fold-m fold-v"></div>
 </div>
-<div class="shareinfo">
-  <div> <div>Share Info: </div> </div>
-  <!--
-  <div> <div>trustee: </div><div></div> </div>
-  <div> <div>owner: </div><div></div> </div>
-  <div> <div>contact: </div><div></div> </div>
-  <div> <div> </div><div></div> </div>
-  -->
+<div class="contactinfo">
+  <div>Owner<br>Contact</div>
+  <hr>
+  <div>Trustee<br>Contact</div>
 </div>
 <div class="logo">
-    <img src="../logo_1024.png" />
+    <img src="../src/sbk/assets/nostroke_logo_1024.png" />
     <div class="logotext"> Split Bitcoin Keys </div>
 </div>
 <div class="qrcode">
@@ -255,10 +244,10 @@
   </div>
 </div>
 <div class="wordlist left">
-  <code>01: </code><span></span><code>02: </code><span></span><code>03: </code><span></span><code>04: </code><span></span><code>05: </code><span></span><code>06: </code><span></span><code>07: </code><span></span><code>08: </code><span></span><code>09: </code><span></span><code>10: </code><span></span><code>11: </code><span></span><code>12: </code><span></span>
+  <code>01: </code><span></span><code>03: </code><span></span><code>05: </code><span></span><code>07: </code><span></span><code>09: </code><span></span><code>11: </code><span></span><code>13: </code><span></span><code>15: </code><span></span><code>17: </code><span></span><code>19: </code><span></span><code>21: </code><span></span><code>23: </code><span></span>
 </div>
 <div class="wordlist right">
-  <code>13: </code><code>14: </code><code>15: </code><code>16: </code><code>17: </code><code>18: </code><code>19: </code><code>20: </code><code>21: </code><code>22: </code><code>23: </code><code>24: </code>
+  <code>02: </code><code>04: </code><code>06: </code><code>08: </code><code>10: </code><code>12: </code><code>14: </code><code>16: </code><code>18: </code><code>20: </code><code>22: </code><code>24: </code>
 </div>
 </body>
 </html>

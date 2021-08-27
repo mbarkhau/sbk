@@ -233,3 +233,5 @@ fabric.properties
 # litprog output
 doc/
 pdfscratch/
+lit/.obsidian
+

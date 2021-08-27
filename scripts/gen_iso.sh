@@ -4,18 +4,19 @@
 
 # apt-get install p7zip-full grub2-common mtools xorriso squashfs-tools-ng
 
-mkdir -p sbk-live-build
+BUILD_DIR=../sbk-live-build
+mkdir -p $BUILD_DIR
 
-cp dist/*.tar.gz sbk-live-build/
-cp static/* sbk-live-build/
-cp sbk-live-data/* sbk-live-build/
+cp dist/*.tar.gz $BUILD_DIR
+cp static/* $BUILD_DIR
+cp sbk-live-data/* $BUILD_DIR
 
-# gpg --import sbk-live-build/ThomasV.asc
+# gpg --import sbk-live-data/ThomasV.asc
 # gpg --sign-key 6694D8DE7BE8EE5631BED9502BD5824B7F9470E6
-# gpg --import sbk-live-build/sombernight_releasekey.asc
+# gpg --import sbk-live-data/sombernight_releasekey.asc
 # gpg --sign-key 0EEDCFD5CAFB459067349B23CA9EEEC43DF911DC
 
-cd sbk-live-build
+cd $BUILD_DIR
 
 ISO_PATH=ubuntu-20.04.2.0-desktop-amd64.iso
 
@@ -471,5 +472,9 @@ docker run \
 
 rm -f sbklive.iso
 mv ubuntulive.iso sbklive.iso
-echo "wrote sbk-live-build/sbklive.iso"
+echo "wrote $BUILD_DIR/sbklive.iso"
+
+# echo ""
+# echo "      qemu-system-x86_64 -boot d -cdrom $BUILD_DIR/sbklive.iso -m 2048"
+# echo ""
 

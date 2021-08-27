@@ -28,7 +28,7 @@ def test_load_sys_info():
 
 
 def test_param_cfg2bytes_overflow():
-    kdf_params = kdf.init_kdf_params(p=1, m=1, t=1)
+    kdf_params = kdf.init_kdf_params(m=1, t=1)
     params.init_param_config(threshold=16, num_shares=1000, kdf_params=kdf_params)
 
     try:
@@ -39,27 +39,27 @@ def test_param_cfg2bytes_overflow():
 
 
 def test_param_cfg2bytes():
-    kdf_params = kdf.init_kdf_params(p=1, m=10, t=1)
-    in_p       = params.init_param_config(
+    kdf_params = kdf.init_kdf_params(m=10, t=1)
+    in_params  = params.init_param_config(
         threshold=16,
         num_shares=1000,
         kdf_params=kdf_params,
     )
 
-    assert in_p.threshold  == 16
-    assert in_p.num_shares == 1000
+    assert in_params.threshold  == 16
+    assert in_params.num_shares == 1000
 
-    result_data = params.param_cfg2bytes(in_p)
+    result_data = params.param_cfg2bytes(in_params)
 
     assert isinstance(result_data, bytes)
     assert len(result_data) == 3
 
-    out_p = params.bytes2param_cfg(result_data)
+    out_params = params.bytes2param_cfg(result_data)
 
-    assert out_p.num_shares >= in_p.threshold
-    assert out_p.threshold  == in_p.threshold
-    assert out_p.prime      == in_p.prime
-    assert out_p.kdf_params == in_p.kdf_params
+    assert out_params.num_shares >= in_params.threshold
+    assert out_params.threshold  == in_params.threshold
+    assert out_params.prime      == in_params.prime
+    assert out_params.kdf_params == in_params.kdf_params
 
     # fields 01
     assert result_data[:1] == b"\x1F"
@@ -68,25 +68,25 @@ def test_param_cfg2bytes():
 
 
 def test_param_cfg2bytes_fuzz():
-    kdf_params = kdf.init_kdf_params(p=1, m=10, t=1)
+    kdf_params = kdf.init_kdf_params(m=10, t=1)
     for _ in range(100):
-        threshold = random.randrange(1, 16)
+        threshold = random.randrange(2, 10)
 
-        in_p = params.init_param_config(
+        in_params = params.init_param_config(
             threshold=threshold,
             num_shares=1000,
             kdf_params=kdf_params,
         )
 
-        result_data = params.param_cfg2bytes(in_p)
+        result_data = params.param_cfg2bytes(in_params)
 
         assert isinstance(result_data, bytes)
         assert len(result_data) == 3
 
-        out_p = params.bytes2param_cfg(result_data)
+        out_params = params.bytes2param_cfg(result_data)
 
-        assert out_p.threshold == in_p.threshold
+        assert out_params.threshold == in_params.threshold
 
-        assert out_p.num_shares >= in_p.threshold
-        assert out_p.prime      == in_p.prime
-        assert out_p.kdf_params == in_p.kdf_params
+        assert out_params.num_shares >= in_params.threshold
+        assert out_params.prime      == in_params.prime
+        assert out_params.kdf_params == in_params.kdf_params

@@ -119,7 +119,7 @@ debug_gui:
 	SBK_DEBUG_BRAINKEY_LEN=2 \
 	SBK_NUM_SHARES=3 \
 	SBK_THRESHOLD=2 \
-	SBK_KDF_TARGET_DURATION=1 \
+	SBK_KDF_KDF_T=1 \
 	$(DEV_ENV_PY) -m sbk.gui
 
 
@@ -131,5 +131,15 @@ debug_cli:
 	SBK_DEBUG_BRAINKEY_LEN=2 \
 	SBK_NUM_SHARES=3 \
 	SBK_THRESHOLD=2 \
-	SBK_KDF_TARGET_DURATION=1 \
+	SBK_KDF_KDF_T=1 \
 	$(DEV_ENV_PY) -m sbk.cli create --yes-all
+
+
+.PHONY: serve_doc
+serve_doc:
+	$(DEV_ENV_PY) -m http.server --directory doc/ 8080
+
+
+.PHONY: landingpage_sync
+landingpage_sync:
+	rsync landingpage/*.* root@vserver:/var/www/html/sbk/

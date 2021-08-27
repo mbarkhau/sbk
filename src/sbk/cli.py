@@ -133,9 +133,6 @@ _kdf_target_duration_option = click.option(
     show_default=True,
     help=KDF_TARGET_DURATION_HELP,
 )
-
-_kdf_parallelism_option = click.option('-p', '--parallelism', type=int, help=KDF_PARALLELISM_HELP)
-
 _kdf_memory_cost_option = click.option(
     '-m', '--memory-cost', 'memory_per_thread', type=int, help=KDF_MEMORY_COST_HELP
 )
@@ -235,21 +232,19 @@ def version() -> None:
 
 @cli.command()
 @_kdf_target_duration_option
-@_kdf_parallelism_option
 @_kdf_memory_cost_option
 @_kdf_time_cost_option
 @_opt_verbose
 def kdf_test(
     target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    parallelism      : typ.Optional[kdf.NumThreads] = None,
     memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
     time_cost        : typ.Optional[kdf.Iterations] = None,
     verbose          : int = 0,
 ) -> None:
+    """Test KDF difficulty settings."""
     _configure_logging(verbose)
     param_cfg = ui_common.init_param_config(
         target_duration=target_duration,
-        parallelism=parallelism,
         memory_per_thread=memory_per_thread,
         time_cost=time_cost,
         threshold=2,
@@ -297,11 +292,7 @@ def _validate_copies(salt: ct.Salt, brainkey: ct.BrainKey, shares: ct.Shares) ->
 
 
 def _show_created_data(
-    yes_all  : bool,
-    param_cfg: params.ParamConfig,
-    salt     : ct.Salt,
-    brainkey : ct.BrainKey,
-    shares   : ct.Shares,
+    yes_all: bool, param_cfg: params.ParamConfig, salt: ct.Salt, brainkey: ct.BrainKey, shares: ct.Shares
 ) -> None:
     text = ui_common.SECURITY_WARNING_TEXT + ui_common.SECURITY_WARNING_QR_CODES
     yes_all or clear()
@@ -358,7 +349,6 @@ def _show_created_data(
 @_scheme_option
 @_yes_all_option
 @_kdf_target_duration_option
-@_kdf_parallelism_option
 @_kdf_memory_cost_option
 @_kdf_time_cost_option
 @_opt_verbose
@@ -366,7 +356,6 @@ def create(
     scheme_arg       : str         = DEFAULT_SCHEME,
     yes_all          : bool        = False,
     target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    parallelism      : typ.Optional[kdf.NumThreads] = None,
     memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
     time_cost        : typ.Optional[kdf.Iterations] = None,
     verbose          : int = 0,
@@ -404,10 +393,8 @@ def create(
             raise click.Abort()
         else:
             raise
-
-    has_manual_kdf_p = parallelism       is not None
     has_manual_kdf_m = memory_per_thread is not None
-    if has_manual_kdf_p or has_manual_kdf_m:
+    if has_manual_kdf_m:
         # Verify that derivation works before we show anything. This is for manually chosen values
         # of kdf_p and kdf_m, because they may exceed what the system is capable of. If we did not
         # do this now the user might get an OOM error later when they try to load the wallet.
@@ -544,6 +531,16 @@ def load_wallet(
         echo("Electrum wallet seed: " + ui_common.seed_data2phrase(seed_data))
     else:
         ui_common.load_wallet(seed_data, offline)
+
+
+@cli.command()
+@_opt_verbose
+def gui(verbose: int = 0) -> None:
+    """Start sbk gui."""
+    import sbk.gui
+
+    _configure_logging(verbosity=0)
+    sbk.gui.gui()
 
 
 if __name__ == '__main__':

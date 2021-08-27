@@ -23,8 +23,8 @@ pylint-ignore>=2020.1013
 isort
 
 mypy>=0.910
-mypy_extensions
-typing_extensions
+mypy-extensions
+typing-extensions
 PyQt5-stubs
 
 # http://doc.pytest.org/en/latest/py27-py34-deprecation.html

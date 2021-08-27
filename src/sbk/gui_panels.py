@@ -26,12 +26,10 @@ from . import shamir
 from . import gui_tasks as gt
 from . import ui_common
 from . import common_types as ct
+from . import package_data
 from . import gui_panels_base as gpb
 
 logger = logging.getLogger("sbk.gui_panels")
-
-
-ICON_PATH = pl.Path("logo_256.png")
 
 
 class SelectCommandPanel(gpb.Panel):
@@ -45,10 +43,10 @@ class SelectCommandPanel(gpb.Panel):
 
         self._layout = qtw.QVBoxLayout()
 
-        pixmap     = qtg.QPixmap(str(ICON_PATH))
-        pixmap     = pixmap.scaledToWidth(128)
+        pixmap = qtg.QPixmap()
+        pixmap.loadFromData(package_data.read_binary("nostroke_logo_64.png"))
         icon_label = qtw.QLabel(self)
-        icon_label.setPixmap(pixmap)
+        icon_label.setPixmap(pixmap.scaledToWidth(64))
         icon_label.setAlignment(qtc.Qt.AlignCenter)
 
         self._layout.addStretch(1)

@@ -597,13 +597,15 @@ def entropy(data: bytes) -> float:
 
 
 def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
-    # sanity check
-    if entropy(raw_salt) < params.RAW_SALT_MIN_ENTROPY:
+    salt_min_entropy     = len(raw_salt) * 0.19 + 0.3
+    brainkey_min_entropy = len(brainkey) * 0.19 + 0.3
+
+    if entropy(raw_salt) < salt_min_entropy:
         entropy_avail = get_entropy_pool_size()
         errmsg        = f"Entropy check failed for salt. entropy_avail={entropy_avail}"
         raise AssertionError(errmsg)
 
-    if entropy(brainkey) < params.BRAINKEY_MIN_ENTROPY:
+    if entropy(brainkey) < brainkey_min_entropy:
         entropy_avail = get_entropy_pool_size()
         errmsg        = f"Entropy check failed for brainkey. entropy_avail={entropy_avail}"
         raise AssertionError(errmsg)
@@ -743,7 +745,7 @@ def load_wallet(seed_data: ct.SeedData, offline: bool = False) -> None:
 
 
 def _debug_entropy_check() -> None:
-    """Determine params.RAW_SALT_MIN_ENTROPY and params.BRAINKEY_MIN_ENTROPY ."""
+    """Determine constans for ui_common._check_entropy."""
     print(" N   MIN_E   low_e   headroom")
 
     a = 0.3

@@ -239,73 +239,73 @@ DEBUG_NONRANDOM_OUTPUT = """
                      Share 1/3
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      13: 802-163
-   02: 065-537   abacus    abraham     14: 051-183
-   03: 180-933   salmon    satoshi     15: 079-837
-   04: 252-115   teacup    squid       16: 166-340
-   05: 317-161   surgeon   unesco      17: 261-881
-   06: 388-327   victoria  ukraine     18: 306-464
+   01: 004-352   bicycle   abacus      02: 802-163
+   03: 065-537   abacus    abraham     04: 051-183
+   05: 180-933   salmon    satoshi     06: 079-837
+   07: 252-115   teacup    squid       08: 166-340
+   09: 317-161   surgeon   unesco      10: 261-881
+   11: 388-327   victoria  ukraine     12: 306-464
 
-   07: 457-469   wizard    yokohama    19: 337-714
-   08: 520-331   vladimir  mozart      20: 419-340
-   09: 560-769   mumbai    meatball    21: 509-915
-   10: 623-775   mercury   oxford      22: 587-094
-   11: 692-885   nairobi   necklace    23: 645-494
-   12: 763-950   peugeot   darwin      24: 713-813
+   13: 457-469   wizard    yokohama    14: 337-714
+   15: 520-331   vladimir  mozart      16: 419-340
+   17: 560-769   mumbai    meatball    18: 509-915
+   19: 623-775   mercury   oxford      20: 587-094
+   21: 692-885   nairobi   necklace    22: 645-494
+   23: 763-950   peugeot   darwin      24: 713-813
 
                      Share 2/3
 
      Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      13: 800-059
-   02: 065-538   abacus    academy     14: 024-298
-   03: 181-197   samurai   slippers    15: 084-694
-   04: 260-065   watanabe  trumpet     16: 178-809
-   05: 322-453   vampire   necklace    17: 205-545
-   06: 368-521   oxford    moldova     18: 314-825
+   01: 004-352   bicycle   abacus      02: 800-059
+   03: 065-538   abacus    academy     04: 024-298
+   05: 181-197   samurai   slippers    06: 084-694
+   07: 260-065   watanabe  trumpet     08: 178-809
+   09: 322-453   vampire   necklace    10: 205-545
+   11: 368-521   oxford    moldova     12: 314-825
 
-   07: 439-229   printer   rhubarb     19: 372-120
-   08: 501-585   pepper    gymnast     20: 415-345
-   09: 547-653   hunter    football    21: 484-605
-   10: 610-169   gorilla   lebanon     22: 550-348
-   11: 680-813   jigsaw    kidney      23: 621-201
-   12: 726-863   bridge    gorilla     24: 712-000
+   13: 439-229   printer   rhubarb     14: 372-120
+   15: 501-585   pepper    gymnast     16: 415-345
+   17: 547-653   hunter    football    18: 484-605
+   19: 610-169   gorilla   lebanon     20: 550-348
+   21: 680-813   jigsaw    kidney      22: 621-201
+   23: 726-863   bridge    gorilla     24: 712-000
 
                      Share 3/3
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      13: 836-611
-   02: 065-539   abacus    acrobat     14: 010-729
-   03: 144-700   donut     egypt       15: 090-406
-   04: 203-526   buffalo   alcohol     16: 174-866
-   05: 264-520   attorney  fujitsu     17: 237-328
-   06: 345-946   freddie   hitachi     18: 322-919
+   01: 004-352   bicycle   abacus      02: 836-611
+   03: 065-539   abacus    acrobat     04: 010-729
+   05: 144-700   donut     egypt       06: 090-406
+   07: 203-526   buffalo   alcohol     08: 174-866
+   09: 264-520   attorney  fujitsu     10: 237-328
+   11: 345-946   freddie   hitachi     12: 322-919
 
-   07: 425-332   lobster   kurosawa    19: 336-638
-   08: 484-334   jigsaw    virginia    20: 411-226
-   09: 582-128   trumpet   vladimir    21: 460-054
-   10: 655-314   zimbabwe  spider      22: 529-850
-   11: 705-996   satoshi   sisyphus    23: 596-940
-   12: 756-633   mozart    normandy    24: 707-258
+   13: 425-332   lobster   kurosawa    14: 336-638
+   15: 484-334   jigsaw    virginia    16: 411-226
+   17: 582-128   trumpet   vladimir    18: 460-054
+   19: 655-314   zimbabwe  spider      20: 529-850
+   21: 705-996   satoshi   sisyphus    22: 596-940
+   23: 756-633   mozart    normandy    24: 707-258
 
                        Salt
 
         Data          Mnemonic               ECC
-   01: 004-352   bicycle   abacus      09: 541-542
-   02: 065-588   abacus    dolphin     10: 620-229
-   03: 144-436   dolphin   dolphin     11: 677-537
-   04: 209-972   dolphin   dolphin     12: 772-367
+   01: 004-352   bicycle   abacus      02: 541-542
+   03: 065-588   abacus    dolphin     04: 620-229
+   05: 144-436   dolphin   dolphin     06: 677-537
+   07: 209-972   dolphin   dolphin     08: 772-367
 
-   05: 275-508   dolphin   dolphin     13: 806-086
-   06: 341-044   dolphin   dolphin     14: 003-160
-   07: 406-580   dolphin   dolphin     15: 117-840
-   08: 472-116   dolphin   dolphin     16: 144-371
+   09: 275-508   dolphin   dolphin     10: 806-086
+   11: 341-044   dolphin   dolphin     12: 003-160
+   13: 406-580   dolphin   dolphin     14: 117-840
+   15: 472-116   dolphin   dolphin     16: 144-371
 
                      Brainkey
 
         Data          Mnemonic               ECC
-   01: 013-364   dolphin    dolphin      04: 209-972
-   02: 078-900   dolphin    dolphin      05: 275-508
-   03: 144-436   dolphin    dolphin      06: 341-044
+   01: 013-364   dolphin    dolphin      02: 209-972
+   03: 078-900   dolphin    dolphin      04: 275-508
+   05: 144-436   dolphin    dolphin      06: 341-044
 """
 
 
@@ -421,7 +421,7 @@ def test_cli_create_basic():
         for share in combo:
             share_interactions = [
                 interaction(expect=r".*Enter code/words at 01: ", send=" ".join(share.words[:4])),
-                interaction(expect=r".*Enter code/words at 03: ", send=" ".join(share.words[4:])),
+                interaction(expect=r".*Enter code/words at 02: ", send=" ".join(share.words[4:])),
                 interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
             ]
             playbook.extend(share_interactions)
@@ -470,6 +470,7 @@ def test_cli_create_validation():
     argv   = ["--scheme=2of3", "--parallelism=1", "--memory-cost=1", "--time-cost=1"]
     env    = {'SBK_PROGRESS_BAR': '0', 'SBK_DEBUG_RANDOM': 'DANGER'}
     result = _run(sbk.cli.create, argv, env=env, playbook=playbook)
+    print(result.output)
 
     validation_output  = result.output.split("Validation", 1)[-1]
     validation_secrets = _parse_output(validation_output)
@@ -500,7 +501,7 @@ def test_cli_recover_salt_from_words():
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 03: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 541-542 <=") == 1
+    assert result.output.count("02: 541-542 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -521,7 +522,7 @@ def test_cli_recover_salt_from_data():
     # check cursor positions
     assert result.output.count("=> 01: ___-___") == 1
     assert result.output.count("=> 05: ___-___") == 1
-    assert result.output.count("09: 541-542 <=") == 1
+    assert result.output.count("02: 541-542 <=") == 1
 
     codes = secrets['salt'].data_codes + secrets['salt'].ecc_codes
     for i, code in enumerate(codes):
@@ -532,15 +533,15 @@ def test_cli_recover_salt_from_ecc():
     secrets  = _parse_output(DEBUG_NONRANDOM_OUTPUT)
     playbook = [
         interaction(expect=r".*Enter code/words at 01: ", send="next"),
-        interaction(expect=r".*Enter code/words at 02: ", send="next"),
         interaction(expect=r".*Enter code/words at 03: ", send="next"),
-        interaction(expect=r".*Enter code/words at 04: ", send="next"),
         interaction(expect=r".*Enter code/words at 05: ", send="next"),
-        interaction(expect=r".*Enter code/words at 06: ", send="next"),
         interaction(expect=r".*Enter code/words at 07: ", send="next"),
-        interaction(expect=r".*Enter code/words at 08: ", send="next"),
-        interaction(expect=r".*Enter code at 09: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
-        interaction(expect=r".*Enter code at 13: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
+        interaction(expect=r".*Enter code/words at 09: ", send="next"),
+        interaction(expect=r".*Enter code/words at 11: ", send="next"),
+        interaction(expect=r".*Enter code/words at 13: ", send="next"),
+        interaction(expect=r".*Enter code/words at 15: ", send="next"),
+        interaction(expect=r".*Enter code at 02: ", send=" ".join(secrets['salt'].ecc_codes[:4])),
+        interaction(expect=r".*Enter code at 12: ", send=" ".join(secrets['salt'].ecc_codes[4:])),
         interaction(expect=r".*\(or Enter to Accept\): ", send="accept"),
     ]
     result = _run(sbk.cli.recover_salt, playbook=playbook)

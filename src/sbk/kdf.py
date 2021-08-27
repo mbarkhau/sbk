@@ -20,7 +20,7 @@ Seconds    = int
 Increment             = float
 ProgressCallback      = typ.Callable[[Increment], None]
 MaybeProgressCallback = typ.Optional[ProgressCallback]
-
+DEFAULT_PARALLELISM   = 128
 
 # NOTE (mb 2021-05-29): Since we feed the hash output back into the
 #   following iteration (to implement the progress bar), the HASH_LEN
@@ -58,7 +58,7 @@ HASH_LEN = 128
 #  g(0) + 1 = s + 1         # +1 to lem 2
 #  s + 1 = s * b            # substitute g(1) given lem 1
 #
-# try to isolate s
+# Solve for s
 #
 #       s + 1 = s * b
 #           1 = s * b - s             # - s
@@ -78,14 +78,11 @@ def curve_params(base: float) -> typ.Tuple[float, float]:
     return (s, o)
 
 
-P_BASE = 1.5
 M_BASE = 1.125
 T_BASE = 1.125
 
-MIN_P = 1
-MIN_M = 10
+MIN_M = 100
 MIN_T = 1
-
 
 FieldVal = int
 
@@ -111,44 +108,36 @@ class KDFParams(typ.NamedTuple):
     t_raw: Iterations
 
     @property
-    def _field_values(
-        self,
-    ) -> typ.Tuple[int, int, int]:
-        f_p = _clamp(val=log(self.p_raw // MIN_P, base=P_BASE), lo=0, hi=2 ** 4 - 1)
+    def _field_values(self) -> typ.Tuple[int, int]:
         f_m = _clamp(val=log(self.m_raw // MIN_M, base=M_BASE), lo=0, hi=2 ** 6 - 1)
         f_t = _clamp(val=log(self.t_raw // MIN_T, base=T_BASE), lo=0, hi=2 ** 6 - 1)
 
-        assert 0 <= f_p < 2 ** 4, f"f_p={f_p}"
         assert 0 <= f_m < 2 ** 6, f"f_m={f_m}"
         assert 0 <= f_t < 2 ** 6, f"f_t={f_t}"
 
-        return (f_p, f_m, f_t)
+        return (f_m, f_t)
 
     def encode(self) -> int:
         """Convert raw values to serializable representation.
 
-        The resulting integer can be encoded as a 16bit unsigned integer.
+        The resulting integer can be encoded as a 12bit unsigned integer.
         """
-        f_p, f_m, f_t = self._field_values
+        f_m, f_t = self._field_values
         fields = 0
-        fields |= f_p << 12
         fields |= f_m << 6
         fields |= f_t << 0
-
-        assert 0 <= fields < 2 ** 16
+        assert 0 <= fields < 2 ** 12
         return fields
 
     @staticmethod
     def decode(fields: int) -> 'KDFParams':
-        if 0 <= fields < 2 ** 16:
-            f_p = (fields >> 12) & 0xF
-            f_m = (fields >>  6) & 0x3F
-            f_t = (fields >>  0) & 0x3F
+        if 0 <= fields < 2 ** 12:
+            f_m = fields >> 6 & 0x3F
+            f_t = fields >> 0 & 0x3F
 
-            p = exp(f_p, base=P_BASE) * MIN_P
             m = exp(f_m, base=M_BASE) * MIN_M
             t = exp(f_t, base=T_BASE) * MIN_T
-            return KDFParams(p, m, t)
+            return KDFParams(DEFAULT_PARALLELISM, m, t)
         else:
             errmsg = f"Invalid fields, out of bounds: {fields}"
             raise AssertionError(errmsg)
@@ -182,32 +171,29 @@ class KDFParams(typ.NamedTuple):
 
     def _replace_any(
         self,
-        p: typ.Optional[int] = None,
         m: typ.Optional[int] = None,
         t: typ.Optional[int] = None,
     ) -> 'KDFParams':
         updated = self
 
-        if p:
-            updated = updated._replace(p_raw=p)
         if m:
             updated = updated._replace(m_raw=m)
         if t:
             updated = updated._replace(t_raw=t)
 
-        return init_kdf_params(p=updated.p_raw, m=updated.m_raw, t=updated.t_raw)
+        return init_kdf_params(m=updated.m_raw, t=updated.t_raw)
 
     def __repr__(self) -> str:
         return f"KDFParams(p={self.p_raw}, m={self.m_raw}, t={self.t_raw})"
 
 
-def init_kdf_params(p: NumThreads, m: MebiBytes, t: Iterations) -> KDFParams:
+def init_kdf_params(m: MebiBytes, t: Iterations) -> KDFParams:
     # NOTE mb: It's important to ALWAYS and ONLY use kdf parameters that have gone through
     #   this function so we always do the kdf parameter normalization.
     #
     # Only certain parameter values can be serialized. Everything goes through this
     # constructor to make sure we only use valid values.
-    tmp = KDFParams(p, m, t)
+    tmp = KDFParams(DEFAULT_PARALLELISM, m, t)
     return KDFParams.decode(tmp.encode())
 
 
@@ -263,9 +249,6 @@ def _hash_argon2_cffi(
 _hash = _hash_argon2_cffi
 
 
-DIGEST_STEPS = 10
-
-
 class ProgressSmoother:
 
     increments: typ.List[float]
@@ -295,11 +278,14 @@ class ProgressSmoother:
     def total_incr(self) -> float:
         return sum(self.increments) + max(self.increments) * 0.55
 
-    def progress_cb(self, incr: Increment) -> None:
+    def progress_cb(self, incr: ProgressIncrement) -> None:
         self.increments.append(incr)
 
     def join(self) -> None:
         self._thread.join()
+
+
+DIGEST_STEPS = 10
 
 
 def digest(
@@ -387,20 +373,18 @@ def kdf_params_for_duration(
 
 
 def debug_params() -> None:
-    max_p = exp(2 ** 4 - 1, base=P_BASE)
-    max_m = exp(2 ** 6 - 1, base=M_BASE) * 10
-    max_t = exp(2 ** 6 - 1, base=T_BASE)
-
+    max_m = exp(2 ** 6 - 1, base=M_BASE) * MIN_M
+    max_t = exp(2 ** 6 - 1, base=T_BASE) * MIN_T
     print(f"       {max_p=:>12}     {max_m=:>12}     {max_t=:>12}")
 
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 30, 31, 32, 62, 63, 64]:
         p = exp(i, base=P_BASE) * MIN_P
         m = exp(i, base=M_BASE) * MIN_M
         t = exp(i, base=T_BASE) * MIN_T
-
         p = min(p, max_p)
 
         kdf_params = init_kdf_params(p=p, m=m, t=t)
+
         print(f"{i:>2}"                     , end=" ")
         print(f"p: {kdf_params.p:>9} {p:>9}", end=" ")
         print(f"m: {kdf_params.m:>9} {m:>9}", end=" ")

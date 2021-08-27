@@ -58,14 +58,14 @@ A person or institution who has custody of an SBK share, which is part of a wall
 You should keep this share *safe*, *secret* and *secure* so that it will be available if the owners wallet has to be recovered.
 
 
-## s - Minimal Owners Guide
+## Minimal Owners Guide
 
 I will start with a bare-bones guide for how to use SBK. It is written with the assumption that you are mostly worried that your wallet will be lost, for example due to a fire, software virus, hardware failure or your untimely demise.
 
 If all you want is a geographically distributed backup of your wallet (to protect against loss and accidents), then this minimal guide may be enough for you. If you are additionally worried that some people that you currently trust might betray you (which is where things get complicated), then you should continue reading the full user guide.
 
 
-### s - Deciding on a Scheme
+### Deciding on a Scheme
 
 The first thing to do, as an owner, is to decide on a "scheme". This is the threshold `T` and number of backup shares `N`, controlled using `--scheme=TofN` when you initially create your wallet. The first parameter `T` is the *threshold*, which is the minimum number of shares that are required to recover your wallet. The second parameter `N` is the total number of shares that are created.
 
@@ -406,7 +406,7 @@ Your first concern as the agent should be to secure any secrets that were under 
 The first step in the recovery process is not to collect the shares or even to contact any of the trustees. The shares are presumed to be safe in their current locations and the recovery process introduces a risk that this will no longer be the case. To minimize this risk the first step should be to make preparations so that the recovery can be done in a deliberate and orderly manner.
 
 
-#### Fund Transfer Preparation
+### Fund Transfer Preparation
 
 The first question that needs to be answered, is what is to be done.
 

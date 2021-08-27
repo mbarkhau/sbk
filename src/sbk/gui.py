@@ -17,12 +17,15 @@ import os
 import sys
 import typing as typ
 import logging
+import platform
 
 import PyQt5.Qt as qt
 import PyQt5.QtGui as qtg
+import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
-from . import gui_panels as gp
+from . import gui_panels
+from . import package_data
 from . import gui_panels_base as gpb
 
 logger = logging.getLogger("sbk.gui")
@@ -33,12 +36,11 @@ class MainGUI(qtw.QStackedWidget):
         super().__init__()
 
         self.setWindowTitle("SBK")
-        self.setWindowIcon(qtg.QIcon(str(gp.ICON_PATH)))
-        self.setFixedSize(1000, 1000)
-        x, y = map(int, os.getenv('SBK_WIN_OFFSET', "200x200").split("x"))
-        self.setGeometry(x, y, 800, 600)
+        pixmap = qtg.QPixmap()
+        pixmap.loadFromData(package_data.read_binary("logo_256.png"))
+        self.setWindowIcon(qtg.QIcon(pixmap))
 
-        select_command_panel = gp.SelectCommandPanel(0)
+        select_command_panel = gui_panels.SelectCommandPanel(0)
         self.addWidget(select_command_panel)
         select_command_panel.switch()
 
@@ -71,16 +73,28 @@ def _screen_size(app: qtw.QApplication) -> typ.Tuple[int, int]:
 
 
 def gui() -> None:
-    app = qtw.QApplication([])
+    # cargo cult qt initialization
+    qtw.QApplication.setAttribute(qtc.Qt.AA_EnableHighDpiScaling, True)
+    if platform.system() == 'Linux':
+        qtc.QCoreApplication.setAttribute(qtc.Qt.AA_X11InitThreads)
+    if hasattr(qtg.QGuiApplication, 'setDesktopFileName'):
+        qtg.QGuiApplication.setDesktopFileName("sbk.desktop")
+    if hasattr(qtg.QGuiApplication, 'applicationDisplayName'):
+        qtg.QGuiApplication.setApplicationDisplayName('SBK')
+
+    app = qtw.QApplication(sys.argv)
+
     # w, h = _screen_size(app)
 
     sbk_dialog = MainGUI()
+    x, y = map(int, os.getenv('SBK_WIN_OFFSET', "200x200").split("x"))
+    sbk_dialog.setGeometry(x, y, 550, 540)
     sbk_dialog.show()
     app.exec()
     sys.exit()
 
 
-def selftest() -> None:
+def main() -> None:
     import sbk.cli
 
     sbk.cli._configure_logging(verbosity=2)
@@ -88,4 +102,4 @@ def selftest() -> None:
 
 
 if __name__ == '__main__':
-    selftest()
+    main()

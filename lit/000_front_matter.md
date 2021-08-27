@@ -10,6 +10,9 @@ description  = "SBK - Keep your Coins Safe and Secure."
 keywords     = "Bitcoin,Wallet,Electrum,Shamir,Crypto"
 docs_url     = "https://sbk.dev/docs"
 
-copyright    = "2019-2021 Manuel Barkhau - MIT License"
-copyright_url= "https://github.com/mbarkhau/sbk/blob/master/LICENSE"
+pdf_basename = "print"
+pdf_formats  = ["a4", "a5", "booklet_a4"]
+
+copyright = "2019-2021 Manuel Barkhau - MIT License"
+copyright_url = "https://github.com/mbarkhau/sbk/blob/master/LICENSE"
 +++

@@ -26,10 +26,6 @@ install_requires = [
 ]
 
 
-package_data_globs = [
-    "assets/*"
-]
-
 long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
 
 package_dir={"": "src"}
@@ -64,10 +60,11 @@ setuptools.setup(
     description="Wallet seed generation from a brainkey with Shamir Secret Shares as Backup.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=["sbk", "sbk.assets"],
-    package_dir=package_dir,
+    packages=["sbk", "sbk.assets", "sbk.wordlist"],
+    package_dir={"": "src"},
+    zip_safe=False,
     include_package_data=True,
-    package_data={'sbk': package_data_globs},
+    setup_requires=['lib3to6'],
     install_requires=install_requires,
     entry_points="""
         [console_scripts]
@@ -75,7 +72,6 @@ setuptools.setup(
         sbk-gui=sbk.gui:main
     """,
     python_requires=">=3.7",
-    zip_safe=True,
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[

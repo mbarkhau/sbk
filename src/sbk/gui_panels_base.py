@@ -466,11 +466,11 @@ def _recover_datas(valid_datas: typ.Sequence[MaybeBytes], msg_len: int) -> typ.S
 
 def column_headers(parent: qtw.QWidget) -> qtw.QHBoxLayout:
     headers = qtw.QHBoxLayout()
-    headers.addStretch(26)
-    headers.addWidget(_label_widget(parent, "Data"    ), 42 - 15)
-    headers.addWidget(_label_widget(parent, "Mnemonic"), 48 * 2)
-    headers.addWidget(_label_widget(parent, "ECC"     ), 42 + 10)
-    headers.addStretch(5)
+    headers.addStretch(20)
+    headers.addWidget(_label_widget(parent, "Data"    ),  20)
+    headers.addWidget(_label_widget(parent, "Mnemonic"), 100)
+    headers.addWidget(_label_widget(parent, "ECC"     ),  25)
+    headers.addStretch(10)
     return headers
 
 
@@ -509,24 +509,24 @@ def init_grid(
             grid_layout.addWidget(widget, grid_row, col)
 
         all_widgets.extend(row_widgets)
-        grid_layout.setRowMinimumHeight(grid_row, 43)
+        grid_layout.setRowMinimumHeight(grid_row, 26)
 
     for row in [4, 9]:
         col    = 0
         widget = qtw.QLabel(" ", parent)
         grid_layout.addWidget(widget, row, col)
 
-    grid_layout.setColumnStretch(0, 3)
-    grid_layout.setColumnMinimumWidth(1,  30)
-    grid_layout.setColumnMinimumWidth(2, 170)
+    grid_layout.setColumnStretch(0, 2)
+    grid_layout.setColumnMinimumWidth(1, 15)
+    grid_layout.setColumnMinimumWidth(2, 90)
     grid_layout.setColumnStretch(3, 1)
-    grid_layout.setColumnMinimumWidth(4, 190)
+    grid_layout.setColumnMinimumWidth(4, 96)
     grid_layout.setColumnStretch(5, 1)
-    grid_layout.setColumnMinimumWidth(6, 190)
+    grid_layout.setColumnMinimumWidth(6, 96)
     grid_layout.setColumnStretch(7, 1)
-    grid_layout.setColumnMinimumWidth(8,  30)
-    grid_layout.setColumnMinimumWidth(9, 170)
-    grid_layout.setColumnStretch(10, 3)
+    grid_layout.setColumnMinimumWidth(8, 15)
+    grid_layout.setColumnMinimumWidth(9, 90)
+    grid_layout.setColumnStretch(10, 2)
 
     return all_widgets
 

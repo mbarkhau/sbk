@@ -114,10 +114,6 @@ def _newline_mod(num_lines: int) -> int:
     return newline_mod
 
 
-def _line_marker(idx: int) -> str:
-    return f"{idx + 1:02}"
-
-
 class PromptState:
 
     secret_type: InputType
@@ -146,6 +142,11 @@ class PromptState:
         assert len(_accepted) == len(self.inputs)
         self.accepted = _accepted
 
+    def line_marker(self, idx: int) -> str:
+        offset     = int(idx * 2 / len(self.inputs)) + 1
+        marker_num = ((idx * 2) % len(self.inputs)) + offset
+        return f"{marker_num:02}"
+
     @property
     def is_cursor_at_ecc(self) -> bool:
         return self.cursor >= len(self.inputs) // 2
@@ -166,18 +167,16 @@ class PromptState:
 
     def message(self, key: str) -> str:
         if key == 'prompt':
-            cursor_marker = _line_marker(idx=self.cursor)
+            cursor_marker = self.line_marker(idx=self.cursor)
             if self.is_completable:
                 if self.is_cursor_at_ecc:
                     return f"Enter code at {cursor_marker} (or Enter to Accept)"
                 else:
                     return f"Enter code/words at {cursor_marker}"
+            elif self.is_cursor_at_ecc:
+                return f"Enter code at {cursor_marker}"
             else:
-                if self.is_cursor_at_ecc:
-                    return f"Enter code at {cursor_marker}"
-                else:
-                    return f"Enter code/words at {cursor_marker}"
-
+                return f"Enter code/words at {cursor_marker}"
         return MESSAGES[self.secret_type][key]
 
     def _formatted_lines(self) -> typ.List[str]:
@@ -191,7 +190,7 @@ class PromptState:
             else:
                 intcode = maybe_intcode
 
-            marker = _line_marker(line_index)
+            marker = self.line_marker(idx=line_index)
             lines[line_index] += marker + ": " + intcode
 
         for line_index, maybe_intcode in enumerate(self.inputs[:num_lines]):
@@ -206,13 +205,12 @@ class PromptState:
 
         # ecc intcodes
         for line_index, maybe_intcode in enumerate(self.inputs[num_lines:]):
-            idx_offset = num_lines + line_index
             if maybe_intcode is None:
                 intcode = "___-___"
             else:
                 intcode = maybe_intcode
 
-            marker = _line_marker(idx_offset)
+            marker = self.line_marker(idx=line_index + num_lines)
             lines[line_index] += marker + ": " + intcode + " "
 
         return lines

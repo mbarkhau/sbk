@@ -9,17 +9,30 @@ Data layout for reference.
 
 |        Field        |  Size  |                          Info                            |
 | ------------------- | ------ | -------------------------------------------------------- |
-| `f_version`         | 4 bit  | ...                                                      |
-| `f_threshold`       | 4 bit  | minimum shares required for recovery                     |
-|                     |        | max: 1..2**4 = 1..16                                     |
+| `f_threshold`       | 8 bit  | minimum shares required for recovery                     |
+|                     |        | max: 1..2**4 = 2..17                                     |
 | `f_share_no`        | 8 bit  | For shares, the x-coordinate > 0                         |
+| `f_version`         | 4 bit  | ...                                                      |
 | `f_kdf_parallelism` | 4 bit  | `ceil(2 ** n)    = kdf_parallelism` in number of threads |
 | `f_kdf_mem_cost`    | 6 bit  | `ceil(1.25 ** n) = kdf_mem_cost` in MiB                  |
 | `f_kdf_time_cost`   | 6 bit  | `ceil(1.5  ** n) = kdf_time_cost` in iterations          |
 
-0     3 4     7 8    11 12       17 18       23 24            31
-[ ver ] [thres] [kdf_p] [ kdf_mem ] [ kdf_time] [   share_no   ]
- 4bit    4bit    4bit      6bit        6bit          8bit
+0         7 8         15 16   19 20   23 24       30       32
+[threshold] [ share_no ] [ ver ] [kdf_p] [ kdf_mem ] [ kdf_time]
+    8bit       8bit       4bit     4bit      4bit        6bit
+
+| `f_version`         | 4 bit  | ...                                                      |
+| `f_kdf_mem_cost`    | 6 bit  | `ceil(1.125 ** n) = kdf_mem_cost` in 128 Mebibyte         |
+| `f_kdf_time_cost`   | 6 bit  | `ceil(n + 1.25  ** n)  = kdf_time_cost` in iterations          |
+
+0      3 4          9 10        15
+[  ver ] [    mem   ] [   time   ]
+  4bit       6bit         6bit
+
+0         7 8         15
+[threshold] [ share_no ]
+    8bit       8bit
+
 """
 
 import os
@@ -29,10 +42,13 @@ import typing as typ
 from . import kdf
 from . import primes
 
-SBK_VERSION_V1 = 1
+SBK_VERSION_V0 = 0
 
-DEFAULT_RAW_SALT_LEN = 13
+DEFAULT_RAW_SALT_LEN = 7
 DEFAULT_BRAINKEY_LEN = 6
+
+PARANOID_RAW_SALT_LEN = 13
+PARANOID_BRAINKEY_LEN = 8
 
 ENV_RAW_SALT_LEN = os.getenv('SBK_DEBUG_RAW_SALT_LEN')
 ENV_BRAINKEY_LEN = os.getenv('SBK_DEBUG_BRAINKEY_LEN')
@@ -44,13 +60,13 @@ BRAINKEY_LEN = int(ENV_BRAINKEY_LEN) if ENV_BRAINKEY_LEN else DEFAULT_BRAINKEY_L
 RAW_SALT_MIN_ENTROPY = RAW_SALT_LEN * 0.19 + 0.3
 BRAINKEY_MIN_ENTROPY = BRAINKEY_LEN * 0.19 + 0.3
 
-PARAM_CFG_LEN     = 3
-SHARE_X_COORD_LEN = 1
-SALT_LEN          = PARAM_CFG_LEN + RAW_SALT_LEN
+PARAM_CFG_LEN  = 3
+SHARE_DATA_LEN = 1
+SALT_LEN       = PARAM_CFG_LEN + RAW_SALT_LEN
 
 MASTER_KEY_LEN = RAW_SALT_LEN + BRAINKEY_LEN
 
-SHARE_LEN = PARAM_CFG_LEN + SHARE_X_COORD_LEN + RAW_SALT_LEN + BRAINKEY_LEN
+SHARE_LEN = PARAM_CFG_LEN + SHARE_DATA_LEN + RAW_SALT_LEN + BRAINKEY_LEN
 
 MIN_ENTROPY      = int(os.getenv('SBK_MIN_ENTROPY'     , "16"))
 MAX_ENTROPY_WAIT = int(os.getenv('SBK_MAX_ENTROPY_WAIT', "10"))
@@ -60,16 +76,18 @@ DEFAULT_KDF_TARGET_DURATION = int(os.getenv('SBK_KDF_TARGET_DURATION', "90"))
 DEFAULT_THRESHOLD  = int(os.getenv('SBK_THRESHOLD' , "3"))
 DEFAULT_NUM_SHARES = int(os.getenv('SBK_NUM_SHARES', "5"))
 
-# constrained by f_threshold (4bits)
-MAX_THRESHOLD = 16
+# constrained by f_threshold (3bits)
+MAX_THRESHOLD = 10
 
 
 class ParamConfig(typ.NamedTuple):
 
     version   : int
-    threshold : int
-    num_shares: int
+    paranoid  : bool
     kdf_params: kdf.KDFParams
+    threshold : int
+    share_no  : typ.Optional[int]
+    num_shares: int
 
     @property
     def prime(self) -> int:
@@ -80,26 +98,27 @@ class ParamConfig(typ.NamedTuple):
 def init_param_config(
     kdf_params: kdf.KDFParams,
     threshold : int,
+    share_no  : typ.Optional[int] = None,
     num_shares: typ.Optional[int] = None,
+    paranoid  : bool = False,
 ) -> ParamConfig:
     _num_shares = threshold if num_shares is None else num_shares
 
     if threshold > _num_shares:
         errmsg = f"threshold must be <= num_shares, got {threshold} > {_num_shares}"
         raise ValueError(errmsg)
-
-    if not 1 <= threshold <= MAX_THRESHOLD:
+    elif not 1 <= threshold <= MAX_THRESHOLD:
         errmsg = f"Invalid threshold {threshold}"
         raise ValueError(errmsg)
-
-    param_cfg = ParamConfig(
-        version=SBK_VERSION_V1,
-        threshold=threshold,
-        num_shares=_num_shares,
-        kdf_params=kdf_params,
-    )
-
-    return param_cfg
+    else:
+        return ParamConfig(
+            version=SBK_VERSION_V0,
+            paranoid=paranoid,
+            kdf_params=kdf_params,
+            threshold=threshold,
+            share_no=share_no,
+            num_shares=_num_shares,
+        )
 
 
 def bytes2param_cfg(data: bytes) -> ParamConfig:
@@ -108,28 +127,36 @@ def bytes2param_cfg(data: bytes) -> ParamConfig:
         errmsg = f"Invalid params len={len(data)}"
         raise ValueError(errmsg)
 
-    # B: Unsigned Char (1 byte)
     # H: Unsigned Short (2 bytes)
-    fields_01, fields_234 = struct.unpack("!BH", data[:3])
+    (fields,) = struct.unpack("!H", data[:2])
 
     # We don't include the share_no in the ParamConfig, it
     # is decoded separately for each share.
     # share_no = _fields_5
 
-    version     = (fields_01 >> 4) & 0xF
-    f_threshold = (fields_01 >> 0) & 0xF
-    if version != SBK_VERSION_V1:
+    version = (fields >> 5) & 0x7
+    if version != SBK_VERSION_V0:
         raise ValueError(f"Unsupported Version {version}")
 
-    threshold = f_threshold + 1
+    paranoid = (fields >> 4) & 0x1
+
+    f_threshold = (fields >> 0) & 0xF
+    threshold   = f_threshold + 2
 
     # The param_cfg encoding doesn't include num_shares as it's
     # only required when originally generating the shares. The
     # minimum value is threshold, so that is what we set it to.
     num_shares = threshold
 
-    kdf_params = kdf.KDFParams.decode(fields_234)
-    return ParamConfig(version, threshold, num_shares, kdf_params)
+    kdf_params = kdf.KDFParams.decode(fields << 4)
+    return ParamConfig(
+        version=version,
+        paranoid=paranoid,
+        kdf_params=kdf_params,
+        threshold=threshold,
+        share_no=share_no,
+        num_shares=num_shares,
+    )
 
 
 def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
@@ -139,12 +166,9 @@ def param_cfg2bytes(param_cfg: ParamConfig) -> bytes:
     to keep the serialized param_cfg small and leave
     more room for randomness, hence the bit twiddling.
     """
-    f_threshold = param_cfg.threshold - 1
+    fields = 0
+    fields |= param_cfg.version << 5
+    fields |= f_threshold
 
-    fields_01 = 0
-    fields_01 |= param_cfg.version << 4
-    fields_01 |= f_threshold
-
-    fields_234     = param_cfg.kdf_params.encode()
-    param_cfg_data = struct.pack("!BH", fields_01, fields_234)
-    return param_cfg_data
+    kdf_fields = param_cfg.kdf_params.encode()
+    return struct.pack("!H", fields)

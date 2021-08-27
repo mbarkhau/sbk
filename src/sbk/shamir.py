@@ -122,7 +122,9 @@ def _split(
     num_shares     = param_cfg.num_shares
 
     if use_gf_p:
-        raw_shares = _split_data_gf_p(shares_input, threshold, num_shares, param_cfg.prime)
+        key_bits   = parameters.master_key_len(param_cfg) * 8
+        gf_prime   = primes.get_pow2prime(key_bits)
+        raw_shares = _split_data_gf_p(shares_input, threshold, num_shares, gf_prime)
     else:
         raw_shares = _split_data_gf_256(shares_input, threshold, num_shares)
 
@@ -149,7 +151,9 @@ def split(
 
 
 def join(
-    param_cfg: params.ParamConfig, shares: ct.Shares, use_gf_p: bool = False
+    param_cfg: params.ParamConfig,
+    shares   : ct.Shares,
+    use_gf_p : bool = False,
 ) -> typ.Tuple[ct.RawSalt, ct.BrainKey]:
     # strip off params
     raw_shares : RawShares = [ct.RawShare(share[params.PARAM_CFG_LEN :]) for share in shares]
@@ -157,9 +161,9 @@ def join(
         master_key = _join_gf_p(raw_shares, param_cfg.threshold, param_cfg.prime)
     else:
         master_key = _join_gf_256(raw_shares, param_cfg.threshold)
-
-    if len(master_key) != params.MASTER_KEY_LEN:
-        errmsg = f"Invaid master_key_len={len(master_key)}"
+    key_len = parameters.master_key_len(param_cfg)
+    if len(master_key) != key_len:
+        errmsg = f"Invaid master_key_len={len(master_key)} (expected {key_len})"
         raise ValueError(errmsg)
 
     salt_end = params.RAW_SALT_LEN

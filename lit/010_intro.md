@@ -1,36 +1,4 @@
-# SBK: Split Bitcoin Keys
-
-## Disclaimers
-
-!!! warning "No Warranty"
-
-    [The software is provided under the MIT License, "as is", without warranty of any kind, express or implied…][href_sbk_license]. In particular, the author(s) of SBK cannot be held liable for any funds that are lost or stolen. The author(s) of SBK have no responsibility (and very likely no ability) to help with wallet recovery.
-
-[href_sbk_license]: https://gitlab.com/mbarkhau/sbk/blob/master/LICENSE
-
-
-!!! warning "Alternative: Multisig"
-
-    I acknowledge the concerns expressed in [Shamir Secret
-    Snakeoil][href_btcwiki_sss] and to that end, I have placed these
-    disclaimers as the first thing for you to read. Further info see the chapter on [Tradeoffs](090_tradeoffs.html)
-
-[href_btcwiki_sss]: https://en.bitcoin.it/wiki/Shamir_Secret_Snakeoil
-
-
-!!! warning "Project Status: Alpha"
-
-    As of January 2020, SBK is still in the experimental, pre-alpha, evaluation only, developmental prototype phase (hedge, hedge, hedge). At this point the primary reason for the software to be publicly available is for review.
-
-    For the moment not even the primary author of SBK is using it for any substantial amount of bitcoin. If you do use it, assume that all of your bitcoin will be lost.
-
-    If you are looking for viable present day alternatives, please review [How To Store Bitcoin Safely][href_yt_held_storing_btc] by Dan Held.
-
-[href_yt_held_storing_btc]: https://www.youtube.com/watch?v=5WWfQM0SFXQ
-
-
-
-## Introduction
+# SBK: Introduction
 
 SBK is a tool to generate and recover Bitcoin Wallets. The goal of SBK is to keep your bitcoin[^fnote_bitcoin_project_vs_money] safe and secure. This means:
 
@@ -62,6 +30,37 @@ SBK is Free Open Source Software. SBK is not a service, not a company and certai
 [^fnote_electrum_plugin]: SBK may well at some point be implemented as an Electrum plugin. You are welcome to contribute at [github.com/mbarkhau/sbk][href_github_sbk].
 
 [href_github_sbk]: https://github.com/mbarkhau/sbk
+
+
+## Disclaimers
+
+!!! warning "No Warranty"
+
+    [The software is provided under the MIT License, "as is", without warranty of any kind, express or implied…][href_sbk_license]. In particular, the author(s) of SBK cannot be held liable for any funds that are lost or stolen. The author(s) of SBK have no responsibility (and very likely no ability) to help with wallet recovery.
+
+[href_sbk_license]: https://gitlab.com/mbarkhau/sbk/blob/master/LICENSE
+
+
+!!! warning "Concerns regarding Shamir's Secret Sharing"
+
+    I acknowledge the concerns expressed by [Jameson Lopp][href_keys_casa_sssss]
+    and in [Shamir Secret Snakeoil][href_btcwiki_sss]. To that end, I
+    have placed these disclaimers as the first thing for you to read.
+    Further info see the chapter on [[Tradeoffs]]
+
+[href_keys_casa_sssss]: https://blog.keys.casa/shamirs-secret-sharing-security-shortcomings/
+[href_btcwiki_sss]: https://en.bitcoin.it/wiki/Shamir_Secret_Snakeoil
+
+
+!!! warning "Project Status: Alpha"
+
+    As of January 2020, SBK is still in the experimental, pre-alpha, evaluation only, developmental prototype phase (hedge, hedge, hedge). At this point the primary reason for the software to be publicly available is for review.
+
+    For the moment not even the primary author of SBK is using it for any substantial amount of bitcoin. If you do use it, assume that all of your bitcoin will be lost.
+
+    If you are looking for viable present day alternatives, please review [How To Store Bitcoin Safely][href_yt_held_storing_btc] by Dan Held.
+
+[href_yt_held_storing_btc]: https://www.youtube.com/watch?v=5WWfQM0SFXQ
 
 
 ## The Many Ways to Lose Your Coins

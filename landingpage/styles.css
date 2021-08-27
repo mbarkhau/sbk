@@ -70,18 +70,29 @@ body {
 
 #logo {
     margin: 3em auto 1em auto;
-    background-color: #FBFAFA;
-    height: 180px;
-    width: 180px;
-
-    border-radius: 90px;
-    box-shadow: inset 0 0 8px #888;
-}
-#logo img {
     height: 128px;
     width: 128px;
-    margin: 35px 26px;
+
+    /*height: 180px;*/
+    /*width: 180px;*/
+    /*background-color: #FBFAFA;*/
+    /*border-radius: 90px;*/
+    /*box-shadow: inset 0 0 8px #888;*/
 }
+
+/*#logo img {margin: 35px 26px; }*/
+
+#logo a {
+    display: block;
+    background-image: url(nostroke_logo_256.png);
+    background-size: cover;
+    height: 128px;
+    width: 128px;
+
+    text-indent: 100%;
+    overflow: hidden;
+}
+
 #content {
     margin: 1em auto 10em auto;
     max-width: 48em;
@@ -138,6 +149,9 @@ a:hover {text-decoration: underline;}
     }
     .warning:before {
         filter: invert(1);
+    }
+    #logo a {
+        background-image: url(logo_256.png);
     }
 }
 

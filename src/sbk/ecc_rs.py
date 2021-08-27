@@ -73,10 +73,10 @@ def _encode(msg: Message, ecc_len: int) -> Block:
     ecc_points   = tuple(gf_poly.Point(x=x, y=_interpolate(data_points, at_x=x)) for x in ecc_x_coords)
     y_vals       = tuple(p.y.val for p in data_points + ecc_points)
 
-    if not all(0 <= y <= 255 for y in y_vals):
+    if all(0 <= y <= 255 for y in y_vals):
+        return bytes(y_vals)
+    else:
         raise AssertionError()
-
-    return bytes(y_vals)
 
 
 def encode(msg: Message, ecc_len: typ.Optional[int] = None, verify: bool = True) -> Block:

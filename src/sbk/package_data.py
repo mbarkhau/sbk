@@ -10,7 +10,7 @@ import typing as typ
 try:
     import importlib.resources as importlib_resources
 except ImportError:
-    # compat for py38 and lower
+    # compat for py36 and lower
     import importlib_resources  # type: ignore
 
 
@@ -20,6 +20,15 @@ def path(filename: str) -> typ.ContextManager:
 
 def read_binary(filename: str) -> bytes:
     return importlib_resources.read_binary("sbk.assets", filename)
-    # with package_data.path("logo.svg") as path:
-    #     with path.open("rb") as fobj:
-    #         return fobj.read()
+
+
+def read_wordlist(filename: str) -> list[str]:
+    result = []
+    with importlib_resources.path("sbk.wordlist", filename) as path:
+        with path.open() as fobj:
+            for line in fobj:
+                for word in line.split():
+                    word = word.strip()
+                    if word:
+                        result.append(word)
+    return result

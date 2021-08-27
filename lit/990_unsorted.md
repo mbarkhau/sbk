@@ -1,4 +1,4 @@
-## Design Considerations
+# Design Considerations
 
 - Tradoffs: Usability, Security, Convenience, Long Term Peace of Mind
 - Why not Split only the Brainkey and distribute the salt to everybody?
@@ -12,7 +12,7 @@
 
 
 
-### Future Work
+## Future Work
 
  - It may very well be appropriate to implement SBK as a Plugin for Electrum
 

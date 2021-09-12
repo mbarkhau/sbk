@@ -12,9 +12,8 @@ import logging
 
 import PyQt5.QtCore as qtc
 
-from . import kdf
-from . import params
 from . import ui_common
+from . import parameters
 from . import common_types as ct
 from . import gui_panels_base as gpb
 
@@ -55,13 +54,13 @@ class SeedGenerationTask(qtc.QThread):
     progress = qtc.pyqtSignal(ProgressStatus)
     finished = qtc.pyqtSignal(str)
 
-    def __init__(self, param_cfg: params.ParamConfig) -> None:
+    def __init__(self, params: parameters.Parameters) -> None:
         super().__init__()
-        self.param_cfg = param_cfg
+        self.params = params
 
     def run(self) -> None:
         try:
-            ui_common.validated_param_data(self.param_cfg)
+            ui_common.validated_param_data(self.params)
         except ValueError as err:
             if err.args and isinstance(err.args[0], list):
                 bad_checks = err.args[0]
@@ -75,27 +74,27 @@ class SeedGenerationTask(qtc.QThread):
         n = 0
         while True:
             entropy = ui_common.get_entropy_pool_size()
-            if entropy < params.MIN_ENTROPY and n < params.MAX_ENTROPY_WAIT:
+            if entropy < parameters.MIN_ENTROPY and n < parameters.MAX_ENTROPY_WAIT:
                 logger.warning(f"low on entropy ({entropy}), waiting a bit for it to accumulate")
                 time.sleep(1)
                 n += 1
             else:
                 break
 
-        if entropy < params.MIN_ENTROPY:
-            errmsg = f"Not enough entropy: {entropy} < {params.MIN_ENTROPY}"
+        if entropy < parameters.MIN_ENTROPY:
+            errmsg = f"Not enough entropy: {entropy} < {parameters.MIN_ENTROPY}"
             logger.error(errmsg)
             self.finished.emit(errmsg)
             return
 
-        salt, brainkey, shares = ui_common.create_secrets(self.param_cfg)
+        salt, brainkey, shares = ui_common.create_secrets(self.params)
 
         # NOTE (mb 2021-07-09): We could do this later in theory, but
         #   if the derivation of seed_data fails, the user would have
         #   written down their shares that are useless. Better to
         #   provoke any such error early on.
         seed_data = ui_common.derive_seed(
-            self.param_cfg.kdf_params,
+            self.params,
             salt,
             brainkey,
             label="KDF Validation ",
@@ -117,19 +116,19 @@ class SeedDerivationTask(qtc.QThread):
 
     def __init__(
         self,
-        param_cfg: params.ParamConfig,
-        salt     : ct.Salt,
-        brainkey : ct.BrainKey,
+        params  : parameters.Parameters,
+        salt    : ct.Salt,
+        brainkey: ct.BrainKey,
     ) -> None:
         super().__init__()
-        self.param_cfg = param_cfg
-        self.salt      = salt
-        self.brainkey  = brainkey
+        self.params   = params
+        self.salt     = salt
+        self.brainkey = brainkey
 
     def run(self) -> None:
         try:
             # provoke error for invalid data
-            ui_common.validated_param_data(self.param_cfg)
+            ui_common.validated_param_data(self.params)
         except ValueError as err:
             if err.args and isinstance(err.args[0], list):
                 bad_checks = err.args[0]
@@ -144,7 +143,7 @@ class SeedDerivationTask(qtc.QThread):
         salt     = self.salt
 
         seed_data = ui_common.derive_seed(
-            self.param_cfg.kdf_params,
+            self.params,
             salt,
             brainkey,
             label="KDF Validation ",
@@ -159,34 +158,34 @@ class SeedDerivationTask(qtc.QThread):
         self.finished.emit("ok")
 
 
-class ParamConfigWorker(qtc.QThread):
+class ParametersWorker(qtc.QThread):
 
     progress = qtc.pyqtSignal(ProgressStatus)
-    finished = qtc.pyqtSignal(params.ParamConfig)
+    finished = qtc.pyqtSignal(parameters.Parameters)
 
     def __init__(
         self,
-        threshold        : int,
-        num_shares       : int,
-        parallelism      : kdf.NumThreads,
-        memory_per_thread: kdf.MebiBytes,
-        target_duration  : kdf.Seconds,
+        threshold      : int,
+        num_shares     : int,
+        target_memory  : ct.MebiBytes,
+        target_duration: ct.Seconds,
+        paranoid       : bool,
     ) -> None:
         super().__init__()
-        self.threshold         = threshold
-        self.num_shares        = num_shares
-        self.parallelism       = parallelism
-        self.memory_per_thread = memory_per_thread
-        self.target_duration   = target_duration
+        self.threshold       = threshold
+        self.num_shares      = num_shares
+        self.target_memory   = target_memory
+        self.target_duration = target_duration
+        self.paranoid        = paranoid
 
     def run(self) -> None:
-        param_cfg = ui_common.init_param_config(
+        params = ui_common.init_params(
             target_duration=self.target_duration,
-            parallelism=self.parallelism,
-            memory_per_thread=self.memory_per_thread,
+            memory_cost=self.target_memory,
             time_cost=None,  # auto from target_duration
             threshold=self.threshold,
             num_shares=self.num_shares,
+            paranoid=self.paranoid,
             init_progressbar=init_progres_status_emitter_clazz(self.progress),
         )
-        self.finished.emit(param_cfg)
+        self.finished.emit(params)

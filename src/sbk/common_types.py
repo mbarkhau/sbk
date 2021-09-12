@@ -1,28 +1,49 @@
-# This file is part of the SBK project
+#################################################
+#     This is a generated file, do not edit     #
+#################################################
+
+# This file is part of the sbk project
 # https://github.com/mbarkhau/sbk
 #
 # Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
-
 """Types used across multiple modules."""
 
-import typing as typ
+from typing import NewType
+from typing import Callable
+from typing import Optional
+from typing import Sequence
+from typing import NamedTuple
 
-RawSalt = typ.NewType('RawSalt', bytes)
+RawSalt = NewType('RawSalt', bytes)
 
 # ParamConfig data + RawSalt
-Salt = typ.NewType('Salt', bytes)
+Salt = NewType('Salt', bytes)
 
-BrainKey  = typ.NewType('BrainKey' , bytes)
-MasterKey = typ.NewType('MasterKey', bytes)
+BrainKey  = NewType('BrainKey' , bytes)
+MasterKey = NewType('MasterKey', bytes)
 
-# only the encoded GFPoint
-RawShare = typ.NewType('RawShare', bytes)
 
-# ParamConfig data + RawShare
-Share  = typ.NewType('Share', bytes)
-Shares = typ.Sequence[Share]
+class RawShare(NamedTuple):
+    x_coord: int
+    data   : bytes  # only the encoded GFPoint.y values
 
-SeedData = typ.NewType('SeedData', bytes)
 
-ElectrumSeed = typ.NewType('ElectrumSeed', str)
+# ParamConfig data + RawShare.data
+Share  = NewType('Share', bytes)
+Shares = Sequence[Share]
+
+SeedData = NewType('SeedData', bytes)
+
+ElectrumSeed = NewType('ElectrumSeed', str)
+
+LangCode = NewType('LangCode', str)
+
+ProgressIncrement     = NewType('ProgressIncrement', float)
+ProgressCallback      = Callable[[ProgressIncrement], None]
+MaybeProgressCallback = Optional[ProgressCallback]
+
+Parallelism = NewType('Parallelism', int)
+MebiBytes   = NewType('MebiBytes'  , int)
+Iterations  = NewType('Iterations' , int)
+Seconds     = NewType('Seconds'    , float)

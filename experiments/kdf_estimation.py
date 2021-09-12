@@ -44,7 +44,7 @@ def _measure_scaled_params(baseline: Measurement) -> typ.List[Measurement]:
             m = measurement.m
             t = measurement.t
 
-        kdf_params  = kdf.init_kdf_params(baseline.p, m, t)
+        kdf_params  = kdf.init_kdf_params(m, t)
         measurement = measure(kdf_params)
         measurements.append(measurement)
 
@@ -59,11 +59,10 @@ def _update_measurements(sys_info: SystemInfo) -> SystemInfo:
     #   to see if curve of the durations is past some inflection
     #   point that is presumably related to a bottleneck.
 
-    p = sys_info.initial_p
     m = 1
 
     while True:
-        kdf_params = kdf.init_kdf_params(p=p, m=m, t=2)
+        kdf_params = kdf.init_kdf_params(m=m, t=2)
         p          = kdf_params.p
         m          = kdf_params.m
         sample     = measure(kdf_params)
@@ -111,7 +110,7 @@ def estimate_param_cost(
 
     min_measurements: typ.Dict[kdf.KDFParams, float] = {}
     for measurement in measurements:
-        key = kdf.init_kdf_params(measurement.p, measurement.m, measurement.t)
+        key = kdf.init_kdf_params(measurement.m, measurement.t)
         if key in min_measurements:
             val = min_measurements[key]
             min_measurements[key] = min(measurement.duration, val)
@@ -141,12 +140,11 @@ def estimate_param_cost(
 
 def get_default_params() -> kdf.KDFParams:
     sys_info = load_sys_info()
-    p        = sys_info.initial_p
     m        = sys_info.initial_m
 
     t = 1
     while True:
-        test_kdf_params = kdf.init_kdf_params(p=p, m=m, t=t)
+        test_kdf_params = kdf.init_kdf_params(m=m, t=t)
 
         est_cost = estimate_param_cost(test_kdf_params)
         if est_cost > DEFAULT_KDF_TIME_SEC:

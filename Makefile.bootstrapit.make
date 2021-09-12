@@ -327,7 +327,7 @@ lint_fmt:
 ## Run Linters in error only mode
 .PHONY: errlint
 errlint:
-	@$(DEV_ENV)/bin/flake8 --select E src/
+	@$(DEV_ENV)/bin/flake8 --select E --extend-ignore E402 src/
 	@$(DEV_ENV)/bin/pylint --disable=C,R,W,F --rcfile=setup.cfg \
 		src/ test/
 

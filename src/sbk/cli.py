@@ -18,11 +18,10 @@ import click
 
 import sbk
 
-from . import kdf
 from . import cli_io
-from . import params
 from . import shamir
 from . import ui_common
+from . import parameters
 from . import common_types as ct
 
 try:
@@ -118,94 +117,92 @@ SALT_PROMPT = "When you have copied the Salt, press enter to continue "
 
 SBK_KEYGEN_PROMPT = "Key generation complete, press enter to continue "
 
-
-KDF_TARGET_DURATION_HELP = "Target duration for Argon2 KDF (unless --time-cost is specified explicitly)"
-KDF_PARALLELISM_HELP     = "Argon2 KDF Parallelism (Number of threads)"
-KDF_MEMORY_COST_HELP     = "Argon2 KDF Memory Cost per Thread (MebiBytes)"
-KDF_TIME_COST_HELP       = "Argon2 KDF Time Cost (iterations)"
-
-
-_kdf_target_duration_option = click.option(
+_opt_kdf_target_duration = click.option(
     '-d',
     '--target-duration',
     type=float,
-    default=params.DEFAULT_KDF_TARGET_DURATION,
+    default=parameters.DEFAULT_KDF_T_TARGET,
     show_default=True,
-    help=KDF_TARGET_DURATION_HELP,
-)
-_kdf_memory_cost_option = click.option(
-    '-m', '--memory-cost', 'memory_per_thread', type=int, help=KDF_MEMORY_COST_HELP
+    help="Target duration for Argon2 KDF (unless --time-cost is specified explicitly)",
 )
 
-_kdf_time_cost_option = click.option('-t', '--time-cost', type=int, help=KDF_TIME_COST_HELP)
+_opt_kdf_memory_cost = click.option(
+    '-m',
+    '--memory-cost',
+    'memory_cost',
+    type=int,
+    help="Argon2 KDF Memory Cost (MebiBytes)",
+)
+
+_opt_kdf_time_cost = click.option(
+    '-t',
+    '--time-cost',
+    type=int,
+    help="Argon2 KDF Time Cost (iterations)",
+)
 
 
-DEFAULT_SCHEME = f"{params.DEFAULT_THRESHOLD}of{params.DEFAULT_NUM_SHARES}"
+DEFAULT_SCHEME = f"{parameters.DEFAULT_SSS_T}of{parameters.DEFAULT_SSS_N}"
 
-SCHEME_OPTION_HELP = "Threshold and total Number of shares (format: TofN)"
-
-_scheme_option = click.option(
+_opt_scheme = click.option(
     '-s',
     '--scheme',
     'scheme_arg',
     type=str,
     default=DEFAULT_SCHEME,
     show_default=True,
-    help=SCHEME_OPTION_HELP,
+    help="Threshold and total Number of shares (format: TofN)",
 )
 
 
-NUM_SHARES_OPTION_HELP = "Number of shares generate"
-
-_num_shares_option = click.option(
-    '-n',
-    '--num-shares',
-    type=int,
-    default=params.DEFAULT_NUM_SHARES,
-    show_default=True,
-    help=NUM_SHARES_OPTION_HELP,
-)
-
-
-YES_ALL_OPTION_HELP = "Enable non-interactive mode"
-
-_yes_all_option = click.option(
+_opt_yes_all = click.option(
     '-y',
     '--yes-all',
     type=bool,
     is_flag=True,
     default=False,
-    help=YES_ALL_OPTION_HELP,
+    help="Enable non-interactive mode",
 )
 
 
-WALLET_NAME_OPTION_HELP = "Wallet name"
+_opt_paranoid = click.option(
+    '--paranoid',
+    type=bool,
+    is_flag=True,
+    default=False,
+    help="Paranoid mode (168bit vs 104bit)",
+)
 
-_wallet_name_option = click.option(
+
+_opt_wallet_name = click.option(
     '--wallet-name',
     type=str,
     default=ui_common.DEFAULT_WALLET_NAME,
     show_default=True,
-    help=WALLET_NAME_OPTION_HELP,
+    help="Wallet name",
 )
 
 
-SHOW_SEED_OPTION_HELP = "Show wallet seed. Don't load electrum wallet"
-
-_show_seed_option = click.option(
-    '--show-seed', type=bool, is_flag=True, default=False, help=SHOW_SEED_OPTION_HELP
+_opt_show_seed = click.option(
+    '--show-seed',
+    type=bool,
+    is_flag=True,
+    default=False,
+    help="Show wallet seed. Don't load electrum wallet",
 )
 
 
-ONLINE_MODE_OPTION_HELP = "Start electrum gui in online mode (--offline is the default)"
-
-_online_mode_option = click.option(
-    '--online', type=bool, is_flag=True, default=False, help=ONLINE_MODE_OPTION_HELP
+_opt_online_mode = click.option(
+    '--online',
+    type=bool,
+    is_flag=True,
+    default=False,
+    help="Start electrum gui in online mode (--offline is the default)",
 )
 
 
-def _show_secret(label: str, data: bytes, secret_type: str) -> None:
-    output_lines = cli_io.format_secret_lines(secret_type, data)
+def _show_secret(label: str, secret_type: str, paranoid: bool, data: bytes) -> None:
+    output_lines = cli_io.format_secret_lines(secret_type, paranoid, data)
 
     len_padding = max(map(len, output_lines))
     echo(f"{label:^{len_padding}}")
@@ -213,7 +210,12 @@ def _show_secret(label: str, data: bytes, secret_type: str) -> None:
     echo("\n".join(output_lines) + "\n\n")
 
 
-_opt_verbose = click.option('-v', '--verbose', count=True, help="Control log level. -vv for debug level.")
+_opt_verbose = click.option(
+    '-v',
+    '--verbose',
+    count=True,
+    help="Control log level. -vv for debug level.",
+)
 
 
 @click.group(context_settings={'help_option_names': ["-h", "--help"]})
@@ -231,68 +233,79 @@ def version() -> None:
 
 
 @cli.command()
-@_kdf_target_duration_option
-@_kdf_memory_cost_option
-@_kdf_time_cost_option
+@_opt_kdf_target_duration
+@_opt_kdf_memory_cost
+@_opt_kdf_time_cost
+@_opt_paranoid
 @_opt_verbose
 def kdf_test(
-    target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
-    time_cost        : typ.Optional[kdf.Iterations] = None,
-    verbose          : int = 0,
+    target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
+    memory_cost    : typ.Optional[ct.MebiBytes ] = None,
+    time_cost      : typ.Optional[ct.Iterations] = None,
+    paranoid       : bool = False,
+    verbose        : int  = 0,
 ) -> None:
     """Test KDF difficulty settings."""
     _configure_logging(verbose)
-    param_cfg = ui_common.init_param_config(
+    params = ui_common.init_params(
         target_duration=target_duration,
-        memory_per_thread=memory_per_thread,
+        memory_cost=memory_cost,
         time_cost=time_cost,
         threshold=2,
         num_shares=2,
+        paranoid=paranoid,
     )
-    kdf_params = param_cfg.kdf_params
+    lens = parameters.raw_secret_lens(params.paranoid)
 
-    params_str = f"-p={kdf_params.p:<3} -m={kdf_params.m:<5} -t={kdf_params.t:<4}"
     echo()
-    echo(f"Using KDF Parameters: {params_str}")
+    echo(f"Using KDF Parameters: -m={params.kdf_m:<5} -t={params.kdf_t:<4}")
     echo()
 
-    dummy_salt     = ct.Salt(b"\x00" * params.RAW_SALT_LEN)
-    dummy_brainkey = ct.BrainKey(b"\x00" * params.BRAINKEY_LEN)
+    dummy_salt     = ct.Salt(b"\x00" * lens.raw_salt)
+    dummy_brainkey = ct.BrainKey(b"\x00" * lens.brainkey)
 
     tzero = time.time()
-    ui_common.derive_seed(param_cfg.kdf_params, dummy_salt, dummy_brainkey, label="kdf-test")
+    ui_common.derive_seed(params, dummy_salt, dummy_brainkey, label="kdf-test")
     duration = time.time() - tzero
     echo(f"Duration   : {round(duration):>4} sec")
 
 
-def _validate_data(header_text: str, data: bytes, secret_type: str) -> None:
+def _validate_data(header_text: str, params: parameters.Parameters, data: bytes, secret_type: str) -> None:
     full_header_text = VALIDATION_TITLE + "\n\n\t" + header_text
     while True:
-        recovered_data = cli_io.prompt(secret_type, full_header_text)
+        recovered_data = cli_io.prompt(params, secret_type, full_header_text)
         if data == recovered_data:
             return
         else:
             anykey_confirm("Invalid input. Data mismatch.")
 
 
-def _validate_copies(salt: ct.Salt, brainkey: ct.BrainKey, shares: ct.Shares) -> bool:
+def _validate_copies(
+    params  : parameters.Parameters,
+    salt    : ct.Salt,
+    brainkey: ct.BrainKey,
+    shares  : ct.Shares,
+) -> bool:
     header_text = "Validation for Salt"
-    _validate_data(header_text, salt, cli_io.SECRET_TYPE_SALT)
+    _validate_data(header_text, params, salt, cli_io.SECRET_TYPE_SALT)
 
     header_text = "Validation for Brainkey"
-    _validate_data(header_text, brainkey, cli_io.SECRET_TYPE_BRAINKEY)
+    _validate_data(header_text, params, brainkey, cli_io.SECRET_TYPE_BRAINKEY)
 
     for i, share_data in enumerate(shares):
         share_no    = i + 1
         header_text = f"Validation for Share {share_no}/{len(shares)}"
-        _validate_data(header_text, share_data, cli_io.SECRET_TYPE_SHARE)
+        _validate_data(header_text, params, share_data, cli_io.SECRET_TYPE_SHARE)
 
     return True
 
 
 def _show_created_data(
-    yes_all: bool, param_cfg: params.ParamConfig, salt: ct.Salt, brainkey: ct.BrainKey, shares: ct.Shares
+    yes_all : bool,
+    params  : parameters.Parameters,
+    salt    : ct.Salt,
+    brainkey: ct.BrainKey,
+    shares  : ct.Shares,
 ) -> None:
     text = ui_common.SECURITY_WARNING_TEXT + ui_common.SECURITY_WARNING_QR_CODES
     yes_all or clear()
@@ -305,18 +318,18 @@ def _show_created_data(
         yes_all or clear()
         info = {
             'share_no'  : share_no,
-            'threshold' : param_cfg.threshold,
-            'num_shares': param_cfg.num_shares,
+            'threshold' : params.sss_t,
+            'num_shares': params.sss_n,
         }
         share_title = SHARE_TITLE.format(**info).strip()
         echo(share_title)
         echo(ui_common.SHARE_INFO_TEXT)
 
-        share_label = f"Share {share_no}/{param_cfg.num_shares}"
-        _show_secret(share_label, share_data, cli_io.SECRET_TYPE_SHARE)
+        share_label = f"Share {share_no}/{params.sss_n}"
+        _show_secret(share_label, cli_io.SECRET_TYPE_SHARE, params.paranoid, share_data)
 
         share_prompt = ui_common.SHARE_PROMPT_TMPL.format(**info)
-        # ui_common.share_data_to_text(param_cfg, share_data, share_no)
+        # ui_common.share_data_to_text(params, share_data, share_no)
         yes_all or anykey_confirm(share_prompt)
 
     # Salt
@@ -327,7 +340,7 @@ def _show_created_data(
 
     echo(ui_common.SALT_INFO_TEXT)
 
-    _show_secret("Salt", salt, cli_io.SECRET_TYPE_SALT)
+    _show_secret("Salt", cli_io.SECRET_TYPE_SALT, params.paranoid, salt)
 
     yes_all or anykey_confirm(SALT_PROMPT)
 
@@ -340,25 +353,27 @@ def _show_created_data(
 
     echo()
 
-    _show_secret("Brainkey", brainkey, cli_io.SECRET_TYPE_BRAINKEY)
+    _show_secret("Brainkey", cli_io.SECRET_TYPE_BRAINKEY, params.paranoid, brainkey)
 
     yes_all or anykey_confirm(ui_common.BRAINKEY_LAST_CHANCE_WARNING_TEXT)
 
 
 @cli.command()
-@_scheme_option
-@_yes_all_option
-@_kdf_target_duration_option
-@_kdf_memory_cost_option
-@_kdf_time_cost_option
+@_opt_scheme
+@_opt_yes_all
+@_opt_kdf_target_duration
+@_opt_kdf_memory_cost
+@_opt_kdf_time_cost
+@_opt_paranoid
 @_opt_verbose
 def create(
-    scheme_arg       : str         = DEFAULT_SCHEME,
-    yes_all          : bool        = False,
-    target_duration  : kdf.Seconds = params.DEFAULT_KDF_TARGET_DURATION,
-    memory_per_thread: typ.Optional[kdf.MebiBytes ] = None,
-    time_cost        : typ.Optional[kdf.Iterations] = None,
-    verbose          : int = 0,
+    scheme_arg     : str        = DEFAULT_SCHEME,
+    yes_all        : bool       = False,
+    target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
+    memory_cost    : typ.Optional[ct.MebiBytes ] = None,
+    time_cost      : typ.Optional[ct.Iterations] = None,
+    paranoid       : bool = False,
+    verbose        : int  = 0,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
 
@@ -369,23 +384,23 @@ def create(
     _configure_logging(verbose)
 
     entropy_available = ui_common.get_entropy_pool_size()
-    if entropy_available < params.MIN_ENTROPY:
+    if entropy_available < parameters.MIN_ENTROPY:
         echo(f"Not enough entropy: {entropy_available} < 16 bytes")
         sys.exit(1)
 
     scheme = ui_common.parse_scheme(scheme_arg)
 
-    param_cfg = ui_common.init_param_config(
+    params = ui_common.init_params(
         target_duration=target_duration,
-        parallelism=parallelism,
-        memory_per_thread=memory_per_thread,
+        memory_cost=memory_cost,
         time_cost=time_cost,
         threshold=scheme.threshold,
         num_shares=scheme.num_shares,
+        paranoid=paranoid,
     )
 
     try:
-        salt, brainkey, shares = ui_common.create_secrets(param_cfg)
+        salt, brainkey, shares = ui_common.create_secrets(params)
     except ValueError as err:
         if err.args and isinstance(err.args[0], list):
             bad_checks = err.args[0]
@@ -393,21 +408,22 @@ def create(
             raise click.Abort()
         else:
             raise
-    has_manual_kdf_m = memory_per_thread is not None
+    has_manual_kdf_m = memory_cost is not None
     if has_manual_kdf_m:
         # Verify that derivation works before we show anything. This is for manually chosen values
         # of kdf_p and kdf_m, because they may exceed what the system is capable of. If we did not
         # do this now the user might get an OOM error later when they try to load the wallet.
-        validation_kdf_params = param_cfg.kdf_params._replace_any(t=min(1, param_cfg.kdf_params.t))
+        new_t                 = min(1, params.kdf_t)
+        validation_kdf_params = parameters.init_kdf_params(kdf_m=params.kdf_m, kdf_t=new_t)
 
         ui_common.derive_seed(validation_kdf_params, salt, brainkey, label="KDF Validation ")
     else:
         # valid values for kdf_m and kdf_p were already tested as part of "KDF Calibration"
         pass
 
-    _show_created_data(yes_all, param_cfg, salt, brainkey, shares)
+    _show_created_data(yes_all, params, salt, brainkey, shares)
 
-    yes_all or _validate_copies(salt, brainkey, shares)
+    yes_all or _validate_copies(params, salt, brainkey, shares)
 
 
 @cli.command()
@@ -415,17 +431,17 @@ def create(
 def recover_salt(verbose: int = 0) -> None:
     """Recover a partially readable Salt."""
     _configure_logging(verbose)
-    param_and_salt_data = cli_io.prompt(cli_io.SECRET_TYPE_SALT)
-    param_cfg_data      = param_and_salt_data[: params.PARAM_CFG_LEN]
-    param_cfg           = params.bytes2param_cfg(param_cfg_data)
+    salt_data   = cli_io.prompt(cli_io.SECRET_TYPE_SALT, paranoid=False)
+    params_data = salt_data[: parameters.SALT_HEADER_LEN]
+    params      = parameters.bytes2params(params_data)
 
     echo()
     echo("Decoded parameters".center(35))
     echo()
-    echo(f"    threshold      : {param_cfg.threshold}")
-    echo(f"    kdf parallelism: {param_cfg.kdf_params.p}")
-    echo(f"    kdf memory cost: {param_cfg.kdf_params.m} MiB")
-    echo(f"    kdf time cost  : {param_cfg.kdf_params.t} Iterations")
+    echo(f"    threshold      : {params.sss_t}")
+    echo(f"    kdf parallelism: {params.kdf_p}")
+    echo(f"    kdf memory cost: {params.kdf_m} MiB")
+    echo(f"    kdf time cost  : {params.kdf_t} Iterations")
 
 
 @cli.command()
@@ -433,33 +449,33 @@ def recover_salt(verbose: int = 0) -> None:
 def recover(verbose: int = 0) -> None:
     """Recover Salt and BrainKey by combining Shares."""
     _configure_logging(verbose)
-    param_cfg: typ.Optional[params.ParamConfig] = None
-    shares   : typ.List[ct.Share] = []
+    params: typ.Optional[parameters.Parameters] = None
+    shares: list[ct.Share] = []
 
-    while param_cfg is None or len(shares) < param_cfg.threshold:
+    while params is None or len(shares) < params.sss_t:
         share_num = len(shares) + 1
 
-        if param_cfg is None:
+        if params is None:
             header_text = f"Enter Share {share_num}."
         else:
-            header_text = f"Enter Share {share_num} of {param_cfg.threshold}."
+            header_text = f"Enter Share {share_num} of {params.sss_t}."
 
         share = cli_io.prompt(cli_io.SECRET_TYPE_SHARE, header_text=header_text)
         shares.append(ct.Share(share))
 
-        param_cfg_data = share[: params.PARAM_CFG_LEN]
-        cur_param_cfg  = params.bytes2param_cfg(param_cfg_data)
-        if param_cfg is None:
-            param_cfg = cur_param_cfg
-        elif param_cfg != cur_param_cfg:
+        params_data = share[: parameters.SHARE_HEADER_LEN]
+        cur_params  = parameters.bytes2params(params_data)
+        if params is None:
+            params = cur_params
+        elif params != cur_params:
             echo("Invalid share. Shares are perhaps for different wallets.")
             raise click.Abort()
 
-    raw_salt, brainkey = shamir.join(param_cfg, shares)
-    salt = param_cfg_data + raw_salt
+    raw_salt, brainkey = shamir.join(shares)
+    salt = params_data + raw_salt
 
-    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , salt)
-    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, brainkey)
+    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , paranoid, salt)
+    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, paranoid, brainkey)
 
     clear()
     echo("RECOVERED SECRETS".center(50))
@@ -475,10 +491,10 @@ def recover(verbose: int = 0) -> None:
 
 
 @cli.command()
-@_wallet_name_option
-@_show_seed_option
-@_online_mode_option
-@_yes_all_option
+@_opt_wallet_name
+@_opt_show_seed
+@_opt_online_mode
+@_opt_yes_all
 @_opt_verbose
 def load_wallet(
     wallet_name: str  = ui_common.DEFAULT_WALLET_NAME,
@@ -502,18 +518,18 @@ def load_wallet(
     yes_all or echo(text.strip())
     yes_all or anykey_confirm("Press enter to continue")
 
-    header_text    = "Enter Salt"
-    salt           = cli_io.prompt(cli_io.SECRET_TYPE_SALT, header_text=header_text)
-    param_cfg_data = salt[: params.PARAM_CFG_LEN]
-    param_cfg      = params.bytes2param_cfg(param_cfg_data)
-    # raw_salt     = salt[params.PARAM_CFG_LEN:]
+    header_text = "Enter Salt"
+    salt        = cli_io.prompt(cli_io.SECRET_TYPE_SALT, header_text=header_text)
+    params_data = salt[: parameters.SALT_HEADER_LEN]
+    params      = parameters.bytes2params(params_data)
+    # raw_salt  = salt[parameters.SALT_HEADER_LEN:]
 
     header_text = "Enter Brainkey"
     brainkey    = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
 
     yes_all or echo()
     seed_data = ui_common.derive_seed(
-        param_cfg.kdf_params,
+        params,
         ct.Salt(salt),
         ct.BrainKey(brainkey),
         wallet_name=wallet_name,

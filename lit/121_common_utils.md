@@ -3,7 +3,7 @@
 ```python
 # file: src/sbk/utils_new.py
 # include: common.boilerplate
-# dep: common.imports, impl_hex, impl_int
+# dep: common.imports, impl_*
 ```
 
 ```python
@@ -16,7 +16,6 @@ def hex2bytes(hex_str: str) -> bytes:
 def bytes2hex(data: bytes) -> str:
     """Convert bytes to a hex string."""
     return base64.b16encode(data).decode('ascii').lower()
-
 
 def bytes_hex(data: bytes) -> str:
     """Display bytes data in hex form, rather than ascii."""
@@ -63,4 +62,45 @@ def int2bytes(num: int, zfill_bytes: int = 1) -> bytes:
         parts.append(b"\x00")
 
     return b"".join(reversed(parts))
+```
+
+
+## Progressbar
+
+```python
+# def: impl_progressbar
+class ProgressSmoother:
+
+    increments: list[float]
+
+    def __init__(self, progress_cb: ct.ProgressCallback) -> None:
+        self.increments = [0]
+
+        def fake_progress() -> None:
+            step_duration = 0.1
+            tzero         = time.time()
+            while True:
+                time.sleep(step_duration)
+                if self.total_incr() == 0:
+                    progress_cb(0.01)
+                elif self.total_incr() >= 100:
+                    progress_cb(100)
+                    return
+                else:
+                    duration      = time.time() - tzero
+                    steps         = duration / step_duration
+                    incr_per_step = self.total_incr() / steps
+                    progress_cb(incr_per_step)
+
+        self._thread = threading.Thread(target=fake_progress)
+        self._thread.start()
+
+    def total_incr(self) -> float:
+        return sum(self.increments) + max(self.increments) * 0.55
+
+    def progress_cb(self, incr: ct.ProgressIncrement) -> None:
+        self.increments.append(incr)
+
+    def join(self) -> None:
+        self._thread.join()
 ```

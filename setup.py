@@ -18,6 +18,12 @@ def read(*sub_paths):
     with open(project_path(*sub_paths), mode="rb") as fobj:
         return fobj.read().decode("utf-8")
 
+try:
+    import lib3to6
+    cmdclass = {'build_py': lib3to6.build_py}
+except ImportError:
+    cmdclass = {}
+
 
 install_requires = [
     line.strip()
@@ -27,26 +33,6 @@ install_requires = [
 
 
 long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
-
-package_dir={"": "src"}
-
-if any(arg.startswith("bdist") for arg in sys.argv):
-    try:
-        import lib3to6
-        package_dir = lib3to6.fix(
-            package_dir,
-            target_version="3.7",
-            install_requires=install_requires,
-            default_mode='enabled',
-        )
-    except ImportError:
-        if sys.version_info < (3, 9):
-            raise
-        else:
-            sys.stderr.write((
-                "WARNING: Creating non-universal bdist, "
-                "this should only be used for development.\n"
-            ))
 
 
 setuptools.setup(
@@ -64,14 +50,16 @@ setuptools.setup(
     package_dir={"": "src"},
     zip_safe=False,
     include_package_data=True,
-    setup_requires=['lib3to6'],
+    python_requires=">=3.6",
     install_requires=install_requires,
+    setup_requires=['lib3to6>=202108.1048'],
+    lib3to6_default_mode='enabled',
+    cmdclass=cmdclass,
     entry_points="""
         [console_scripts]
         sbk=sbk.cli:cli
         sbk-gui=sbk.gui:main
     """,
-    python_requires=">=3.7",
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -85,8 +73,6 @@ setuptools.setup(
         # "Operating System :: MacOS :: MacOS X",
         # "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: Implementation :: CPython",

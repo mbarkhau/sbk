@@ -22,10 +22,10 @@ import typing_extensions as typext
 
 from . import cli_io
 from . import ecc_rs
-from . import params
 from . import mnemonic
 from . import sys_info
 from . import ui_common
+from . import parameters
 from . import common_types as ct
 
 logger = logging.getLogger("sbk.gui_panels")
@@ -37,20 +37,18 @@ PanelState = typext.TypedDict(
         'salt'       : typ.Optional[ct.Salt],
         'brainkey'   : typ.Optional[ct.BrainKey],
         'shares'     : ct.Shares,
-        'param_cfg'  : typ.Optional[params.ParamConfig],
+        'params'     : typ.Optional[parameters.Parameters],
         'seed_data'  : typ.Optional[ct.SeedData],
         # options
-        'sys_info'         : typ.Optional[sys_info.SystemInfo],
-        'offline'          : bool,
-        'wallet_name'      : str,
-        'threshold'        : int,
-        'num_shares'       : int,
-        'target_memory'    : int,
-        'target_duration'  : int,
-        'max_parallelism'  : int,
-        'parallelism'      : int,
-        'max_memory'       : int,
-        'memory_per_thread': int,
+        'sys_info'       : typ.Optional[sys_info.SystemInfo],
+        'offline'        : bool,
+        'wallet_name'    : str,
+        'threshold'      : int,
+        'num_shares'     : int,
+        'target_memory'  : int,
+        'target_duration': int,
+        'max_memory'     : int,
+        'paranoid'       : bool,
     },
 )
 
@@ -59,20 +57,18 @@ shared_panel_state: PanelState = {
     'salt'       : None,
     'brainkey'   : None,
     'shares'     : [],
-    'param_cfg'  : None,
+    'params'     : None,
     'seed_data'  : None,
     # options
-    'sys_info'         : None,
-    'offline'          : True,
-    'wallet_name'      : "empty",
-    'threshold'        : params.DEFAULT_THRESHOLD,
-    'num_shares'       : params.DEFAULT_NUM_SHARES,
-    'target_memory'    : -1,
-    'target_duration'  : params.DEFAULT_KDF_TARGET_DURATION,
-    'max_parallelism'  : -1,
-    'parallelism'      : -1,
-    'max_memory'       : -1,
-    'memory_per_thread': -1,
+    'sys_info'       : None,
+    'offline'        : True,
+    'wallet_name'    : "empty",
+    'threshold'      : parameters.DEFAULT_SSS_T,
+    'num_shares'     : parameters.DEFAULT_SSS_N,
+    'target_memory'  : sys_info.FALLBACK_MEM_MB,
+    'target_duration': parameters.DEFAULT_KDF_T_TARGET,
+    'max_memory'     : -1,
+    'paranoid'       : False,
 }
 
 
@@ -80,23 +76,17 @@ def has_secrets() -> bool:
     return bool(shared_panel_state['salt'] and shared_panel_state['brainkey'])
 
 
-def get_param_cfg() -> typ.Optional[params.ParamConfig]:
-    return shared_panel_state['param_cfg']
+def get_params() -> typ.Optional[parameters.Parameters]:
+    return shared_panel_state['params']
 
 
 def get_state() -> PanelState:
     state = shared_panel_state
     if state['sys_info'] is None:
-        _sys_info = sys_info.init_sys_info()
+        _sys_info = sys_info.load_sys_info()
         state['sys_info'] = _sys_info
-        parallelism    = _sys_info.num_cores * 2
-        default_memory = _sys_info.initial_m * _sys_info.initial_p
 
-        state['parallelism'      ] = parallelism
-        state['max_parallelism'  ] = _sys_info.num_cores * 4
-        state['target_memory'    ] = default_memory
-        state['memory_per_thread'] = round(default_memory / parallelism)
-        state['max_memory'       ] = _sys_info.total_mb
+        state['max_memory'] = int(_sys_info.total_mb / 100) * 100
     return state
 
 
@@ -120,25 +110,28 @@ def get_label_text() -> str:
 
 
 def get_current_secret() -> CurrentSecret:
+    params = shared_panel_state['params']
+    lens   = parameters.raw_secret_lens(params.paranoid)
+
     shares     = shared_panel_state['shares']
     num_shares = len(shares)
 
     panel_index = shared_panel_state['panel_index']
     if panel_index < num_shares:
         return CurrentSecret(
-            secret_len=params.SHARE_LEN,
+            secret_len=lens.raw_share + parameters.SHARE_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SHARE,
             secret_data=shares[panel_index],
         )
     elif panel_index == num_shares:
         return CurrentSecret(
-            secret_len=params.SALT_LEN,
+            secret_len=lens.raw_salt + parameters.SALT_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SALT,
             secret_data=shared_panel_state['salt'],  # type: ignore
         )
     else:
         return CurrentSecret(
-            secret_len=params.BRAINKEY_LEN,
+            secret_len=lens.brainkey,
             secret_type=cli_io.SECRET_TYPE_BRAINKEY,
             secret_data=shared_panel_state['brainkey'],  # type: ignore
         )
@@ -814,11 +807,11 @@ class EnterSecretPanel(NavigablePanel):
         #     return
 
         recovered_datas = self.recover_datas()
-        if shared_panel_state['param_cfg'] is None and all(recovered_datas[:3]):
+        if shared_panel_state['params'] is None and all(recovered_datas[:3]):
             _recover_data = b"".join(recovered_datas[:3])  # type: ignore
             try:
-                param_cfg = params.bytes2param_cfg(_recover_data)
-                shared_panel_state['param_cfg'] = param_cfg
+                params = parameters.bytes2params(_recover_data)
+                shared_panel_state['params'] = params
 
                 idx = shared_panel_state['panel_index']
                 self.widget_states[idx]['header_text'] = self.label_text()

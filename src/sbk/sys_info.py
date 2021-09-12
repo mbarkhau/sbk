@@ -1,115 +1,175 @@
+#################################################
+#     This is a generated file, do not edit     #
+#################################################
+
 # This file is part of the sbk project
 # https://github.com/mbarkhau/sbk
 #
 # Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
-"""Evaluate memory available on system (for kdf parameters)."""
-
-# Some notes on parameter choices.
-# https://tools.ietf.org/html/draft-irtf-cfrg-argon2-04#section-4
-#
-# parallelism: RFC reccomends 2x the number of cores.
-#
-# time_cost: As the time constraint is not such an issue for the
-# intended use cases of SBK, you should be able to dedicate a few
-# minutes of computation time to derive a secure key from relativly
-# low amount of secret entropy (the brainkey).
-#
-# hash_type: Theoretically you should only use SBK on a trusted system
-# in a trusted environment, so side channel attacks shouldn't be an
-# issue and the benefits of using the argon2id are questionable.
-# But the argument is similar to with time_cost, even if the extra time
-# spent is pointless, it's not too much of a loss.
-#
-# memory_cost: The main constraint here is that later reconstruction
-# of the secret will require a machine with at least as much memory as
-# the one used during the initial derivation. Otherwise it should be
-# chosen as large as possible.
 import os
 import re
+import sys
 import json
+import math
 import time
-import typing as typ
+import base64
+import struct
+import hashlib
 import logging
 import pathlib as pl
+import functools as ft
+import itertools as it
+import threading
 import subprocess as sp
+from typing import Any
+from typing import NewType
+from typing import Callable
+from typing import Optional
+from typing import Sequence
+from typing import NamedTuple
+from collections.abc import Iterator
+from collections.abc import Generator
 
+import sbk.common_types as ct
+
+logger = logging.getLogger(__name__)
 from . import kdf
-
-logger = logging.getLogger("sbk.sys_info")
-
-
-Seconds = float
-
-DEFAULT_KDF_THREADS_RATIO = 2
-DEFAULT_KDF_MEM_RATIO     = int(os.getenv('SBK_MEM_PERCENT', "90")) / 100
-
-# Fallback value for systems on which total memory cannot be detected
-FALLBACK_MEM_TOTAL_MB = int(os.getenv("SBK_FALLBACK_MEM_TOTAL_MB", "1024"))
+from . import parameters
 
 DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
-XDG_CONFIG_HOME         = pl.Path(os.environ.get('XDG_CONFIG_HOME', DEFAULT_XDG_CONFIG_HOME))
+XDG_CONFIG_HOME         = pl.Path(os.environ.get("XDG_CONFIG_HOME", DEFAULT_XDG_CONFIG_HOME))
 
-SBK_APP_DIR_STR     = os.getenv('SBK_APP_DIR')
+SBK_APP_DIR_STR     = os.getenv("SBK_APP_DIR")
 SBK_APP_DIR         = pl.Path(SBK_APP_DIR_STR) if SBK_APP_DIR_STR else XDG_CONFIG_HOME / "sbk"
-SYSINFO_CACHE_FNAME = "sys_info_measurements.json"
-SYSINFO_CACHE_FPATH = SBK_APP_DIR / SYSINFO_CACHE_FNAME
+DEFAULT_LANG        = ct.LangCode("en")
+SUPPORTED_LANGUAGES = {"en"}
+
+# PR welcome
+# SUPPORTED_LANGUAGES |= {'es', 'pt', 'ru', 'fr', de', 'it', 'tr'}
+#
+# non-phonetic systems may be a design issue for wordlists
+# SUPPORTED_LANGUAGES |= {'ar', 'ko', 'cn', 'jp'}
+
+KB_LAYOUT_TO_LANG = {'us': "en"}
+# Fallback value for systems on which total memory cannot be detected
+FALLBACK_MEM_MB = int(os.getenv("SBK_FALLBACK_MEM_MB", "1024"))
+
+# cache so we don't have to check usable memory every time
+SYSINFO_CACHE_FPATH = SBK_APP_DIR / "sys_info_measurements.json"
 
 
-def mem_total() -> kdf.MebiBytes:
-    """Get total memory."""
+def detect_lang() -> ct.LangCode:
+    try:
+        localectl_output = sp.check_output("localectl").decode("utf-8")
+        lang             = _parse_lang(localectl_output)
+        kb_lang          = _parse_keyboard_lang(localectl_output)
+        return lang or kb_lang or DEFAULT_LANG
+    except Exception:
+        logger.warning(f"Fallback to default lang: en", exc_info=True)
+        return ct.LangCode("en")
 
-    # Linux
+
+def _parse_lang(localectl_output: str) -> Optional[ct.LangCode]:
+    lang_match = re.search(r"LANG=([a-z]+)", localectl_output)
+    if lang_match:
+        lang = lang_match.group(1)
+        logger.debug(f"lang: {lang}")
+        if lang in SUPPORTED_LANGUAGES:
+            return ct.LangCode(lang)
+    return None
+
+
+def _parse_keyboard_lang(localectl_output: str) -> Optional[ct.LangCode]:
+    keyboard_match = re.search(r"X11 Layout: ([a-z]+)", localectl_output)
+    if keyboard_match:
+        layout = keyboard_match.group(1)
+        logger.debug(f"keyboard: {layout}")
+        if layout in KB_LAYOUT_TO_LANG:
+            return ct.LangCode(KB_LAYOUT_TO_LANG[layout])
+    return None
+
+
+class SystemInfo(NamedTuple):
+    total_mb : ct.MebiBytes
+    free_mb  : ct.MebiBytes
+    usable_mb: ct.MebiBytes
+
+
+def _parse_meminfo(meminfo_text: str) -> tuple[ct.MebiBytes, ct.MebiBytes]:
+    total_mb = FALLBACK_MEM_MB
+    avail_mb = FALLBACK_MEM_MB
+
+    for line in meminfo_text.splitlines():
+        if line.startswith("Mem"):
+            key, num, unit = line.strip().split()
+            if key == "MemTotal:":
+                assert unit == "kB"
+                total_mb = int(num) // 1024
+            elif key == "MemAvailable:":
+                assert unit == "kB"
+                avail_mb = int(num) // 1024
+    return (total_mb, avail_mb)
+
+
+def memory_info() -> tuple[ct.MebiBytes, ct.MebiBytes]:
     meminfo_path = pl.Path("/proc/meminfo")
     if meminfo_path.exists():
         try:
-            with meminfo_path.open(mode="rb") as fobj:
-                data = fobj.read()
-            for line in data.splitlines():
-                key, num, unit = line.decode("ascii").strip().split()
-                if key == "MemTotal:":
-                    assert unit == "kB"
-                    return int(num) // 1024
+            with meminfo_path.open(mode="r", encoding="utf-8") as fobj:
+                return _parse_meminfo(fobj.read())
         except Exception:
-            logger.error("Error while evaluating system memory", exc_info=True)
-
-    return FALLBACK_MEM_TOTAL_MB
-
-
-class Measurement(typ.NamedTuple):
-
-    p: kdf.NumThreads
-    m: kdf.MebiBytes
-    t: kdf.Iterations
-
-    duration: Seconds
+            logger.warning("Error while evaluating system memory", exc_info=True)
+    return (FALLBACK_MEM_MB, FALLBACK_MEM_MB)
 
 
-def _measure(kdf_params: kdf.KDFParams) -> Measurement:
-    tzero = time.time()
-    kdf.digest(b"saltsaltsaltsaltbrainkey", kdf_params, hash_len=16)
-    duration = round(time.time() - tzero, 5)
+def _init_sys_info() -> SystemInfo:
+    total_mb, avail_mb = memory_info()
 
-    logger.debug(f"kdf parameter calibration {kdf_params} -> {round(duration * 1000)}ms")
+    check_mb = avail_mb
+    while check_mb > 100:
+        logger.debug(f"testing check_mb={check_mb}")
+        if _is_usable_kdf_m(check_mb):
+            break
+        else:
+            check_mb = int(check_mb * 0.75)  # try a bit less
 
-    p, m, t = kdf_params
-    return Measurement(p=p, m=m, t=t, duration=duration)
-
-
-class SystemInfo(typ.NamedTuple):
-
-    num_cores: int
-    total_mb : kdf.MebiBytes
-    initial_p: kdf.NumThreads
-    initial_m: kdf.MebiBytes
+    nfo = SystemInfo(total_mb, avail_mb, max(check_mb, 100))
+    _dump_sys_info(nfo)
+    return nfo
 
 
-_SYS_INFO: typ.Optional[SystemInfo] = None
+def _is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
+    retcode = sp.call([sys.executable, "-m", "sbk.kdf_new", str(memory_mb)])
+    return retcode == 0
 
 
-def dump_sys_info(sys_info: SystemInfo) -> None:
-    global _SYS_INFO
-    _SYS_INFO = sys_info
+def load_sys_info(use_cache: bool = True) -> SystemInfo:
+    if use_cache:
+        if not _SYS_INFO_KW and SYSINFO_CACHE_FPATH.exists():
+            try:
+                with SYSINFO_CACHE_FPATH.open(mode="rb") as fobj:
+                    _SYS_INFO_KW.update(json.load(fobj))
+            except Exception as ex:
+                logger.warning(f"Error reading cache file {cache_path}: {ex}")
+
+        if _SYS_INFO_KW:
+            return SystemInfo(**_SYS_INFO_KW)
+
+    return _init_sys_info()
+
+
+_SYS_INFO_KW: dict[str, int] = {}
+
+
+def _dump_sys_info(sys_info: SystemInfo) -> None:
+    _SYS_INFO_KW.update(
+        {
+            'total_mb' : sys_info.total_mb,
+            'free_mb'  : sys_info.free_mb,
+            'usable_mb': sys_info.usable_mb,
+        }
+    )
 
     cache_path = SYSINFO_CACHE_FPATH
     try:
@@ -118,135 +178,21 @@ def dump_sys_info(sys_info: SystemInfo) -> None:
         logger.warning(f"Unable to create cache dir {cache_path.parent}: {ex}")
         return
 
-    sys_info_data = {
-        'num_cores': sys_info.num_cores,
-        'total_mb' : sys_info.total_mb,
-        'initial_p': sys_info.initial_p,
-        'initial_m': sys_info.initial_m,
-    }
-
     try:
         with cache_path.open(mode="w", encoding="utf-8") as fobj:
-            json.dump(sys_info_data, fobj, indent=4)
+            json.dump(_SYS_INFO_KW, fobj, indent=4)
     except Exception as ex:
         logger.warning(f"Error writing cache file {cache_path}: {ex}")
-        return
 
 
-def _load_cached_sys_info() -> SystemInfo:
-    cache_path = SYSINFO_CACHE_FPATH
-    try:
-        with cache_path.open(mode="rb") as fobj:
-            sys_info_data = json.load(fobj)
-        nfo = SystemInfo(**sys_info_data)
-    except Exception as ex:
-        logger.warning(f"Error reading cache file {cache_path}: {ex}")
-        nfo = init_sys_info()
-
-    return nfo
-
-
-def load_sys_info(use_cache: bool = True) -> SystemInfo:
-    global _SYS_INFO
-    if _SYS_INFO:
-        return _SYS_INFO
-
-    if use_cache and SYSINFO_CACHE_FPATH.exists():
-        nfo = _load_cached_sys_info()
-    else:
-        nfo = init_sys_info()
-
-    _SYS_INFO = nfo
-    return nfo
-
-
-def num_cores() -> int:
-    if hasattr(os, 'sched_getaffinity'):
-        # pylint: disable=no-member    ; macos doesn't have this
-        return len(os.sched_getaffinity(0))
-    else:
-        return os.cpu_count() or 1
-
-
-def init_sys_info() -> SystemInfo:
-    import argon2
-
-    total_mb = mem_total()
-
-    initial_p = int(num_cores() * DEFAULT_KDF_THREADS_RATIO)
-    initial_m = int(total_mb * DEFAULT_KDF_MEM_RATIO) // initial_p
-
-    while True:
-        try:
-            kdf_params = kdf.init_kdf_params(p=initial_p, m=initial_m, t=1)
-            initial_p  = kdf_params.p
-            initial_m  = kdf_params.m
-            logger.debug(f"testing initial_p={initial_p}, initial_m={initial_m}")
-            _measure(kdf_params)
-            logger.debug(f"using initial_p={initial_p}, initial_m={initial_m}")
-            break  # success
-        except argon2.exceptions.HashingError as err:
-            if "Memory allocation error" not in str(err):
-                raise
-            initial_m = (2 * initial_m) // 3
-
-    nfo = SystemInfo(num_cores(), total_mb, initial_p, initial_m)
-    dump_sys_info(nfo)
-    return nfo
-
-
-# NOTE (mb 2021-06-06):
-# SBK tries to be as non-region specific as possible.
-#   no en_US, en_GB, en_AU etc.etc. just en
-#
-# I'm also not sure we'll ever support non-phonetic systems,
-# especiall for the wordlists.
-
-# initially
-SUPPORTED_LANGUAGES = {'en', 'de'}
-
-# next (PR welcome)
-# SUPPORTED_LANGUAGES |= {'es', 'pt', 'ru', 'fr', de', 'it', 'tr'}
-
-# eventually/maybe (non-phonetic systems may be a design issue for wordlists)
-# SUPPORTED_LANGUAGES |= {'ar', 'ko', 'cn', 'jp'}
-
-LAYOUT_TO_LANG = {'us': 'en', 'de': 'de'}
-
-LangCode = str
-
-
-def detect_lang() -> LangCode:
-    try:
-        output_data = sp.check_output("localectl")
-        output_text = output_data.decode("utf-8")
-
-        # We only parse the first portion on purpose.
-        lang_match = re.search(r"LANG=([a-z]+)", output_text)
-        if lang_match is None:
-            lang = "default"
-        else:
-            lang = lang_match.group(1)
-
-        if lang != 'default' and lang in SUPPORTED_LANGUAGES:
-            return lang
-
-        keyboard_match = re.search(r"X11 Layout: ([a-z]+)", output_text)
-        if keyboard_match is None:
-            layout = "default"
-        else:
-            layout = keyboard_match.group(1)
-
-        layout_lang = LAYOUT_TO_LANG.get(layout, layout)
-
-        if layout_lang != 'default' and layout_lang in SUPPORTED_LANGUAGES:
-            return layout_lang
-
-    except Exception:
-        pass
-
-    return "en"
+def main() -> int:
+    # xinclude: common.debug_logging
+    print("lang: "                 , detect_lang())
+    print("Mem Info:"              , memory_info())
+    print("Memory Info (uncached):", _init_sys_info())
+    print("Memory Info (cached)  :", load_sys_info())
+    return 0
 
 
 if __name__ == '__main__':
-    print("lang:", detect_lang())
+    main()

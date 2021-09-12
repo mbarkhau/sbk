@@ -25,11 +25,11 @@ import mypy_extensions as mypyext
 
 from . import kdf
 from . import ecc_rs
-from . import params
 from . import shamir
 from . import enc_util
 from . import mnemonic
 from . import sys_info
+from . import parameters
 from . import common_types as ct
 from . import electrum_mnemonic
 
@@ -299,15 +299,15 @@ def intcodes2bytes(intcodes: IntCodes, msg_len: int) -> bytes:
 
 
 class ParsedSecret(typ.NamedTuple):
-    words     : typ.Tuple[str    , ...]
-    data_codes: typ.Tuple[IntCode, ...]
-    ecc_codes : typ.Tuple[IntCode, ...]
+    words     : tuple[str    , ...]
+    data_codes: tuple[IntCode, ...]
+    ecc_codes : tuple[IntCode, ...]
 
 
 def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
-    words     : typ.List[str    ] = []
-    data_codes: typ.List[IntCode] = []
-    ecc_codes : typ.List[IntCode] = []
+    words     : list[str    ] = []
+    data_codes: list[IntCode] = []
+    ecc_codes : list[IntCode] = []
 
     for i, line in enumerate(text.splitlines()):
         line = line.strip().lower()
@@ -336,6 +336,8 @@ class Scheme(typ.NamedTuple):
 
     threshold : int
     num_shares: int
+    # sss_t: int
+    # sss_n: int
 
 
 def parse_scheme(scheme_arg: str) -> Scheme:
@@ -410,8 +412,6 @@ class ThreadRunner(threading.Thread, typ.Generic[T]):
         return self.retval
 
 
-Seconds = typ.NewType('Seconds', float)
-
 DEFAULT_WALLET_NAME = "empty"
 
 SEED_DATA_LEN = 16
@@ -453,7 +453,7 @@ def fallback_progressbar(label: str) -> InitProgressbar:
 
 
 def derive_seed(
-    kdf_params      : kdf.KDFParams,
+    kdf_params      : parameters.KDFParams,
     salt            : ct.Salt,
     brainkey        : ct.BrainKey,
     label           : str,
@@ -525,16 +525,13 @@ def run_with_progress_bar(
 
 
 def parse_kdf_params(
-    target_duration : kdf.Seconds,
-    parallelism     : typ.Optional[kdf.NumThreads],
-    memory_cost     : typ.Optional[kdf.MebiBytes],
-    time_cost       : typ.Optional[kdf.Iterations],
+    target_duration : ct.Seconds,
+    memory_cost     : typ.Optional[ct.MebiBytes],
+    time_cost       : typ.Optional[ct.Iterations],
     init_progressbar: InitProgressbar,
-) -> kdf.KDFParams:
+) -> parameters.KDFParams:
     nfo        = sys_info.load_sys_info()
-    kdf_params = kdf.init_kdf_params(
-        p=parallelism or nfo.initial_p, m=memory_cost or nfo.initial_m, t=time_cost or 1
-    )
+    kdf_params = parameters.init_kdf_params(kdf_m=memory_cost or nfo.usable_mb, kdf_t=time_cost or 1)
 
     if time_cost is None:
         # time_cost estimated based on duration
@@ -544,15 +541,15 @@ def parse_kdf_params(
         return kdf_params
 
 
-def init_param_config(
-    target_duration  : kdf.Seconds,
-    parallelism      : typ.Optional[kdf.NumThreads],
-    memory_per_thread: typ.Optional[kdf.MebiBytes],
-    time_cost        : typ.Optional[kdf.Iterations],
-    threshold        : int,
-    num_shares       : int,
-    init_progressbar : typ.Optional[InitProgressbar] = None,
-) -> params.ParamConfig:
+def init_params(
+    target_duration : ct.Seconds,
+    memory_cost     : typ.Optional[ct.MebiBytes],
+    time_cost       : typ.Optional[ct.Iterations],
+    threshold       : int,
+    num_shares      : int,
+    paranoid        : bool,
+    init_progressbar: typ.Optional[InitProgressbar] = None,
+) -> parameters.Parameters:
     if init_progressbar is None:
         _init_progressbar = fallback_progressbar("KDF Calibration")
     else:
@@ -560,17 +557,18 @@ def init_param_config(
 
     kdf_params = parse_kdf_params(
         target_duration,
-        parallelism,
-        memory_per_thread,
+        memory_cost,
         time_cost,
         init_progressbar=_init_progressbar,
     )
-    param_cfg = params.init_param_config(
-        threshold=threshold,
-        num_shares=num_shares,
-        kdf_params=kdf_params,
+    return parameters.init_parameters(
+        paranoid=paranoid,
+        kdf_m=kdf_params.kdf_m,
+        kdf_t=kdf_params.kdf_t,
+        sss_x=1,
+        sss_t=threshold,
+        sss_n=num_shares,
     )
-    return param_cfg
 
 
 def get_entropy_pool_size() -> int:
@@ -611,20 +609,23 @@ def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
         raise AssertionError(errmsg)
 
 
-def validated_param_data(param_cfg: params.ParamConfig) -> bytes:
-    # validate encoding round trip before we use param_cfg
-    param_cfg_data    = params.param_cfg2bytes(param_cfg)
-    decoded_param_cfg = params.bytes2param_cfg(param_cfg_data)
-    checks            = {
-        'threshold' : param_cfg.threshold  == decoded_param_cfg.threshold,
-        'version'   : param_cfg.version    == decoded_param_cfg.version,
-        'kdf_params': param_cfg.kdf_params == decoded_param_cfg.kdf_params,
+def validated_param_data(params: parameters.Parameters) -> bytes:
+    # validate encoding round trip before we use params
+    params_data    = parameters.params2bytes(params)
+    decoded_params = parameters.bytes2params(params_data)
+    checks         = {
+        'threshold': params.sss_t    == decoded_params.sss_t,
+        'version'  : params.version  == decoded_params.version,
+        'paranoid' : params.paranoid == decoded_params.paranoid,
+        'kdf_p'    : params.kdf_p    == decoded_params.kdf_p,
+        'kdf_m'    : params.kdf_m    == decoded_params.kdf_m,
+        'kdf_t'    : params.kdf_t    == decoded_params.kdf_t,
     }
     bad_checks = [name for name, is_ok in checks.items() if not is_ok]
     if any(bad_checks):
         raise ValueError(bad_checks)
     else:
-        return param_cfg_data
+        return params_data
 
 
 def validate_wallet_name(wallet_name: str) -> None:
@@ -642,19 +643,21 @@ def validate_wallet_name(wallet_name: str) -> None:
     raise ValueError(errmsg)
 
 
-def create_secrets(param_cfg: params.ParamConfig) -> typ.Tuple[ct.Salt, ct.BrainKey, ct.Shares]:
-    param_cfg_data = validated_param_data(param_cfg)
+def create_secrets(params: parameters.Parameters) -> tuple[ct.Salt, ct.BrainKey, ct.Shares]:
+    params_data = validated_param_data(params)
 
-    raw_salt = ct.RawSalt(urandom(params.RAW_SALT_LEN))
-    salt     = ct.Salt(param_cfg_data + raw_salt)
-    brainkey = ct.BrainKey(urandom(params.BRAINKEY_LEN))
+    lens = parameters.raw_secret_lens(params.paranoid)
+
+    raw_salt = ct.RawSalt(urandom(lens.raw_salt))
+    salt     = ct.Salt(params_data + raw_salt)
+    brainkey = ct.BrainKey(urandom(lens.brainkey))
 
     if os.getenv('SBK_DEBUG_RANDOM') is None:
         _check_entropy(raw_salt, brainkey)
 
-    shares = list(shamir.split(param_cfg, raw_salt, brainkey))
+    shares = list(shamir.split(params, raw_salt, brainkey))
 
-    raw_salt_recovered, brainkey_recovered = shamir.join(param_cfg, shares)
+    raw_salt_recovered, brainkey_recovered = shamir.join(shares)
 
     is_recovery_ok = raw_salt_recovered == raw_salt and brainkey_recovered == brainkey
     if is_recovery_ok:
@@ -697,7 +700,7 @@ def clean_wallet(wallet_fpath: pl.Path) -> None:
     assert not wallet_fpath.exists()
 
 
-Command = typ.List[str]
+Command = list[str]
 
 
 def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
@@ -705,7 +708,7 @@ def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
     return electrum_mnemonic.raw_seed2phrase(seed_int)
 
 
-def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> typ.Tuple[pl.Path, Command, Command]:
+def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> tuple[pl.Path, Command, Command]:
     wallet_fpath = mk_tmp_wallet_fpath()
 
     restore_cmd = [

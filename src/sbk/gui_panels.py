@@ -21,10 +21,10 @@ import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
-from . import params
 from . import shamir
 from . import gui_tasks as gt
 from . import ui_common
+from . import parameters
 from . import common_types as ct
 from . import package_data
 from . import gui_panels_base as gpb
@@ -84,10 +84,10 @@ class SelectCommandPanel(gpb.Panel):
     def switch(self) -> None:
         state = gpb.get_state()
 
-        self.trace("switch " + str((state['salt'], state['brainkey'], state['param_cfg'])))
+        self.trace("switch " + str((state['salt'], state['brainkey'], state['params'])))
 
         state['panel_index'] = 0
-        if state['salt'] and state['brainkey'] and state['param_cfg']:
+        if state['salt'] and state['brainkey'] and state['params']:
             self.buttons['open'].setEnabled(True)
             self.buttons['show'].setEnabled(True)
         else:
@@ -102,10 +102,10 @@ class SelectCommandPanel(gpb.Panel):
             p = self.parent()
 
             if button_name in ('generate', 'load', 'recover'):
-                gpb.shared_panel_state['salt'     ] = None
-                gpb.shared_panel_state['brainkey' ] = None
-                gpb.shared_panel_state['param_cfg'] = None
-                gpb.shared_panel_state['shares'   ] = []
+                gpb.shared_panel_state['salt'    ] = None
+                gpb.shared_panel_state['brainkey'] = None
+                gpb.shared_panel_state['params'  ] = None
+                gpb.shared_panel_state['shares'  ] = []
 
             if button_name == 'generate':
                 p.get_or_init_panel(SeedGenerationPanel).switch()
@@ -120,8 +120,8 @@ class SelectCommandPanel(gpb.Panel):
             elif button_name == 'show':
                 p.get_or_init_panel(ShowKeysPanel).switch()
             elif button_name == 'debug':
-                param_cfg = params.bytes2param_cfg(b"\x11\x00\x00")
-                gpb.shared_panel_state['param_cfg'] = param_cfg
+                params = parameters.bytes2params(b"\x11\x00\x00")
+                gpb.shared_panel_state['params'] = params
                 p.get_or_init_panel(OpenWalletPanel).switch()
             else:
                 raise NotImplementedError()
@@ -148,6 +148,11 @@ class OptionsPanel(gpb.NavigablePanel):
         self.offline.setCheckState(qtc.Qt.Checked if state['offline'] else qtc.Qt.Unchecked)
         form.addRow("&Offline", self.offline)
 
+        self.paranoid = qtw.QCheckBox()
+        self.paranoid.setTristate(False)
+        self.paranoid.setCheckState(qtc.Qt.Checked if state['paranoid'] else qtc.Qt.Unchecked)
+        form.addRow("&Paranoid", self.paranoid)
+
         self.wallet_name = qtw.QLineEdit()
         if state['wallet_name'] == 'empty':
             self.wallet_name.setPlaceholderText("empty")
@@ -166,7 +171,7 @@ class OptionsPanel(gpb.NavigablePanel):
         form.addRow("&Shares", self.num_shares)
 
         def constrain_threshold():
-            threshold = min(self.num_shares.value(), params.MAX_THRESHOLD)
+            threshold = min(self.num_shares.value(), parameters.MAX_THRESHOLD)
             self.threshold.setMaximum(threshold)
 
         def constrain_num_shares():
@@ -174,11 +179,6 @@ class OptionsPanel(gpb.NavigablePanel):
 
         self.num_shares.valueChanged.connect(constrain_threshold)
         self.threshold.valueChanged.connect(constrain_num_shares)
-
-        self.parallelism = qtw.QSpinBox()
-        self.parallelism.setRange(1, state['max_parallelism'])
-        self.parallelism.setValue(state['parallelism'])
-        form.addRow("&Parallelism [Threads]", self.parallelism)
 
         self.target_memory = qtw.QSpinBox()
         self.target_memory.setRange(10, state['max_memory'])
@@ -202,19 +202,16 @@ class OptionsPanel(gpb.NavigablePanel):
         state = gpb.shared_panel_state
 
         target_memory = self.target_memory.value()
-        parallelism   = self.parallelism.value()
 
-        state['threshold'        ] = self.threshold.value()
-        state['num_shares'       ] = self.num_shares.value()
-        state['parallelism'      ] = parallelism
-        state['target_memory'    ] = target_memory
-        state['target_duration'  ] = self.target_duration.value()
-        state['memory_per_thread'] = round(target_memory / parallelism)
+        state['threshold'      ] = self.threshold.value()
+        state['num_shares'     ] = self.num_shares.value()
+        state['target_memory'  ] = target_memory
+        state['target_duration'] = self.target_duration.value()
 
 
 class SeedGenerationPanel(gpb.Panel):
 
-    task1: typ.Optional[gt.ParamConfigWorker]
+    task1: typ.Optional[gt.ParametersWorker]
     task2: typ.Optional[gt.SeedGenerationTask]
 
     def __init__(self, index: int):
@@ -254,14 +251,18 @@ class SeedGenerationPanel(gpb.Panel):
 
         state = gpb.get_state()
 
-        threshold         = state['threshold']
-        num_shares        = state['num_shares']
-        parallelism       = state['parallelism']
-        memory_per_thread = state['memory_per_thread']
-        target_duration   = state['target_duration']
+        threshold       = state['threshold']
+        num_shares      = state['num_shares']
+        target_memory   = state['target_memory']
+        target_duration = state['target_duration']
+        paranoid        = state['paranoid']
 
-        self.task1 = gt.ParamConfigWorker(
-            threshold, num_shares, parallelism, memory_per_thread, target_duration
+        self.task1 = gt.ParametersWorker(
+            threshold,
+            num_shares,
+            target_memory,
+            target_duration,
+            paranoid,
         )
         self.task1.progress.connect(progressbar_updater(self.progressbar1))
         self.task1.finished.connect(self.on_param_config_done)
@@ -270,12 +271,12 @@ class SeedGenerationPanel(gpb.Panel):
 
         self.task1.start()
 
-    def on_param_config_done(self, param_cfg: params.ParamConfig) -> None:
+    def on_param_config_done(self, params: parameters.Parameters) -> None:
         self.trace("on_param_config_done")
 
-        gpb.shared_panel_state['param_cfg'] = param_cfg
+        gpb.shared_panel_state['params'] = params
 
-        self.task2 = gt.SeedGenerationTask(param_cfg)
+        self.task2 = gt.SeedGenerationTask(params)
         self.task2.progress.connect(progressbar_updater(self.progressbar2))
         self.task2.finished.connect(self.on_seed_generation_done)
 
@@ -480,10 +481,12 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
             return "Enter Brainkey"
 
     def secret_len(self) -> int:
+        params = gpb.get_params()
+        lens   = parameters.raw_secret_lens(params.paranoid)
         if gpb.shared_panel_state['panel_index'] == 0:
-            return params.SALT_LEN
+            return lens.salt
         else:
-            return params.BRAINKEY_LEN
+            return lens.brainkey
 
     @property
     def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
@@ -508,23 +511,24 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
         recovered_datas = self.recover_datas()
         if all(recovered_datas):
             recovered_data = b"".join(recovered_datas)  # type: ignore
-
+            params         = gpb.get_params()
+            lens           = parameters.raw_secret_lens(params.paranoid)
             if state['panel_index'] == 0:
-                assert len(recovered_data) == params.SALT_LEN
-                state['param_cfg'] = params.bytes2param_cfg(recovered_data)
-                state['salt'     ] = ct.Salt(recovered_data)
+                assert len(recovered_data) == lens.salt
+                state['params'] = parameters.bytes2params(recovered_data)
+                state['salt'  ] = ct.Salt(recovered_data)
             else:
-                assert len(recovered_data) == params.BRAINKEY_LEN
+                assert len(recovered_data) == lens.brainkey
                 state['brainkey'] = ct.BrainKey(recovered_data)
 
-            param_cfg = state['param_cfg']
-            salt      = state['salt']
-            brainkey  = state['brainkey']
+            params   = state['params']
+            salt     = state['salt']
+            brainkey = state['brainkey']
 
-            if param_cfg and salt and brainkey:
-                param_cfg = param_cfg._replace(num_shares=state['num_shares'])
-                raw_salt  = ct.RawSalt(bytes(salt)[params.PARAM_CFG_LEN :])
-                shares    = shamir.split(param_cfg, raw_salt, brainkey)
+            if params and salt and brainkey:
+                params   = params._replace(sss_n=state['num_shares'])
+                raw_salt = ct.RawSalt(bytes(salt)[parameters.SALT_HEADER_LEN :])
+                shares   = shamir.split(params, raw_salt, brainkey)
                 state['shares'] = shares
 
         super().destroy_panel()
@@ -598,9 +602,9 @@ class OpenWalletPanel(gpb.Panel):
 
         state     = gpb.get_state()
         seed_data = state['seed_data']
-        param_cfg = state['param_cfg']
+        params    = state['params']
 
-        assert param_cfg is not None
+        assert params is not None
 
         if seed_data is None:
             salt     = state['salt']
@@ -608,7 +612,7 @@ class OpenWalletPanel(gpb.Panel):
             assert salt     is not None
             assert brainkey is not None
 
-            self.task = gt.SeedDerivationTask(param_cfg, salt, brainkey)
+            self.task = gt.SeedDerivationTask(params, salt, brainkey)
             self.task.progress.connect(progressbar_updater(self.progressbar))
             self.task.finished.connect(self.on_key_dervation_done)
 
@@ -642,11 +646,11 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
         super().__init__(index)
 
     def label_text(self) -> str:
-        param_cfg = gpb.get_param_cfg()
-        if param_cfg is None:
+        params = gpb.get_params()
+        if params is None:
             num_shares = -1
         else:
-            num_shares = param_cfg.num_shares
+            num_shares = params.sss_n
 
         panel_index = gpb.shared_panel_state['panel_index']
         share_no    = panel_index + 1
@@ -656,7 +660,9 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
             return f"Enter Share {share_no}/{num_shares}"
 
     def secret_len(self) -> int:
-        return params.SHARE_LEN
+        params = gpb.get_params()
+        lens   = parameters.raw_secret_lens(params.paranoid)
+        return lens.share
 
     def destroy_panel(self) -> None:
         recovered_datas = self.recover_datas()
@@ -684,27 +690,25 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
             state['panel_index'] = panel_index + 1
             return RecoverKeysPanel
         else:
-            param_cfg = gpb.get_param_cfg()
+            params = gpb.get_params()
             # we should only reach here if a valid share was entered previously
-            assert param_cfg is not None
-            num_shares = param_cfg.num_shares
-            if len(state['shares']) < num_shares:
+            assert params is not None
+            if len(state['shares']) < params.sss_n:
                 state['panel_index'] = panel_index + 1
                 return RecoverKeysPanel
             else:
-                raw_salt, brainkey = shamir.join(param_cfg, state['shares'])
+                raw_salt, brainkey = shamir.join(params, state['shares'])
                 # recompute shares, because user only enters as many as needed
-                shares = shamir.split(param_cfg, raw_salt, brainkey)
+                shares = shamir.split(params, raw_salt, brainkey)
 
-                param_cfg_data = params.param_cfg2bytes(param_cfg)
-                salt           = ct.Salt(param_cfg_data + raw_salt)
+                params_data = parameters.params2bytes(params)
+                salt        = ct.Salt(params_data + raw_salt)
                 state['salt'    ] = salt
                 state['brainkey'] = brainkey
                 state['shares'  ] = shares
                 return SelectCommandPanel
 
     def is_final_panel(self) -> bool:
-        param_cfg = gpb.get_param_cfg()
-        assert param_cfg is not None
-        num_shares = param_cfg.num_shares
-        return len(gpb.shared_panel_state['shares']) >= num_shares
+        params = gpb.get_params()
+        assert params is not None
+        return len(gpb.shared_panel_state['shares']) >= params.sss_n

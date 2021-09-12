@@ -40,7 +40,7 @@ def digest(data: bytes, p: int, m: int, t: int, digest_len: int = DIGEST_LEN) ->
     return result[:digest_len]
 
 
-kdf_params  = kdf.init_kdf_params(p=1, m=1, t=1)
+kdf_params  = kdf.init_kdf_params(m=1, t=1)
 digest_data = digest(b"test1234", p=kdf_params.p, m=kdf_params.m, t=kdf_params.t)
 if VERIFY:
     assert digest_data == kdf.digest(b"test1234", kdf_params, hash_len=1024)
@@ -55,7 +55,7 @@ else:
 # Params: pass=test1234, salt=test1234, time=1, mem=1024, hashLen=32, parallelism=1, type=0
 # Encoded: $argon2d$v=19$m=1024,t=1,p=1$dGVzdDEyMzQ$O2GpxMquN/amTCVwe5GHPJr89BvBVnM0ylSHfzez4l8
 
-kdf_params  = kdf.init_kdf_params(p=1, m=1, t=2)
+kdf_params  = kdf.init_kdf_params(m=1, t=2)
 digest_data = digest(b"test1234", p=kdf_params.p, m=kdf_params.m, t=kdf_params.t)
 if VERIFY:
     assert digest_data == kdf.digest(b"test1234", kdf_params, hash_len=1024)
@@ -66,7 +66,7 @@ else:
     # b'47a5e595dc0183405f45c0b8c1efe267c01ae2b5bb97fa11a3a662d39352b9dd'
 
 
-kdf_params  = kdf.init_kdf_params(p=1, m=1, t=87)
+kdf_params  = kdf.init_kdf_params(m=1, t=87)
 digest_data = digest(b"test1234", p=kdf_params.p, m=kdf_params.m, t=kdf_params.t)
 
 if VERIFY:
@@ -87,7 +87,7 @@ else:
 
 
 constant_kwargs = {
-    'hash_len'   : HASH_LEN,
+    'hash_len'   : kdf.HASH_LEN,
     'memory_cost': 500 * 1024,
     'parallelism': 4,
     'type'       : argon2.low_level.Type.ID,

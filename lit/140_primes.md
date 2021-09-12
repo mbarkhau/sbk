@@ -58,22 +58,14 @@ primes we're actually interested in.
 We generate a python module and a test script.
 
 ```python
-# file: src/sbk/primes_new.py
+# file: src/sbk/primes.py
 # include: common.boilerplate
 """Prime constants for sbk.gf.GFNum and sbk.gf.Field."""
-# include: common.imports
-# dep: constants
-# dep: get_pow2prime
-# dep: is_prime
-# dep: is_probable_prime
-# dep: validate_pow2_prime_params
-# dep: a014234_verify
-# dep: read_oeis_org_a014234
-# dep: download_oeis_org_a014234
+# dep: common.imports, constants, impl*
 ```
 
 ```bash
-# run: bash scripts/lint.sh src/sbk/primes_new.py
+# run: bash scripts/lint.sh src/sbk/primes.py
 # exit: 0
 ```
 
@@ -162,7 +154,7 @@ actual prime itself, but rather we can just store the much smaller
 index the prime in `POW2_PRIME_PARAMS`.
 
 ```python
-# def: get_pow2prime
+# def: impl_get_pow2prime
 def get_pow2prime_index(num_bits: int) -> int:
     if num_bits % 8 != 0:
         err = f"Invalid num_bits={num_bits}, not a multiple of 8"
@@ -240,7 +232,7 @@ against accidental changes. We start with the most basic test if `n`
 is a prime.
 
 ```python
-# def: is_prime
+# def: impl_is_prime
 # dep: constants
 def is_prime(n: int) -> bool:
     for p in PRIMES:
@@ -269,7 +261,7 @@ resources:
 - [gist.github.com/Ayrx/5884790](https://gist.github.com/Ayrx/5884790)
 
 ```python
-# def: is_probable_prime
+# def: impl_is_probable_prime
 # include: _miller_test_bases, _is_composite
 def is_probable_prime(n: int, k: int = 100) -> bool:
     # Early exit if not prime
@@ -325,7 +317,7 @@ Basic test of is_probable_prime.
 
 ```python
 # def: test_setup
-# dep: common.imports, constants, pow2primes, is_probable_prime
+# dep: common.imports, constants, pow2primes, impl_is_probable_prime
 ```
 
 ```python
@@ -345,6 +337,7 @@ Test the constants with `is_probable_prime`.
 
 ```python
 # exec
+# timeout: 90
 # dep: test_setup
 for i, (n, k) in enumerate(POW2_PRIME_PARAMS.items()):
     prime = POW2_PRIMES[i]
@@ -361,7 +354,7 @@ For the verification, we simply greate a string representation of the `POW2_PRIM
 
 
 ```python
-# def: validate_pow2_prime_params
+# def: impl_validate_pow2_prime_params
 # Hardcoded digest of POW2_PRIME_PARAMS
 _V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
 
@@ -413,7 +406,7 @@ The format from aeis.org is a text file where each line consists of `n` and the 
 We can calculate $` k = 2^n - p `$ , e.g. $` 2^{8} - 251 = 5 `$ . Assuming we have the content of such a file, we can use it to verify the constants of `POW2_PRIME_PARAMS`.
 
 ```python
-# def: a014234_verify
+# def: impl_a014234_verify
 def a014234_verify(a014234_content: str) -> Pow2PrimeItems:
     for line in a014234_content.splitlines():
         if not line.strip():
@@ -432,7 +425,7 @@ def a014234_verify(a014234_content: str) -> Pow2PrimeItems:
         yield (n, k)
 ```
 
-For the tests we'll be nice and not download the file for every test run and instead use a local copy. Note that the `a014234_verify` uses assertions internally and the assertions of the test itself just make sure that the content had some entries that were yielded (which wouldn't be the case if `content` were empty for example).
+For the tests we'll be nice and not download the file for every test run and instead use a local copy. Note that `a014234_verify` uses assertions internally and the assertions of the test itself just make sure that the content had some entries that were yielded (which wouldn't be the case if `content` were empty for example).
 
 
 ```python
@@ -449,7 +442,7 @@ def test_a014234_verfiy():
 So that you don't need to run the test suite, the `sbk.primes` module is has a `main` funciton which downloads the A014234 dataset...
 
 ```python
-# def: read_oeis_org_a014234
+# def: impl_read_oeis_org_a014234
 def read_oeis_org_a014234() -> str:
     import time
     import tempfile
@@ -475,7 +468,7 @@ def read_oeis_org_a014234() -> str:
 
 
 ```python
-# def: download_oeis_org_a014234
+# def: impl_download_oeis_org_a014234
 def download_oeis_org_a014234() -> None:
     """Helper to verify local primes against https://oeis.org/A014234.
 
@@ -494,7 +487,7 @@ if __name__ == '__main__':
 Truncated output of running the `main` function.
 
 ```bash
-# run: bash -c "python src/sbk/primes_new.py | tail"
+# run: bash -c "python src/sbk/primes.py | tail"
 2**928  - 645  https://www.wolframalpha.com/input/?i=factors(2%5E928+-+645)
 2**936  - 1325 https://www.wolframalpha.com/input/?i=factors(2%5E936+-+1325)
 2**944  - 573  https://www.wolframalpha.com/input/?i=factors(2%5E944+-+573)

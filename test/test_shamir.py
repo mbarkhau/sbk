@@ -10,7 +10,7 @@ import sbk.enc_util
 
 @pytest.mark.parametrize("use_gf_p", [True, False])
 def test_split(use_gf_p):
-    kdf_params     = sbk.kdf.init_kdf_params(p=1, m=1, t=1)
+    kdf_params     = sbk.kdf.init_kdf_params(m=1, t=1)
     param_cfg      = sbk.params.init_param_config(threshold=2, num_shares=3, kdf_params=kdf_params)
     param_cfg_data = sbk.params.param_cfg2bytes(param_cfg)
     x_coord_index  = len(param_cfg_data)
@@ -26,7 +26,7 @@ def test_split(use_gf_p):
 
 @pytest.mark.parametrize("use_gf_p", [True, False])
 def test_join(use_gf_p):
-    kdf_params = sbk.kdf.init_kdf_params(p=1, m=1, t=1)
+    kdf_params = sbk.kdf.init_kdf_params(m=1, t=1)
     param_cfg  = sbk.params.init_param_config(threshold=2, num_shares=3, kdf_params=kdf_params)
 
     raw_salt_in = os.urandom(sbk.params.RAW_SALT_LEN)
@@ -52,7 +52,7 @@ def test_shamir_edgecases(use_gf_p, raw_salt_in, brainkey_in):
     assert len(raw_salt_in) == sbk.params.RAW_SALT_LEN
     assert len(brainkey_in) == sbk.params.BRAINKEY_LEN
 
-    kdf_params = sbk.kdf.init_kdf_params(p=1, m=1, t=1)
+    kdf_params = sbk.kdf.init_kdf_params(m=1, t=1)
     param_cfg  = sbk.params.init_param_config(threshold=7, num_shares=11, kdf_params=kdf_params)
 
     shares = list(sbk.shamir.split(param_cfg, raw_salt_in, brainkey_in, use_gf_p=use_gf_p))

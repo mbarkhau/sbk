@@ -471,11 +471,13 @@ def recover(verbose: int = 0) -> None:
             echo("Invalid share. Shares are perhaps for different wallets.")
             raise click.Abort()
 
+    assert params is not None
+
     raw_salt, brainkey = shamir.join(shares)
     salt = params_data + raw_salt
 
-    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , paranoid, salt)
-    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, paranoid, brainkey)
+    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , params.paranoid, salt)
+    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, params.paranoid, brainkey)
 
     clear()
     echo("RECOVERED SECRETS".center(50))

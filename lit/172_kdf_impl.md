@@ -22,7 +22,7 @@ terms of its output and in terms of performance.
 # def: imports
 import argon2
 
-from sbk import utils_new as utils
+from sbk import utils
 from sbk import parameters
 ```
 

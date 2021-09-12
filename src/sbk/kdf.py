@@ -36,7 +36,7 @@ import sbk.common_types as ct
 logger = logging.getLogger(__name__)
 import argon2
 
-from sbk import utils_new as utils
+from sbk import utils
 from sbk import parameters
 
 HASH_LEN                           = 128

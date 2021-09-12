@@ -11,6 +11,7 @@ import math
 import typing as typ
 
 from . import gf
+from . import primes
 from . import gf_poly
 from . import enc_util
 from . import parameters

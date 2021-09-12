@@ -1,7 +1,7 @@
 ## Hex Encode/Decode
 
 ```python
-# file: src/sbk/utils_new.py
+# file: src/sbk/utils.py
 # include: common.boilerplate
 # dep: common.imports, impl_*
 ```

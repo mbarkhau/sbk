@@ -20,6 +20,8 @@ Project/Repo:
 
 [![LitProg Documentation][docs_img]][docs_ref]
 [![MIT License][license_img]][license_ref]
+[![Libera.Chat][liberachat_img]][liberachat_ref]
+
 [![Supported Python Versions][pyversions_img]][pyversions_ref]
 [![CalVer 2021.1002-beta][version_img]][version_ref]
 
@@ -50,6 +52,9 @@ $ make lint mypy devtest
 [docs_ref]: https://sbk.dev/docs
 
 [repo_ref]: https://gitlab.com/mbarkhau/sbk
+
+[liberachat_img]: https://img.shields.io/static/v1.svg?label=Libera&message=Chat&color=f5d&labelColor=55f
+[liberachat_ref]: https://web.libera.chat/#sbk
 
 [github_build_img]: https://github.com/mbarkhau/sbk/workflows/CI/badge.svg
 [github_build_ref]: https://github.com/mbarkhau/sbk/actions?query=workflow%3ACI

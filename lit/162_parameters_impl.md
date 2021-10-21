@@ -39,11 +39,9 @@ default values to be used by an end user.
 # def: constant_overrides
 if 'SBK_DEBUG_RAW_SALT_LEN' in os.environ:
     DEFAULT_RAW_SALT_LEN  = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
-    PARANOID_RAW_SALT_LEN = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
 
 if 'SBK_DEBUG_BRAINKEY_LEN' in os.environ:
     DEFAULT_BRAINKEY_LEN  = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
-    PARANOID_BRAINKEY_LEN = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
 
 MIN_ENTROPY      = int(os.getenv('SBK_MIN_ENTROPY'     , "16"))
 MAX_ENTROPY_WAIT = int(os.getenv('SBK_MAX_ENTROPY_WAIT', "10"))
@@ -88,7 +86,6 @@ values are used for  `kdf_m` and `kdf_t`.
 ```python
 # def: impl_init_parameters
 def init_parameters(
-    paranoid: bool,
     kdf_m   : ct.MebiBytes,
     kdf_t   : ct.Iterations,
     sss_x   : int,
@@ -103,7 +100,6 @@ def init_parameters(
     else:
         return Parameters(
             version=SBK_VERSION_V0,
-            paranoid=paranoid,
             kdf_p=kdf_params.kdf_p,
             kdf_m=kdf_params.kdf_m,
             kdf_t=kdf_params.kdf_t,
@@ -125,24 +121,27 @@ sanity checks on the encoded representation of the parameters.
 def params2bytes(params: Parameters) -> bytes:
     kdf_m_enc = param_log(params.kdf_m / 100, 1.125)
     kdf_t_enc = param_log(params.kdf_t, 1.125)
-    sss_x_enc = params.sss_x - 1
+
+    assert params.version & 0b0000_1111 == params.version
+    assert kdf_m_enc      & 0b0011_1111 == kdf_m_enc
+    assert kdf_t_enc      & 0b0011_1111 == kdf_t_enc
+
+    if params.sss_x > 0:
+        sss_x_enc = params.sss_x - 1
+    else:
+        sss_x_enc = 0
     sss_t_enc = params.sss_t - 2
 
-    assert params.version       & 0b0000_0111 == params.version
-    assert int(params.paranoid) & 0b0000_0001 == params.paranoid
-    assert kdf_m_enc            & 0b0011_1111 == kdf_m_enc
-    assert kdf_t_enc            & 0b0011_1111 == kdf_t_enc
-    assert sss_x_enc            & 0b0001_1111 == sss_x_enc
-    assert sss_t_enc            & 0b0000_0111 == sss_t_enc
+    assert sss_x_enc      & 0b0001_1111 == sss_x_enc
+    assert sss_t_enc      & 0b0000_0111 == sss_t_enc
 
     encoded_uint = (
         0
-        | params.version       << 0x00
-        | int(params.paranoid) << 0x03
-        | kdf_m_enc            << 0x04
-        | kdf_t_enc            << 0x0A
-        | sss_x_enc            << 0x10
-        | sss_t_enc            << 0x15
+        | params.version << 0x00
+        | kdf_m_enc      << 0x04
+        | kdf_t_enc      << 0x0A
+        | sss_x_enc      << 0x10
+        | sss_t_enc      << 0x15
     )
     encoded_data = struct.pack("<L", encoded_uint)
     assert encoded_data[-1:] == b"\x00", encoded_data[-1:]
@@ -159,14 +158,13 @@ def bytes2params(data: bytes) -> Parameters:
     assert len(data) == 3, len(data)
     encoded_uint, = struct.unpack("<L", data + b"\x00")
 
-    version   = (encoded_uint >> 0x00) & 0b0000_0111
-    paranoid  = (encoded_uint >> 0x03) & 0b0000_0001
+    version   = (encoded_uint >> 0x00) & 0b0000_1111
     kdf_m_enc = (encoded_uint >> 0x04) & 0b0011_1111
     kdf_t_enc = (encoded_uint >> 0x0A) & 0b0011_1111
     sss_x_enc = (encoded_uint >> 0x10) & 0b0001_1111
     sss_t_enc = (encoded_uint >> 0x15) & 0b0000_0111
 
-    assert version == SBK_VERSION_V0, version
+    assert version == SBK_VERSION_V0, f"Invalid version: {version}"
 
     kdf_m = param_exp(kdf_m_enc, 1.125) * 100
     kdf_t = param_exp(kdf_t_enc, 1.125)
@@ -178,7 +176,7 @@ def bytes2params(data: bytes) -> Parameters:
         sss_t = sss_t_enc + 2
 
     sss_n = sss_t
-    return init_parameters(bool(paranoid), kdf_m, kdf_t, sss_x, sss_t, sss_n)
+    return init_parameters(kdf_m, kdf_t, sss_x, sss_t, sss_n)
 ```
 
 
@@ -205,7 +203,6 @@ def validate_params(in_params: Parameters) -> None:
     assert len(params_data) == 3
 
     assert out_params.version  == in_params.version
-    assert out_params.paranoid == in_params.paranoid
     assert out_params.kdf_p    == in_params.kdf_p
     assert out_params.kdf_m    == in_params.kdf_m
     assert out_params.kdf_t    == in_params.kdf_t
@@ -236,7 +233,6 @@ def validate_params(in_params: Parameters) -> None:
 
     out_params = bytes2params(params_data[:2])
     assert out_params.version  == in_params.version
-    assert out_params.paranoid == in_params.paranoid
     assert out_params.kdf_p    == in_params.kdf_p
     assert out_params.kdf_m    == in_params.kdf_m
     assert out_params.kdf_t    == in_params.kdf_t
@@ -252,7 +248,6 @@ import random
 rand = random.Random(0)
 
 kwargs_range = {
-    'paranoid': [True, False],
     'kdf_m'   : [rand.randint(1, 1000000) for _ in range(100)],
     'kdf_t'   : [rand.randint(1, 10000) for _ in range(100)],
     'sss_x'   : list(range(1, 2**5)),
@@ -300,7 +295,9 @@ ok
 
 ## Utils
 
-Parse various data lengths according to paranoid bit.
+Parse various data lengths. An initial design intended these to be
+variable, but that design was disregarded to simplify the initial
+implementation. The `SecretLens` construct remains.
 
 ```python
 # def: impl_len_utils
@@ -309,20 +306,17 @@ class SecretLens(NamedTuple):
     brainkey  : int
     master_key: int
     raw_share : int
-    salt :  int
-    share: int
+    salt      : int
+    share     : int
 
 
-def raw_secret_lens(paranoid: bool) -> SecretLens:
-    if paranoid:
-        raw_salt = PARANOID_RAW_SALT_LEN
-        brainkey = PARANOID_BRAINKEY_LEN
-    else:
-        raw_salt = DEFAULT_RAW_SALT_LEN
-        brainkey = DEFAULT_BRAINKEY_LEN
+def raw_secret_lens() -> SecretLens:
+    raw_salt = DEFAULT_RAW_SALT_LEN
+    brainkey = DEFAULT_BRAINKEY_LEN
 
-    raw_share = master_key = raw_salt + brainkey
-    salt = raw_salt + SALT_HEADER_LEN
-    share = raw_share + SHARE_HEADER_LEN
+    raw_share  = raw_salt + brainkey
+    master_key = raw_salt + brainkey
+    salt  = SALT_HEADER_LEN  + raw_salt
+    share = SHARE_HEADER_LEN + raw_share
     return SecretLens(raw_salt, brainkey, master_key, raw_share, salt, share)
 ```

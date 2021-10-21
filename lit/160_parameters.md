@@ -9,19 +9,19 @@ parameters are used to derive the wallet seed. For the salt, the
 header is 2 bytes, for each share it is 3 bytes.
 
 ```bob
-              "kdf_params"           share
+              "kdf_params"          "share"
         .---------------------. .-------------.
+        +                     + +             +
 0                             0 1             1
 0 1 2 3 4 5 6 7 8 9 A B C D E F 0 1 2 3 4 5 6 7
-+---+ . +---------+ +---------+ +-------+ +---+
-+---+ ' +---------+ +---------+ +-------+ +---+
-  :   :      :          :         :       :
-  :   :      '          '         '       '
-  :   :    "kdf_r"   "kdf_m"  "sss_x"   "sss_t"
-  :   :    "(6bits)" "(6bits)""(5bits)" "(3bits)"
-  '   '~~~~~~~.
-"version"  "paranoid"
-"(3bits)"  "(1bit)"
++-----+ +---------+ +---------+ +-------+ +---+
++-----+ +---------+ +---------+ +-------+ +---+
+   !         !          !         !        !
+   !         !          !         !        !
+   !         '          '         '        '
+   '       "kdf_r"   "kdf_m"  "sss_x"   "sss_t"
+"version"  "(6bits)" "(6bits)""(5bits)" "(3bits)"
+"(4bits)"
 ```
 
 
@@ -35,7 +35,6 @@ of `Parameters`.
 class Parameters(NamedTuple):
 
     version   : int
-    paranoid  : bool
 
     kdf_p: ct.Parallelism
     kdf_m: ct.MebiBytes
@@ -45,9 +44,6 @@ class Parameters(NamedTuple):
     sss_t: int
     sss_n: int
 ```
-
-The `paranoid` bit determines the length of the salt and brainkey. See
-[Constants](#Constants).
 
 The `sss_*` parameters may not always be available:
 - `sss_x` may be `-1` when params were decoded from a salt
@@ -99,8 +95,8 @@ DEFAULT_SSS_N = 5
 
 A note in particular on the lengths for salt and brainkey. The length
 of a share consists of the salt + brainkey + header. This gives us a
-total of 16 bytes/words and 24 bytes/words in paranoid mode. The
-values were chosen with the following priority of constraints:
+total of 24 bytes/words. The values were chosen with the following
+priority of constraints:
 
 1. Due to encoding constraints, the header length for a share is fixed
    at 3 bytes.
@@ -109,30 +105,28 @@ values were chosen with the following priority of constraints:
    maximum number of words a human can be expected to memorize.
 3. With the previous two constraints on the header and brainkey, any
    remaining constraints must be satisfied by the salt. The main
-   constraint here is a minimum level of total entropy. This must be
-   balanced against the tedium imposed on users.
+   constraint here is a minimum level of total entropy.
 
-The paranoid bit offers users a minimum level some control over the
-tradeoff between entropy and convenience.
+With an entropy of 8 words/bytes = 64 bits, the brainkey is expensive
+but perhaps not infeasible to brute force. This low value is only
+justified as the attack to defend against is the narrow case of a
+compromised salt. The wallet owner is intended ot be the only person
+with access to the salt (treating it similarly to a traditional wallet
+seed) and should be aware if it may have been compromised, giving them
+enough time to create a new wallet.
 
-With entropy of 6 words/bytes = 48 bits
-   is already quite low. This is only justified as the attack to
-   defend against is the narrow case of a compromised salt. Even so, a
-   lower entropy would be too much of a risk. For the paranoid mode,
-   the main constraint is human memory 8 words/bytes = 64 bits on the
-   high end of what a human can reasonably be expected to memorize.
-
-The resulting total entropies we've chosen are 104bit and 168bit in
-paranoid mode.
+The resulting total entropy is at least `13 + 8 = 15byte = 168bit`. The
+headers are somewhat variable, but nonetheless predictable so they are
+not counted as part of the entropy.
 
 ```python
 # def: constants_lens
 SALT_HEADER_LEN  = 2
 SHARE_HEADER_LEN = 3
 
-DEFAULT_RAW_SALT_LEN  = 7
-PARANOID_RAW_SALT_LEN = 13
+DEFAULT_RAW_SALT_LEN  = 13
+DEFAULT_BRAINKEY_LEN  = 8
 
-DEFAULT_BRAINKEY_LEN  = 6
-PARANOID_BRAINKEY_LEN = 8
+DEFAULT_RAW_SALT_LEN  = 5
+DEFAULT_BRAINKEY_LEN  = 4
 ```

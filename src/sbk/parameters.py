@@ -27,53 +27,51 @@ from typing import NewType
 from typing import Callable
 from typing import Optional
 from typing import Sequence
+from typing import TypeAlias
 from typing import NamedTuple
 from collections.abc import Iterator
 from collections.abc import Generator
 
 import sbk.common_types as ct
 
-logger         = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 SBK_VERSION_V0 = 0
 
 # constrained by f_threshold (3bits)
 MIN_THRESHOLD = 2
 MAX_THRESHOLD = 10
 
-KDF_PARALLELISM      = ct.Parallelism(128)  # hardcoded
+KDF_PARALLELISM = ct.Parallelism(128)  # hardcoded
 DEFAULT_KDF_T_TARGET = ct.Seconds(90)
 
-DEFAULT_SSS_T    = 3
-DEFAULT_SSS_N    = 5
-SALT_HEADER_LEN  = 2
+DEFAULT_SSS_T = 3
+DEFAULT_SSS_N = 5
+SALT_HEADER_LEN = 2
 SHARE_HEADER_LEN = 3
 
-DEFAULT_RAW_SALT_LEN  = 7
-PARANOID_RAW_SALT_LEN = 13
+DEFAULT_RAW_SALT_LEN = 13
+DEFAULT_BRAINKEY_LEN = 8
 
-DEFAULT_BRAINKEY_LEN  = 6
-PARANOID_BRAINKEY_LEN = 8
+DEFAULT_RAW_SALT_LEN = 5
+DEFAULT_BRAINKEY_LEN = 4
 if "SBK_DEBUG_RAW_SALT_LEN" in os.environ:
-    DEFAULT_RAW_SALT_LEN  = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
-    PARANOID_RAW_SALT_LEN = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
+    DEFAULT_RAW_SALT_LEN = int(os.environ["SBK_DEBUG_RAW_SALT_LEN"])
 
 if "SBK_DEBUG_BRAINKEY_LEN" in os.environ:
-    DEFAULT_BRAINKEY_LEN  = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
-    PARANOID_BRAINKEY_LEN = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
+    DEFAULT_BRAINKEY_LEN = int(os.environ["SBK_DEBUG_BRAINKEY_LEN"])
 
-MIN_ENTROPY      = int(os.getenv("SBK_MIN_ENTROPY"     , "16"))
+MIN_ENTROPY = int(os.getenv("SBK_MIN_ENTROPY", "16"))
 MAX_ENTROPY_WAIT = int(os.getenv("SBK_MAX_ENTROPY_WAIT", "10"))
 
 DEFAULT_KDF_T_TARGET = int(os.getenv("SBK_KDF_T_TARGET") or DEFAULT_KDF_T_TARGET)
 
-DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD" ) or DEFAULT_SSS_T)
+DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD") or DEFAULT_SSS_T)
 DEFAULT_SSS_N = int(os.getenv("SBK_NUM_SHARES") or DEFAULT_SSS_N)
 
 
 class Parameters(NamedTuple):
 
-    version : int
-    paranoid: bool
+    version: int
 
     kdf_p: ct.Parallelism
     kdf_m: ct.MebiBytes
@@ -127,12 +125,11 @@ def init_kdf_params(kdf_m: ct.MebiBytes, kdf_t: ct.Iterations) -> KDFParams:
 
 
 def init_parameters(
-    paranoid: bool,
-    kdf_m   : ct.MebiBytes,
-    kdf_t   : ct.Iterations,
-    sss_x   : int,
-    sss_t   : int = DEFAULT_SSS_T,
-    sss_n   : int = -1,
+    kdf_m: ct.MebiBytes,
+    kdf_t: ct.Iterations,
+    sss_x: int,
+    sss_t: int = DEFAULT_SSS_T,
+    sss_n: int = -1,
 ) -> Parameters:
     kdf_params = init_kdf_params(kdf_m, kdf_t)
     if not MIN_THRESHOLD <= sss_t <= MAX_THRESHOLD:
@@ -142,7 +139,6 @@ def init_parameters(
     else:
         return Parameters(
             version=SBK_VERSION_V0,
-            paranoid=paranoid,
             kdf_p=kdf_params.kdf_p,
             kdf_m=kdf_params.kdf_m,
             kdf_t=kdf_params.kdf_t,
@@ -155,20 +151,23 @@ def init_parameters(
 def params2bytes(params: Parameters) -> bytes:
     kdf_m_enc = param_log(params.kdf_m / 100, 1.125)
     kdf_t_enc = param_log(params.kdf_t, 1.125)
-    sss_x_enc = params.sss_x - 1
-    sss_t_enc = params.sss_t - 2
 
-    assert params.version & 0b0000_0111 == params.version
-    assert int(params.paranoid) & 0b0000_0001 == params.paranoid
+    assert params.version & 0b0000_1111 == params.version
     assert kdf_m_enc & 0b0011_1111 == kdf_m_enc
     assert kdf_t_enc & 0b0011_1111 == kdf_t_enc
+
+    if params.sss_x > 0:
+        sss_x_enc = params.sss_x - 1
+    else:
+        sss_x_enc = 0
+    sss_t_enc = params.sss_t - 2
+
     assert sss_x_enc & 0b0001_1111 == sss_x_enc
     assert sss_t_enc & 0b0000_0111 == sss_t_enc
 
     encoded_uint = (
         0
         | params.version << 0x00
-        | int(params.paranoid) << 0x03
         | kdf_m_enc << 0x04
         | kdf_t_enc << 0x0A
         | sss_x_enc << 0x10
@@ -187,14 +186,13 @@ def bytes2params(data: bytes) -> Parameters:
     assert len(data) == 3, len(data)
     (encoded_uint,) = struct.unpack("<L", data + b"\x00")
 
-    version   = (encoded_uint >> 0x00) & 0b0000_0111
-    paranoid  = (encoded_uint >> 0x03) & 0b0000_0001
+    version = (encoded_uint >> 0x00) & 0b0000_1111
     kdf_m_enc = (encoded_uint >> 0x04) & 0b0011_1111
     kdf_t_enc = (encoded_uint >> 0x0A) & 0b0011_1111
     sss_x_enc = (encoded_uint >> 0x10) & 0b0001_1111
     sss_t_enc = (encoded_uint >> 0x15) & 0b0000_0111
 
-    assert version == SBK_VERSION_V0, version
+    assert version == SBK_VERSION_V0, f"Invalid version: {version}"
 
     kdf_m = param_exp(kdf_m_enc, 1.125) * 100
     kdf_t = param_exp(kdf_t_enc, 1.125)
@@ -206,27 +204,24 @@ def bytes2params(data: bytes) -> Parameters:
         sss_t = sss_t_enc + 2
 
     sss_n = sss_t
-    return init_parameters(bool(paranoid), kdf_m, kdf_t, sss_x, sss_t, sss_n)
+    return init_parameters(kdf_m, kdf_t, sss_x, sss_t, sss_n)
 
 
 class SecretLens(NamedTuple):
-    raw_salt  : int
-    brainkey  : int
+    raw_salt: int
+    brainkey: int
     master_key: int
-    raw_share : int
-    salt      : int
-    share     : int
+    raw_share: int
+    salt: int
+    share: int
 
 
-def raw_secret_lens(paranoid: bool) -> SecretLens:
-    if paranoid:
-        raw_salt = PARANOID_RAW_SALT_LEN
-        brainkey = PARANOID_BRAINKEY_LEN
-    else:
-        raw_salt = DEFAULT_RAW_SALT_LEN
-        brainkey = DEFAULT_BRAINKEY_LEN
+def raw_secret_lens() -> SecretLens:
+    raw_salt = DEFAULT_RAW_SALT_LEN
+    brainkey = DEFAULT_BRAINKEY_LEN
 
-    raw_share = master_key = raw_salt + brainkey
-    salt      = raw_salt  + SALT_HEADER_LEN
-    share     = raw_share + SHARE_HEADER_LEN
+    raw_share = raw_salt + brainkey
+    master_key = raw_salt + brainkey
+    salt = SALT_HEADER_LEN + raw_salt
+    share = SHARE_HEADER_LEN + raw_share
     return SecretLens(raw_salt, brainkey, master_key, raw_share, salt, share)

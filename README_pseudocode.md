@@ -88,13 +88,13 @@ def _fuzzy_match(word: str) -> str:
     return closest_word
 
 
-def phrase2bytes(phrase: str) -> bytes:
+def phrase2bytes(phrase: str, msg_len: int) -> bytes:
     """Decode human readable phrases to bytes."""
-    data: List[int] = []
+    data: list[int] = []
     for word in phrase.split():
         word = _fuzzy_match(word)
         data.append(WORDLIST.index(word))
-    return bytes(data)
+    return bytes(data)[:msg_len]
 ```
 
 ```python

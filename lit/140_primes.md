@@ -83,10 +83,10 @@ because we will only be encoding secrets with a length in bytes.
 
 ```python
 # def: pow2prime_params
-Pow2PrimeN     = NewType('Pow2PrimeN', int)
-Pow2PrimeK     = NewType('Pow2PrimeK', int)
-Pow2PrimeItem  = tuple[Pow2PrimeN, Pow2PrimeK]
-Pow2PrimeItems = Iterator[Pow2PrimeItem]
+Pow2PrimeN     : TypeAlias = int
+Pow2PrimeK     : TypeAlias = int
+Pow2PrimeItem  : TypeAlias = tuple[Pow2PrimeN, Pow2PrimeK]
+Pow2PrimeItems : TypeAlias = Iterator[Pow2PrimeItem]
 
 POW2_PRIME_PARAMS: dict[Pow2PrimeN, Pow2PrimeK] = {
       8:    5,  16:   15,  24:    3,  32:    5,   40:   87,

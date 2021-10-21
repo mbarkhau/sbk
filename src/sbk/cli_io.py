@@ -82,8 +82,8 @@ MaybeInputs = typ.Optional[Inputs]
 Accepted = typ.List[bool]
 
 
-def _data_len(secret_type: str, paranoid: bool) -> DataLen:
-    lens = parameters.raw_secret_lens(paranoid)
+def _data_len(secret_type: str) -> DataLen:
+    lens = parameters.raw_secret_lens()
     if secret_type == SECRET_TYPE_SALT:
         return lens.salt
     elif secret_type == SECRET_TYPE_SHARE:
@@ -95,9 +95,9 @@ def _data_len(secret_type: str, paranoid: bool) -> DataLen:
         raise NotImplementedError(errmsg)
 
 
-def _init_blank_inputs(secret_type: str, paranoid: bool) -> Inputs:
+def _init_blank_inputs(secret_type: str) -> Inputs:
     # round up if there are an uneven number of inputs (e.g. for shares)
-    data_len = _data_len(secret_type, paranoid)
+    data_len = _data_len(secret_type)
     num_inputs: int = ((data_len + 1) // 2) * 2
     assert num_inputs > 0
     assert num_inputs % 2 == 0
@@ -119,7 +119,6 @@ class PromptState:
 
     secret_type: InputType
     inputs     : Inputs
-    paranoid   : bool
     accepted   : Accepted
     cursor     : int
 
@@ -127,7 +126,6 @@ class PromptState:
         self,
         secret_type: InputType,
         inputs     : Inputs,
-        paranoid   : bool,
         cursor     : int = 0,
         accepted   : typ.Optional[Accepted] = None,
     ) -> None:
@@ -140,9 +138,8 @@ class PromptState:
         else:
             _accepted = accepted
 
-        self.inputs   = inputs
-        self.paranoid = paranoid
-        self.cursor   = max(0, min(len(self.inputs) - 1, cursor))
+        self.inputs = inputs
+        self.cursor = max(0, min(len(self.inputs) - 1, cursor))
         assert len(_accepted) == len(self.inputs)
         self.accepted = _accepted
 
@@ -164,7 +161,7 @@ class PromptState:
 
     def result(self) -> bytes:
         if self.is_complete():
-            msg_len = _data_len(self.secret_type, self.paranoid)
+            msg_len = _data_len(self.secret_type)
             return ui_common.maybe_intcodes2bytes(self.inputs, msg_len=msg_len)
         else:
             raise RuntimeError("Invalid State")
@@ -246,7 +243,6 @@ class PromptState:
         return PromptState(
             secret_type=overrides.get('secret_type', self.secret_type),
             inputs=overrides.get('inputs', self.inputs),
-            paranoid=self.paranoid,
             accepted=overrides.get('accepted', self.accepted),
             cursor=overrides.get('cursor', self.cursor),
         )
@@ -284,7 +280,7 @@ class PromptState:
                     cmd = _parse_command(in_val)
 
                 if cmd is None:
-                    in_data = mnemonic.phrase2bytes(in_val)
+                    in_data = mnemonic.phrase2bytes(in_val, msg_len=_data_len(self.secret_type))
                 else:
                     return self._eval_cmd(cmd)
         except ValueError as err:
@@ -323,7 +319,7 @@ class PromptState:
             new_accepted[self.cursor + i] = True
 
         input_data_len = sum(2 for maybe_intcode in new_inputs if maybe_intcode)
-        msg_len        = _data_len(self.secret_type, self.paranoid)
+        msg_len        = _data_len(self.secret_type)
         is_recoverable = input_data_len >= msg_len
 
         if is_recoverable:
@@ -341,20 +337,20 @@ class PromptState:
         return (new_inputs, new_accepted)
 
 
-def format_secret_lines(secret_type: str, paranoid: bool, data: bytes) -> typ.Sequence[str]:
+def format_secret_lines(secret_type: str, data: bytes) -> typ.Sequence[str]:
     intcodes     = list(ui_common.bytes2intcodes(data))
     inputs       = typ.cast(Inputs, intcodes)
-    prompt_state = PromptState(secret_type, inputs, paranoid=paranoid)
+    prompt_state = PromptState(secret_type, inputs)
     return prompt_state.formatted_input_lines(show_cursor=False)
 
 
-def format_secret(secret_type: str, paranoid: bool, data: bytes) -> str:
-    return "\n".join(format_secret_lines(secret_type, paranoid, data))
+def format_secret(secret_type: str, data: bytes) -> str:
+    return "\n".join(format_secret_lines(secret_type, data))
 
 
-def prompt(secret_type: str, header_text: typ.Optional[str] = None, paranoid: bool = False) -> bytes:
-    blank_inputs = _init_blank_inputs(secret_type, paranoid)
-    current_ps   = PromptState(secret_type, blank_inputs, paranoid=paranoid)
+def prompt(secret_type: str, header_text: typ.Optional[str] = None) -> bytes:
+    blank_inputs = _init_blank_inputs(secret_type)
+    current_ps   = PromptState(secret_type, blank_inputs)
 
     if header_text is None:
         _header_text = current_ps.message('header')

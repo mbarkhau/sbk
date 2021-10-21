@@ -51,10 +51,27 @@ if __name__ == '__main__':
 ```bash
 # run: python -m sbk.sys_info
 # timeout: 90
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
+! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
 lang:  en
-Mem Info: (15888, 10947)
-Memory Info (uncached): SystemInfo(total_mb=15888, free_mb=10947, usable_mb=8210)
-Memory Info (cached)  : SystemInfo(total_mb=15888, free_mb=10947, usable_mb=8210)
+Mem Info: (15886, 10863)
+Memory Info (uncached): SystemInfo(total_mb=15886, free_mb=10863, usable_mb=100)
+Memory Info (cached)  : SystemInfo(total_mb=15886, free_mb=10863, usable_mb=100)
 # exit: 0
 ```
 
@@ -223,9 +240,10 @@ level caching logic, both within the current process (using
 # def: impl_load_sys_info
 def load_sys_info(use_cache: bool = True) -> SystemInfo:
     if use_cache:
-        if not _SYS_INFO_KW and SYSINFO_CACHE_FPATH.exists():
+        cache_path = SYSINFO_CACHE_FPATH
+        if not _SYS_INFO_KW and cache_path.exists():
             try:
-                with SYSINFO_CACHE_FPATH.open(mode="rb") as fobj:
+                with cache_path.open(mode="rb") as fobj:
                     _SYS_INFO_KW.update(json.load(fobj))
             except Exception as ex:
                 logger.warning(f"Error reading cache file {cache_path}: {ex}")

@@ -139,20 +139,17 @@ class SeedDerivationTask(qtc.QThread):
             self.finished.emit(errmsg)
             return
 
-        brainkey = self.brainkey
-        salt     = self.salt
-
         seed_data = ui_common.derive_seed(
             self.params,
-            salt,
-            brainkey,
+            self.salt,
+            self.brainkey,
             label="KDF Validation ",
             init_progressbar=init_progres_status_emitter_clazz(self.progress),
         )
 
         state = gpb.shared_panel_state
-        state['salt'     ] = salt
-        state['brainkey' ] = brainkey
+        state['salt'     ] = self.salt
+        state['brainkey' ] = self.brainkey
         state['seed_data'] = seed_data
 
         self.finished.emit("ok")
@@ -165,18 +162,17 @@ class ParametersWorker(qtc.QThread):
 
     def __init__(
         self,
-        threshold      : int,
-        num_shares     : int,
         target_memory  : ct.MebiBytes,
         target_duration: ct.Seconds,
-        paranoid       : bool,
+        threshold      : int,
+        num_shares     : int,
     ) -> None:
         super().__init__()
-        self.threshold       = threshold
-        self.num_shares      = num_shares
         self.target_memory   = target_memory
         self.target_duration = target_duration
-        self.paranoid        = paranoid
+
+        self.threshold  = threshold
+        self.num_shares = num_shares
 
     def run(self) -> None:
         params = ui_common.init_params(
@@ -185,7 +181,6 @@ class ParametersWorker(qtc.QThread):
             time_cost=None,  # auto from target_duration
             threshold=self.threshold,
             num_shares=self.num_shares,
-            paranoid=self.paranoid,
             init_progressbar=init_progres_status_emitter_clazz(self.progress),
         )
         self.finished.emit(params)

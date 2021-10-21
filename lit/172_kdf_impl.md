@@ -98,7 +98,7 @@ def digest(
     hash_len   : int,
     progress_cb: ct.MaybeProgressCallback = None,
 ) -> bytes:
-    _ps           : typ.Optional[ProgressSmoother]
+    _ps           : Optional[utils.ProgressSmoother]
     if progress_cb:
         _ps = utils.ProgressSmoother(progress_cb)
     else:

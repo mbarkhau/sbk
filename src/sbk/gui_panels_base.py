@@ -40,15 +40,14 @@ PanelState = typext.TypedDict(
         'params'     : typ.Optional[parameters.Parameters],
         'seed_data'  : typ.Optional[ct.SeedData],
         # options
-        'sys_info'       : typ.Optional[sys_info.SystemInfo],
-        'offline'        : bool,
-        'wallet_name'    : str,
-        'threshold'      : int,
-        'num_shares'     : int,
+        'sys_info'   : typ.Optional[sys_info.SystemInfo],
+        'offline'    : bool,
+        'wallet_name': str,
+        # 'sss_t'          : int,
+        # 'sss_n'          : int,
         'target_memory'  : int,
         'target_duration': int,
         'max_memory'     : int,
-        'paranoid'       : bool,
     },
 )
 
@@ -60,15 +59,14 @@ shared_panel_state: PanelState = {
     'params'     : None,
     'seed_data'  : None,
     # options
-    'sys_info'       : None,
-    'offline'        : True,
-    'wallet_name'    : "empty",
-    'threshold'      : parameters.DEFAULT_SSS_T,
-    'num_shares'     : parameters.DEFAULT_SSS_N,
+    'sys_info'   : None,
+    'offline'    : True,
+    'wallet_name': "empty",
+    # 'sss_t'          : parameters.DEFAULT_SSS_T,
+    # 'sss_n'          : parameters.DEFAULT_SSS_N,
     'target_memory'  : sys_info.FALLBACK_MEM_MB,
     'target_duration': parameters.DEFAULT_KDF_T_TARGET,
     'max_memory'     : -1,
-    'paranoid'       : False,
 }
 
 
@@ -76,18 +74,29 @@ def has_secrets() -> bool:
     return bool(shared_panel_state['salt'] and shared_panel_state['brainkey'])
 
 
-def get_params() -> typ.Optional[parameters.Parameters]:
-    return shared_panel_state['params']
-
-
 def get_state() -> PanelState:
     state = shared_panel_state
+
     if state['sys_info'] is None:
         _sys_info = sys_info.load_sys_info()
-        state['sys_info'] = _sys_info
+        state['sys_info'     ] = _sys_info
+        state['max_memory'   ] = int(_sys_info.total_mb / 100) * 100
+        state['target_memory'] = int(_sys_info.free_mb  / 100) * 100
 
-        state['max_memory'] = int(_sys_info.total_mb / 100) * 100
+    if state['params'] is None:
+        state['params'] = parameters.init_parameters(
+            kdf_m=state['sys_info'].usable_mb,
+            kdf_t=parameters.DEFAULT_KDF_T_TARGET,
+            sss_x=1,
+            sss_t=parameters.DEFAULT_SSS_T,
+            sss_n=parameters.DEFAULT_SSS_N,
+        )
+
     return state
+
+
+def get_params() -> typ.Optional[parameters.Parameters]:
+    return get_state()['params']
 
 
 class CurrentSecret(typ.NamedTuple):
@@ -97,33 +106,46 @@ class CurrentSecret(typ.NamedTuple):
     secret_data: bytes
 
 
-def get_label_text() -> str:
-    num_shares  = len(shared_panel_state['shares'])
+def get_secret_type() -> str:
+    sss_n       = len(shared_panel_state['shares'])
     panel_index = shared_panel_state['panel_index']
-    if panel_index < num_shares:
-        share_no = panel_index + 1
-        return f"Verify Share {share_no}/{num_shares}"
-    elif panel_index == num_shares:
-        return "Verify Salt"
+    if panel_index < sss_n:
+        return 'share'
+    elif panel_index == sss_n:
+        return 'salt'
     else:
+        return 'brainkey'
+
+
+def get_label_text() -> str:
+    secret_type = get_secret_type()
+    if secret_type == 'share':
+        share_no = shared_panel_state['panel_index'] + 1
+        sss_n       = len(shared_panel_state['shares'])
+        return f"Verify Share {share_no}/{sss_n}"
+    elif secret_type == 'salt':
+        return "Verify Salt"
+    elif secret_type == 'brainkey':
         return "Verify Brainkey"
+    else:
+        raise ValueError(f"Invalid secret_type={secret_type}")
 
 
 def get_current_secret() -> CurrentSecret:
     params = shared_panel_state['params']
-    lens   = parameters.raw_secret_lens(params.paranoid)
+    lens   = parameters.raw_secret_lens()
 
-    shares     = shared_panel_state['shares']
-    num_shares = len(shares)
+    shares = shared_panel_state['shares']
+    sss_n  = len(shares)
 
     panel_index = shared_panel_state['panel_index']
-    if panel_index < num_shares:
+    if panel_index < sss_n:
         return CurrentSecret(
             secret_len=lens.raw_share + parameters.SHARE_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SHARE,
             secret_data=shares[panel_index],
         )
-    elif panel_index == num_shares:
+    elif panel_index == sss_n:
         return CurrentSecret(
             secret_len=lens.raw_salt + parameters.SALT_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SALT,
@@ -141,8 +163,9 @@ def get_padded_secret() -> bytes:
     # NOTE (mb 2021-06-11): In the case of secrets with odd length, we must
     #   go through the ecc generation (part of bytes2intcodes) so that we
     #   can get ecc data that is used as padding in the mnemonic phrase.
-    secret       = get_current_secret()
-    intcodes     = ui_common.bytes2intcodes(secret.secret_data)
+    secret   = get_current_secret()
+    intcodes = ui_common.bytes2intcodes(secret.secret_data)
+
     data_and_ecc = b"".join(ui_common.intcodes2parts(intcodes))
     if data_and_ecc[: secret.secret_len] == secret.secret_data:
         return data_and_ecc
@@ -171,9 +194,8 @@ class Panel(qtw.QWidget):
             parent.setCurrentIndex(self.index)
 
     def trace(self, message: str) -> None:
-        instance_idx = self.index
-        panel_idx    = shared_panel_state['panel_index']
-        prefix       = f"{type(self).__name__:>30}[{instance_idx}, {panel_idx}] - "
+        panel_idx = shared_panel_state['panel_index']
+        prefix    = f"{type(self).__name__:>30}[{self.index}, {panel_idx}] - "
         logger.debug(prefix + message)
 
 
@@ -467,7 +489,7 @@ def column_headers(parent: qtw.QWidget) -> qtw.QHBoxLayout:
     return headers
 
 
-RowWidgets = typ.List[typ.Tuple[qtw.QWidget, qtw.QWidget, qtw.QWidget, qtw.QWidget]]
+RowWidgets = list[tuple[qtw.QWidget, qtw.QWidget, qtw.QWidget, qtw.QWidget]]
 
 
 def init_grid(
@@ -475,14 +497,14 @@ def init_grid(
     grid_layout    : qtw.QGridLayout,
     all_row_widgets: RowWidgets,
 ) -> typ.Sequence[qtw.QWidget]:
-    all_widgets: typ.List[qtw.QWidget] = []
+    all_widgets: list[qtw.QWidget] = []
 
     num_rows = len(all_row_widgets)
     for row, (i1, m1, m2, i2) in enumerate(all_row_widgets):
         grid_row = row + row // 4
 
-        row_num_left  = (row % num_rows) + 1
-        row_num_right = (row % num_rows) + num_rows + 1
+        row_num_left  = (row * 2) + 1
+        row_num_right = row_num_left + 1
 
         row_widgets = [
             _label_widget(parent, ""),  # 0
@@ -504,7 +526,12 @@ def init_grid(
         all_widgets.extend(row_widgets)
         grid_layout.setRowMinimumHeight(grid_row, 26)
 
-    for row in [4, 9]:
+    if num_rows % 4 == 0:
+        spacers = [4, 9]
+    else:
+        spacers = []
+
+    for row in spacers:
         col    = 0
         widget = qtw.QLabel(" ", parent)
         grid_layout.addWidget(widget, row, col)
@@ -526,10 +553,10 @@ def init_grid(
 
 class EnterSecretPanel(NavigablePanel):
 
-    widget_states   : typ.Dict[int, typ.Dict[str, typ.Any]]
-    grid_widgets    : typ.List[qtw.QWidget]
-    intcode_widgets : typ.List[IntCodeEdit]
-    mnemonic_widgets: typ.List[MnemonicEdit]
+    widget_states   : dict[int, dict[str, typ.Any]]
+    grid_widgets    : list[qtw.QWidget]
+    intcode_widgets : list[IntCodeEdit]
+    mnemonic_widgets: list[MnemonicEdit]
 
     def __init__(self, index: int):
         super().__init__(index)
@@ -564,19 +591,21 @@ class EnterSecretPanel(NavigablePanel):
     def secret_len(self) -> int:
         raise NotImplementedError()
 
-    def get_or_init_state(self) -> typ.Dict[str, typ.Any]:
+    def get_or_init_state(self) -> dict[str, typ.Any]:
         # NOTE (mb 2021-06-04): This whole state business may well be an artifact
         #   of (ab)using the Panel classes in NavigablePanel.nav_handler
-        idx = shared_panel_state['panel_index']
-        if idx in self.widget_states:
-            return self.widget_states[idx]
-        else:
-            msg_len    = self.secret_len()
-            num_inputs = msg_len
-            if num_inputs % 2 != 0:
-                num_inputs += 1
 
-            self.widget_states[idx] = {
+        msg_len    = self.secret_len()
+        num_inputs = msg_len
+        if num_inputs % 2 != 0:
+            num_inputs += 1
+
+        idx = shared_panel_state['panel_index']
+
+        if idx in self.widget_states:
+            wstate = self.widget_states[idx]
+        else:
+            wstate = self.widget_states[idx] = {
                 'header_text'   : self.label_text(),
                 'num_inputs'    : num_inputs,
                 'msg_len'       : msg_len,
@@ -589,22 +618,42 @@ class EnterSecretPanel(NavigablePanel):
                 'mnemonics_accepted': [0] * num_inputs,
             }
             self.trace(f"init widgets state: {self.widget_states[idx]}")
-            return self.widget_states[idx]
+
+        if num_inputs != wstate['num_inputs']:
+            wstate['num_inputs'        ] = num_inputs
+            wstate['msg_len'           ] = msg_len
+            wstate['intcode_texts'     ] += [""] * num_inputs
+            wstate['mnemonic_texts'    ] += [""] * num_inputs
+            wstate['intcodes_accepted' ] += [0] * num_inputs
+            wstate['mnemonics_accepted'] += [0] * num_inputs
+
+            wstate['intcode_texts'     ] = wstate['intcode_texts'     ][:num_inputs]
+            wstate['mnemonic_texts'    ] = wstate['mnemonic_texts'    ][:num_inputs]
+            wstate['intcodes_accepted' ] = wstate['intcodes_accepted' ][:num_inputs]
+            wstate['mnemonics_accepted'] = wstate['mnemonics_accepted'][:num_inputs]
+
+        return wstate
 
     def switch(self) -> None:
         self.trace(f"switch {type(self).__name__} {shared_panel_state['panel_index']}")
+        self.update_widgets()
+        super().switch()
+        self.set_focus()
+        self.autofill()
+
+    def update_widgets(self) -> None:
         state = self.get_or_init_state()
 
         self.header.setText(state['header_text'])
 
-        # initialize state from packious usage
+        # initialize state from previous usage
         for i in range(state['num_inputs']):
-            if state['intcode_texts']:
+            if state['intcode_texts'] and i < len(state['intcode_texts']):
                 initial_intcode_text = state['intcode_texts'][i]
             else:
                 initial_intcode_text = ""
 
-            if state['mnemonic_texts']:
+            if state['mnemonic_texts'] and i < len(state['mnemonic_texts']):
                 initial_mnemonic_text = state['mnemonic_texts'][i]
             else:
                 initial_mnemonic_text = ""
@@ -642,10 +691,11 @@ class EnterSecretPanel(NavigablePanel):
         # for cleanup later
         self.grid_widgets.extend(new_widgets)
 
-        super().switch()
-
+    def set_focus(self, offset: int = 0) -> None:
+        state        = self.get_or_init_state()
         widget_type  = state['widget_type']
-        widget_index = state['widget_index']
+        widget_index = state['widget_index'] + offset
+        self.trace(f"set_focus {widget_type} {widget_index}")
 
         if widget_type == 'mnemonic':
             self.mnemonic_widgets[widget_index].setFocus()
@@ -654,8 +704,6 @@ class EnterSecretPanel(NavigablePanel):
         else:
             errmsg = f"Invalid widget_type='{widget_type}'"
             raise ValueError(errmsg)
-
-        self.autofill()
 
     def destroy_panel(self) -> None:
         self.back_button.setFocus()  # trigger focusOut of current edit widget
@@ -721,6 +769,11 @@ class EnterSecretPanel(NavigablePanel):
                     yield None
                     yield None
 
+        state = self.get_or_init_state()
+        for _ in range(state['num_inputs'] - len(self.intcode_widgets)):
+            yield None
+            yield None
+
     def _known_secret_iter_valid_mnemonic_datas(self) -> typ.Iterable[MaybeBytes]:
         expected_data_and_ecc = get_padded_secret()
         expected_data_padded  = expected_data_and_ecc[: len(expected_data_and_ecc) // 2]
@@ -744,12 +797,16 @@ class EnterSecretPanel(NavigablePanel):
             word = widget.text().strip()
             if word:
                 try:
-                    yield mnemonic.phrase2bytes(word)
+                    yield mnemonic.phrase2bytes(word, msg_len=1)
                 except ValueError:
                     widget.setStyleSheet("background-color: #F66;")
                     yield None
             else:
                 yield None
+
+        state = self.get_or_init_state()
+        for _ in range(state['num_inputs'] - len(self.mnemonic_widgets)):
+            yield None
 
     def iter_valid_intcode_datas(self) -> typ.Iterable[MaybeBytes]:
         if has_secrets():
@@ -764,12 +821,13 @@ class EnterSecretPanel(NavigablePanel):
             return self._unknown_secret_iter_valid_mnemonic_datas()
 
     def parse_accepted_datas(self) -> typ.Iterable[MaybeBytes]:
-        valid_intcode_datas : typ.Sequence[MaybeBytes] = list(self.iter_valid_intcode_datas())
-        valid_mnemonic_datas: typ.Sequence[MaybeBytes] = list(self.iter_valid_mnemonic_datas())
-
         state    = self.get_or_init_state()
         data_len = state['num_inputs']
         ecc_len  = state['num_inputs']
+
+        valid_intcode_datas : typ.Sequence[MaybeBytes] = list(self.iter_valid_intcode_datas())
+        valid_mnemonic_datas: typ.Sequence[MaybeBytes] = list(self.iter_valid_mnemonic_datas())
+
         assert len(valid_intcode_datas) == len(valid_mnemonic_datas) * 2
         assert len(valid_intcode_datas) == data_len + ecc_len
 
@@ -797,6 +855,7 @@ class EnterSecretPanel(NavigablePanel):
         return list(_recover_datas(valid_datas, msg_len=state['msg_len']))
 
     def autofill(self, accept_intcode: int = -1, accept_mnemonic: int = -1) -> None:
+        self.trace(f"autofill i:{accept_intcode} m:{accept_mnemonic}")
         state = self.get_or_init_state()
         if accept_intcode >= 0:
             state['intcodes_accepted'][accept_intcode] = time.time()
@@ -807,8 +866,14 @@ class EnterSecretPanel(NavigablePanel):
         #     return
 
         recovered_datas = self.recover_datas()
-        if shared_panel_state['params'] is None and all(recovered_datas[:3]):
-            _recover_data = b"".join(recovered_datas[:3])  # type: ignore
+        if all(recovered_datas[:2]):
+            print(state)
+            print()
+            if all(recovered_datas[:3]):
+                _recover_data = b"".join(recovered_datas[:3])
+            else:
+                _recover_data = b"".join(recovered_datas[:2])
+
             try:
                 params = parameters.bytes2params(_recover_data)
                 shared_panel_state['params'] = params
@@ -816,7 +881,7 @@ class EnterSecretPanel(NavigablePanel):
                 idx = shared_panel_state['panel_index']
                 self.widget_states[idx]['header_text'] = self.label_text()
                 self.header.setText(state['header_text'])
-            except ValueError as err:
+            except (ValueError, AssertionError) as err:
                 logger.error(f"Error parsing params {err}")
                 if "Unsupported Version" in str(err):
                     self.mnemonic_widgets[0].setStyleSheet("background-color: #F66;")

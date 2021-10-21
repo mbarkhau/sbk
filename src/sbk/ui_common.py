@@ -39,9 +39,9 @@ logger = logging.getLogger("sbk.ui_common")
 SECURITY_WARNING_TEXT = """
 Security Warning
 
-Please make sure:
+Ideally you can satisfy the following:
 
- - You are the only person who can currently view your screen.
+ - No other person can see your screen.
  - Your computer is not connected to any network.
  - Your computer is booted using a trusted installation of Linux.
 
@@ -547,7 +547,6 @@ def init_params(
     time_cost       : typ.Optional[ct.Iterations],
     threshold       : int,
     num_shares      : int,
-    paranoid        : bool,
     init_progressbar: typ.Optional[InitProgressbar] = None,
 ) -> parameters.Parameters:
     if init_progressbar is None:
@@ -562,7 +561,6 @@ def init_params(
         init_progressbar=_init_progressbar,
     )
     return parameters.init_parameters(
-        paranoid=paranoid,
         kdf_m=kdf_params.kdf_m,
         kdf_t=kdf_params.kdf_t,
         sss_x=1,
@@ -614,12 +612,11 @@ def validated_param_data(params: parameters.Parameters) -> bytes:
     params_data    = parameters.params2bytes(params)
     decoded_params = parameters.bytes2params(params_data)
     checks         = {
-        'threshold': params.sss_t    == decoded_params.sss_t,
-        'version'  : params.version  == decoded_params.version,
-        'paranoid' : params.paranoid == decoded_params.paranoid,
-        'kdf_p'    : params.kdf_p    == decoded_params.kdf_p,
-        'kdf_m'    : params.kdf_m    == decoded_params.kdf_m,
-        'kdf_t'    : params.kdf_t    == decoded_params.kdf_t,
+        'threshold': params.sss_t   == decoded_params.sss_t,
+        'version'  : params.version == decoded_params.version,
+        'kdf_p'    : params.kdf_p   == decoded_params.kdf_p,
+        'kdf_m'    : params.kdf_m   == decoded_params.kdf_m,
+        'kdf_t'    : params.kdf_t   == decoded_params.kdf_t,
     }
     bad_checks = [name for name, is_ok in checks.items() if not is_ok]
     if any(bad_checks):
@@ -645,11 +642,12 @@ def validate_wallet_name(wallet_name: str) -> None:
 
 def create_secrets(params: parameters.Parameters) -> tuple[ct.Salt, ct.BrainKey, ct.Shares]:
     params_data = validated_param_data(params)
+    salt_header = params_data[: parameters.SALT_HEADER_LEN]
 
-    lens = parameters.raw_secret_lens(params.paranoid)
+    lens = parameters.raw_secret_lens()
 
     raw_salt = ct.RawSalt(urandom(lens.raw_salt))
-    salt     = ct.Salt(params_data + raw_salt)
+    salt     = ct.Salt(salt_header + raw_salt)
     brainkey = ct.BrainKey(urandom(lens.brainkey))
 
     if os.getenv('SBK_DEBUG_RANDOM') is None:
@@ -657,9 +655,29 @@ def create_secrets(params: parameters.Parameters) -> tuple[ct.Salt, ct.BrainKey,
 
     shares = list(shamir.split(params, raw_salt, brainkey))
 
+    # test encoding and recovery before we ever give out any secrets
+
+    ic_salt     = bytes2intcodes(salt)
+    ic_brainkey = bytes2intcodes(brainkey)
+    ic_shares   = [bytes2intcodes(share) for share in shares]
+
+    phrase_salt     = " ".join(intcodes2mnemonics(ic_salt    ))
+    phrase_brainkey = " ".join(intcodes2mnemonics(ic_brainkey))
+    phrase_shares   = [" ".join(intcodes2mnemonics(ic_share)) for ic_share in ic_shares]
+
     raw_salt_recovered, brainkey_recovered = shamir.join(shares)
 
-    is_recovery_ok = raw_salt_recovered == raw_salt and brainkey_recovered == brainkey
+    is_recovery_ok = (
+        brainkey     == intcodes2bytes(ic_brainkey, lens.brainkey)
+        and salt     == intcodes2bytes(ic_salt    , lens.salt)
+        and shares   == [intcodes2bytes(ic_share, lens.share) for ic_share in ic_shares]
+        and salt     == mnemonic.phrase2bytes(phrase_salt    , lens.salt)
+        and brainkey == mnemonic.phrase2bytes(phrase_brainkey, lens.brainkey)
+        and shares   == [mnemonic.phrase2bytes(phrase_share, lens.share) for phrase_share in phrase_shares]
+        and raw_salt == raw_salt_recovered
+        and brainkey == brainkey_recovered
+    )
+
     if is_recovery_ok:
         return (salt, brainkey, shares)
     else:

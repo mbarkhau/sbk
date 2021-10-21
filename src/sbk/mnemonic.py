@@ -92,9 +92,9 @@ def _phrase2bytes(phrase: PhraseStr) -> typ.Iterable[bytes]:
         yield struct.pack("B", wordlist_index(word))
 
 
-def phrase2bytes(phrase: PhraseStr) -> bytes:
+def phrase2bytes(phrase: PhraseStr, msg_len: int) -> bytes:
     """Decode human readable phrases to bytes."""
-    return b"".join(_phrase2bytes(phrase))
+    return b"".join(_phrase2bytes(phrase))[:msg_len]
 
 
 def main() -> None:

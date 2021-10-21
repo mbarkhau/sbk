@@ -165,15 +165,6 @@ _opt_yes_all = click.option(
 )
 
 
-_opt_paranoid = click.option(
-    '--paranoid',
-    type=bool,
-    is_flag=True,
-    default=False,
-    help="Paranoid mode (168bit vs 104bit)",
-)
-
-
 _opt_wallet_name = click.option(
     '--wallet-name',
     type=str,
@@ -201,8 +192,8 @@ _opt_online_mode = click.option(
 )
 
 
-def _show_secret(label: str, secret_type: str, paranoid: bool, data: bytes) -> None:
-    output_lines = cli_io.format_secret_lines(secret_type, paranoid, data)
+def _show_secret(label: str, secret_type: str, data: bytes) -> None:
+    output_lines = cli_io.format_secret_lines(secret_type, data)
 
     len_padding = max(map(len, output_lines))
     echo(f"{label:^{len_padding}}")
@@ -236,14 +227,12 @@ def version() -> None:
 @_opt_kdf_target_duration
 @_opt_kdf_memory_cost
 @_opt_kdf_time_cost
-@_opt_paranoid
 @_opt_verbose
 def kdf_test(
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
     memory_cost    : typ.Optional[ct.MebiBytes ] = None,
     time_cost      : typ.Optional[ct.Iterations] = None,
-    paranoid       : bool = False,
-    verbose        : int  = 0,
+    verbose        : int = 0,
 ) -> None:
     """Test KDF difficulty settings."""
     _configure_logging(verbose)
@@ -253,9 +242,8 @@ def kdf_test(
         time_cost=time_cost,
         threshold=2,
         num_shares=2,
-        paranoid=paranoid,
     )
-    lens = parameters.raw_secret_lens(params.paranoid)
+    lens = parameters.raw_secret_lens()
 
     echo()
     echo(f"Using KDF Parameters: -m={params.kdf_m:<5} -t={params.kdf_t:<4}")
@@ -270,10 +258,10 @@ def kdf_test(
     echo(f"Duration   : {round(duration):>4} sec")
 
 
-def _validate_data(header_text: str, params: parameters.Parameters, data: bytes, secret_type: str) -> None:
+def _validate_data(header_text: str, data: bytes, secret_type: str) -> None:
     full_header_text = VALIDATION_TITLE + "\n\n\t" + header_text
     while True:
-        recovered_data = cli_io.prompt(params, secret_type, full_header_text)
+        recovered_data = cli_io.prompt(secret_type, full_header_text)
         if data == recovered_data:
             return
         else:
@@ -287,15 +275,15 @@ def _validate_copies(
     shares  : ct.Shares,
 ) -> bool:
     header_text = "Validation for Salt"
-    _validate_data(header_text, params, salt, cli_io.SECRET_TYPE_SALT)
+    _validate_data(header_text, salt, cli_io.SECRET_TYPE_SALT)
 
     header_text = "Validation for Brainkey"
-    _validate_data(header_text, params, brainkey, cli_io.SECRET_TYPE_BRAINKEY)
+    _validate_data(header_text, brainkey, cli_io.SECRET_TYPE_BRAINKEY)
 
     for i, share_data in enumerate(shares):
         share_no    = i + 1
         header_text = f"Validation for Share {share_no}/{len(shares)}"
-        _validate_data(header_text, params, share_data, cli_io.SECRET_TYPE_SHARE)
+        _validate_data(header_text, share_data, cli_io.SECRET_TYPE_SHARE)
 
     return True
 
@@ -326,7 +314,7 @@ def _show_created_data(
         echo(ui_common.SHARE_INFO_TEXT)
 
         share_label = f"Share {share_no}/{params.sss_n}"
-        _show_secret(share_label, cli_io.SECRET_TYPE_SHARE, params.paranoid, share_data)
+        _show_secret(share_label, cli_io.SECRET_TYPE_SHARE, share_data)
 
         share_prompt = ui_common.SHARE_PROMPT_TMPL.format(**info)
         # ui_common.share_data_to_text(params, share_data, share_no)
@@ -340,7 +328,7 @@ def _show_created_data(
 
     echo(ui_common.SALT_INFO_TEXT)
 
-    _show_secret("Salt", cli_io.SECRET_TYPE_SALT, params.paranoid, salt)
+    _show_secret("Salt", cli_io.SECRET_TYPE_SALT, salt)
 
     yes_all or anykey_confirm(SALT_PROMPT)
 
@@ -353,7 +341,7 @@ def _show_created_data(
 
     echo()
 
-    _show_secret("Brainkey", cli_io.SECRET_TYPE_BRAINKEY, params.paranoid, brainkey)
+    _show_secret("Brainkey", cli_io.SECRET_TYPE_BRAINKEY, brainkey)
 
     yes_all or anykey_confirm(ui_common.BRAINKEY_LAST_CHANCE_WARNING_TEXT)
 
@@ -364,7 +352,6 @@ def _show_created_data(
 @_opt_kdf_target_duration
 @_opt_kdf_memory_cost
 @_opt_kdf_time_cost
-@_opt_paranoid
 @_opt_verbose
 def create(
     scheme_arg     : str        = DEFAULT_SCHEME,
@@ -372,8 +359,7 @@ def create(
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
     memory_cost    : typ.Optional[ct.MebiBytes ] = None,
     time_cost      : typ.Optional[ct.Iterations] = None,
-    paranoid       : bool = False,
-    verbose        : int  = 0,
+    verbose        : int = 0,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
 
@@ -396,7 +382,6 @@ def create(
         time_cost=time_cost,
         threshold=scheme.threshold,
         num_shares=scheme.num_shares,
-        paranoid=paranoid,
     )
 
     try:
@@ -408,6 +393,7 @@ def create(
             raise click.Abort()
         else:
             raise
+
     has_manual_kdf_m = memory_cost is not None
     if has_manual_kdf_m:
         # Verify that derivation works before we show anything. This is for manually chosen values
@@ -431,7 +417,7 @@ def create(
 def recover_salt(verbose: int = 0) -> None:
     """Recover a partially readable Salt."""
     _configure_logging(verbose)
-    salt_data   = cli_io.prompt(cli_io.SECRET_TYPE_SALT, paranoid=False)
+    salt_data   = cli_io.prompt(cli_io.SECRET_TYPE_SALT)
     params_data = salt_data[: parameters.SALT_HEADER_LEN]
     params      = parameters.bytes2params(params_data)
 
@@ -476,8 +462,8 @@ def recover(verbose: int = 0) -> None:
     raw_salt, brainkey = shamir.join(shares)
     salt = params_data + raw_salt
 
-    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , params.paranoid, salt)
-    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, params.paranoid, brainkey)
+    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , salt)
+    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, brainkey)
 
     clear()
     echo("RECOVERED SECRETS".center(50))
@@ -557,7 +543,7 @@ def gui(verbose: int = 0) -> None:
     """Start sbk gui."""
     import sbk.gui
 
-    _configure_logging(verbosity=0)
+    _configure_logging(verbose)
     sbk.gui.gui()
 
 

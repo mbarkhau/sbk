@@ -9,41 +9,34 @@
 # SPDX-License-Identifier: MIT
 """Types used across multiple modules."""
 
-from typing import NewType
-from typing import Callable
-from typing import Optional
-from typing import Sequence
-from typing import NamedTuple
-
-RawSalt = NewType('RawSalt', bytes)
+from typing import NewType, TypeAlias, Sequence, Callable, Optional, NamedTuple
+RawSalt: TypeAlias = bytes
 
 # ParamConfig data + RawSalt
-Salt = NewType('Salt', bytes)
-
-BrainKey  = NewType('BrainKey' , bytes)
-MasterKey = NewType('MasterKey', bytes)
-
+Salt     : TypeAlias = bytes
+BrainKey : TypeAlias = bytes
+MasterKey: TypeAlias = bytes
 
 class RawShare(NamedTuple):
     x_coord: int
     data   : bytes  # only the encoded GFPoint.y values
 
-
 # ParamConfig data + RawShare.data
-Share  = NewType('Share', bytes)
-Shares = Sequence[Share]
+Share: TypeAlias  = bytes
+Shares: TypeAlias = Sequence[Share]
 
-SeedData = NewType('SeedData', bytes)
+SeedData: TypeAlias = bytes
 
-ElectrumSeed = NewType('ElectrumSeed', str)
+ElectrumSeed: TypeAlias = str
 
-LangCode = NewType('LangCode', str)
+LangCode: TypeAlias = str
 
-ProgressIncrement     = NewType('ProgressIncrement', float)
-ProgressCallback      = Callable[[ProgressIncrement], None]
-MaybeProgressCallback = Optional[ProgressCallback]
+ProgressIncrement    : TypeAlias = float
+ProgressCallback     : TypeAlias = Callable[[ProgressIncrement], None]
+MaybeProgressCallback: TypeAlias = Optional[ProgressCallback]
 
-Parallelism = NewType('Parallelism', int)
-MebiBytes   = NewType('MebiBytes'  , int)
-Iterations  = NewType('Iterations' , int)
-Seconds     = NewType('Seconds'    , float)
+Parallelism : TypeAlias = int
+MebiBytes   : TypeAlias = int
+Iterations  : TypeAlias = int
+Seconds     : TypeAlias = float
+

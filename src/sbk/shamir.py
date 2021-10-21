@@ -41,7 +41,7 @@ def _split_data_gf_p(
     gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)  # type: ignore
     for gfpoint in gfpoints:
         # NOTE: for x=0 or x=255 the y value may be the secret, which should not be serialized.
-        x = point.x.val
+        x = gfpoint.x.val
         if not (0 < x < 32):
             errmsg = f"Invalid point with x={x}. Was not (0 < x < 32)"
             raise ValueError(errmsg)
@@ -51,7 +51,7 @@ def _split_data_gf_p(
 
 
 def _bytes2gfpoint(raw_share: ct.RawShare, field: gf.FieldGF256) -> gf_poly.Point:
-    y = bytes2int(raw_shares.data)
+    y = enc_util.bytes2int(raw_share.data)
     if y < field.order:
         return gf_poly.Point(field[raw_share.x_coord], field[y])
     else:
@@ -128,7 +128,7 @@ def split(
     brainkey: ct.BrainKey,
     use_gf_p: bool = False,
 ) -> list[ct.Share]:
-    lens = parameters.raw_secret_lens(params.paranoid)
+    lens = parameters.raw_secret_lens()
 
     assert len(raw_salt) == lens.raw_salt
     assert len(brainkey) == lens.brainkey
@@ -166,7 +166,7 @@ def join(shares: list[ct.Shares], use_gf_p: bool = False) -> tuple[ct.RawSalt, c
         raw_shares.append(ct.RawShare(share_params.sss_x, share_data))
         all_share_params.append(share_params)
 
-    unique_params = set(params._replace(sss_x=None) for params in all_share_params)
+    unique_params = {params._replace(sss_x=None) for params in all_share_params}
     if len(unique_params) > 1:
         errmsg = f"Invalid shares using different parameters {unique_params}"
         raise ValueError(errmsg)
@@ -177,7 +177,7 @@ def join(shares: list[ct.Shares], use_gf_p: bool = False) -> tuple[ct.RawSalt, c
         errmsg = f"Insufficient shares {len(unique_coords)} < {params.sss_t}"
         raise ValueError(errmsg)
 
-    lens = parameters.raw_secret_lens(params.paranoid)
+    lens = parameters.raw_secret_lens()
 
     if use_gf_p:
         gf_prime   = primes.get_pow2prime(lens.master_key * 8)

@@ -18,13 +18,6 @@ def read(*sub_paths):
     with open(project_path(*sub_paths), mode="rb") as fobj:
         return fobj.read().decode("utf-8")
 
-try:
-    import lib3to6
-    cmdclass = {'build_py': lib3to6.build_py}
-except ImportError:
-    cmdclass = {}
-
-
 install_requires = [
     line.strip()
     for line in read("requirements", "pypi.txt").splitlines()
@@ -33,6 +26,12 @@ install_requires = [
 
 
 long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
+
+try:
+    import lib3to6
+    distclass = lib3to6.Distribution
+except ImportError:
+    distclass = setuptools.dist.Distribution
 
 
 setuptools.setup(
@@ -50,11 +49,11 @@ setuptools.setup(
     package_dir={"": "src"},
     zip_safe=False,
     include_package_data=True,
-    python_requires=">=3.6",
+    python_requires=">=3.10",
     install_requires=install_requires,
-    setup_requires=['lib3to6>=202108.1048'],
+    setup_requires=['lib3to6>=202110.1050b0'],
     lib3to6_default_mode='enabled',
-    cmdclass=cmdclass,
+    distclass=distclass,
     entry_points="""
         [console_scripts]
         sbk=sbk.cli:cli

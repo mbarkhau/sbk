@@ -49,7 +49,7 @@ import functools as ft
 import itertools as it
 import subprocess as sp
 
-from typing import NewType, Callable, Sequence, NamedTuple, Optional, Any
+from typing import NewType, TypeAlias, Callable, Sequence, NamedTuple, Optional, Any
 from collections.abc import Generator, Iterator
 
 import sbk.common_types as ct
@@ -70,33 +70,32 @@ logging.basicConfig(level=logging.DEBUG, format=_logfmt, datefmt="%Y-%m-%dT%H:%M
 # dep: common.boilerplate
 """Types used across multiple modules."""
 
-from typing import NewType, Sequence, Callable, Optional, NamedTuple
+from typing import NewType, TypeAlias, Sequence, Callable, Optional, NamedTuple
 # dep: types
 ```
 
 ```python
 # def: types
-RawSalt = NewType('RawSalt', bytes)
+RawSalt: TypeAlias = bytes
 
 # ParamConfig data + RawSalt
-Salt = NewType('Salt', bytes)
-
-BrainKey  = NewType('BrainKey' , bytes)
-MasterKey = NewType('MasterKey', bytes)
+Salt     : TypeAlias = bytes
+BrainKey : TypeAlias = bytes
+MasterKey: TypeAlias = bytes
 
 class RawShare(NamedTuple):
     x_coord: int
     data   : bytes  # only the encoded GFPoint.y values
 
 # ParamConfig data + RawShare.data
-Share  = NewType('Share', bytes)
-Shares = Sequence[Share]
+Share: TypeAlias  = bytes
+Shares: TypeAlias = Sequence[Share]
 
-SeedData = NewType('SeedData', bytes)
+SeedData: TypeAlias = bytes
 
-ElectrumSeed = NewType('ElectrumSeed', str)
+ElectrumSeed: TypeAlias = str
 
-LangCode = NewType('LangCode', str)
+LangCode: TypeAlias = str
 
 # include: kdf_types
 ```
@@ -121,13 +120,13 @@ based progress bar rendering, as we for the same kdf calculation code.
 
 ```python
 # def: kdf_types
-ProgressIncrement     = NewType('ProgressIncrement', float)
-ProgressCallback      = Callable[[ProgressIncrement], None]
-MaybeProgressCallback = Optional[ProgressCallback]
+ProgressIncrement    : TypeAlias = float
+ProgressCallback     : TypeAlias = Callable[[ProgressIncrement], None]
+MaybeProgressCallback: TypeAlias = Optional[ProgressCallback]
 
-Parallelism = NewType('Parallelism', int)
-MebiBytes   = NewType('MebiBytes', int)
-Iterations  = NewType('Iterations', int)
-Seconds     = NewType('Seconds', float)
+Parallelism : TypeAlias = int
+MebiBytes   : TypeAlias = int
+Iterations  : TypeAlias = int
+Seconds     : TypeAlias = float
 ```
 

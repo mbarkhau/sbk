@@ -63,8 +63,8 @@ class SelectCommandPanel(gpb.Panel):
             self._layout.addWidget(button)
             return button
 
-        add_button("Open &Electrum", 'open', enabled=False)
-        add_button("&Show Keys"    , 'show', enabled=False)
+        add_button("Open &Wallet", 'open', enabled=False)
+        add_button("&Show Keys"  , 'show', enabled=False)
         # add_button("&Derive GPG Keypair", 'derive_gpg', enabled=False)
 
         self._layout.addStretch(1)
@@ -102,10 +102,11 @@ class SelectCommandPanel(gpb.Panel):
             p = self.parent()
 
             if button_name in ('generate', 'load', 'recover'):
-                gpb.shared_panel_state['salt'    ] = None
-                gpb.shared_panel_state['brainkey'] = None
-                gpb.shared_panel_state['params'  ] = None
-                gpb.shared_panel_state['shares'  ] = []
+                state = gpb.get_state()
+                state['salt'    ] = None
+                state['brainkey'] = None
+                state['shares'  ] = []
+                # state['params'  ] = None
 
             if button_name == 'generate':
                 p.get_or_init_panel(SeedGenerationPanel).switch()
@@ -121,7 +122,8 @@ class SelectCommandPanel(gpb.Panel):
                 p.get_or_init_panel(ShowKeysPanel).switch()
             elif button_name == 'debug':
                 params = parameters.bytes2params(b"\x11\x00\x00")
-                gpb.shared_panel_state['params'] = params
+                state  = gpb.get_state()
+                state['params'] = params
                 p.get_or_init_panel(OpenWalletPanel).switch()
             else:
                 raise NotImplementedError()
@@ -137,7 +139,7 @@ class OptionsPanel(gpb.NavigablePanel):
 
         super().__init__(index)
 
-        self.next_button.setVisible(False)
+        self.next_button.setText("&Save")
 
         form = qtw.QFormLayout()
 
@@ -145,50 +147,44 @@ class OptionsPanel(gpb.NavigablePanel):
 
         self.offline = qtw.QCheckBox()
         self.offline.setTristate(False)
-        self.offline.setCheckState(qtc.Qt.Checked if state['offline'] else qtc.Qt.Unchecked)
         form.addRow("&Offline", self.offline)
 
-        self.paranoid = qtw.QCheckBox()
-        self.paranoid.setTristate(False)
-        self.paranoid.setCheckState(qtc.Qt.Checked if state['paranoid'] else qtc.Qt.Unchecked)
-        form.addRow("&Paranoid", self.paranoid)
+        # NOTE (mb 2021-09-24): Reserve wallet name function to cli
+        #   for now. It might be added to the gui later if we can
+        #   communicae the usage caveats to the user.
+        #
+        # self.wallet_name = qtw.QLineEdit()
+        # if state['wallet_name'] == ui_common.DEFAULT_WALLET_NAME:
+        #     self.wallet_name.setPlaceholderText(ui_common.DEFAULT_WALLET_NAME)
+        # else:
+        #     self.wallet_name.setText(state['wallet_name'])
+        # form.addRow("&Wallet Name", self.wallet_name)
 
-        self.wallet_name = qtw.QLineEdit()
-        if state['wallet_name'] == 'empty':
-            self.wallet_name.setPlaceholderText("empty")
-        else:
-            self.wallet_name.setText(state['wallet_name'])
-        form.addRow("&Wallet Name", self.wallet_name)
+        self.sss_t = qtw.QSpinBox()
+        self.sss_t.setRange(2, 5)
+        form.addRow("&Threshold", self.sss_t)
 
-        self.threshold = qtw.QSpinBox()
-        self.threshold.setRange(2, 5)
-        self.threshold.setValue(state['threshold'])
-        form.addRow("&Threshold", self.threshold)
-
-        self.num_shares = qtw.QSpinBox()
-        self.num_shares.setRange(3, 63)
-        self.num_shares.setValue(state['num_shares'])
-        form.addRow("&Shares", self.num_shares)
+        self.sss_n = qtw.QSpinBox()
+        self.sss_n.setRange(3, 63)
+        form.addRow("Shares", self.sss_n)
 
         def constrain_threshold():
-            threshold = min(self.num_shares.value(), parameters.MAX_THRESHOLD)
-            self.threshold.setMaximum(threshold)
+            threshold = min(self.sss_n.value(), parameters.MAX_THRESHOLD)
+            self.sss_t.setMaximum(threshold)
 
         def constrain_num_shares():
-            self.num_shares.setMinimum(self.threshold.value())
+            self.sss_n.setMinimum(self.sss_t.value())
 
-        self.num_shares.valueChanged.connect(constrain_threshold)
-        self.threshold.valueChanged.connect(constrain_num_shares)
+        self.sss_n.valueChanged.connect(constrain_threshold)
+        self.sss_t.valueChanged.connect(constrain_num_shares)
 
         self.target_memory = qtw.QSpinBox()
         self.target_memory.setRange(10, state['max_memory'])
-        self.target_memory.setValue(state['target_memory'])
         self.target_memory.setSingleStep(10)
         form.addRow("&Memory Usage [MB]", self.target_memory)
 
         self.target_duration = qtw.QSpinBox()
         self.target_duration.setRange(1, 600)
-        self.target_duration.setValue(state['target_duration'])
         form.addRow("&Duration [Seconds]", self.target_duration)
 
         self._layout = qtw.QVBoxLayout()
@@ -198,15 +194,33 @@ class OptionsPanel(gpb.NavigablePanel):
         self._layout.addLayout(self.nav_layout)
         self.setLayout(self._layout)
 
-    def destroy_panel(self) -> None:
-        state = gpb.shared_panel_state
+    def switch(self) -> None:
+        super().switch()
+        state = gpb.get_state()
+        self.offline.setCheckState(qtc.Qt.Checked if state['offline'] else qtc.Qt.Unchecked)
+        self.sss_t.setValue(state['params'].sss_t)
+        self.sss_n.setValue(state['params'].sss_n)
+        self.target_memory.setValue(state['target_memory'])
+        self.target_duration.setValue(state['target_duration'])
 
-        target_memory = self.target_memory.value()
+    def nav_handler(self, eventtype: str) -> typ.Callable:
+        super_handler = super().nav_handler(eventtype)
 
-        state['threshold'      ] = self.threshold.value()
-        state['num_shares'     ] = self.num_shares.value()
-        state['target_memory'  ] = target_memory
-        state['target_duration'] = self.target_duration.value()
+        def handler() -> None:
+            if eventtype == 'next':
+                state = gpb.shared_panel_state
+                state['offline'] = self.offline.checkState() == qtc.Qt.Checked
+
+                state['sss_t'] = self.sss_t.value()
+                state['sss_n'] = self.sss_n.value()
+
+                target_memory = self.target_memory.value()
+
+                state['target_memory'  ] = target_memory
+                state['target_duration'] = self.target_duration.value()
+            return super_handler()
+
+        return handler
 
 
 class SeedGenerationPanel(gpb.Panel):
@@ -251,18 +265,11 @@ class SeedGenerationPanel(gpb.Panel):
 
         state = gpb.get_state()
 
-        threshold       = state['threshold']
-        num_shares      = state['num_shares']
-        target_memory   = state['target_memory']
-        target_duration = state['target_duration']
-        paranoid        = state['paranoid']
-
         self.task1 = gt.ParametersWorker(
-            threshold,
-            num_shares,
-            target_memory,
-            target_duration,
-            paranoid,
+            state['target_memory'],
+            state['target_duration'],
+            state['params'].sss_t,
+            state['params'].sss_n,
         )
         self.task1.progress.connect(progressbar_updater(self.progressbar1))
         self.task1.finished.connect(self.on_param_config_done)
@@ -274,7 +281,8 @@ class SeedGenerationPanel(gpb.Panel):
     def on_param_config_done(self, params: parameters.Parameters) -> None:
         self.trace("on_param_config_done")
 
-        gpb.shared_panel_state['params'] = params
+        state = gpb.get_state()
+        state['params'] = params
 
         self.task2 = gt.SeedGenerationTask(params)
         self.task2.progress.connect(progressbar_updater(self.progressbar2))
@@ -482,7 +490,7 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
 
     def secret_len(self) -> int:
         params = gpb.get_params()
-        lens   = parameters.raw_secret_lens(params.paranoid)
+        lens   = parameters.raw_secret_lens()
         if gpb.shared_panel_state['panel_index'] == 0:
             return lens.salt
         else:
@@ -511,11 +519,13 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
         recovered_datas = self.recover_datas()
         if all(recovered_datas):
             recovered_data = b"".join(recovered_datas)  # type: ignore
-            params         = gpb.get_params()
-            lens           = parameters.raw_secret_lens(params.paranoid)
+
+            params = gpb.get_params()
+            lens   = parameters.raw_secret_lens()
             if state['panel_index'] == 0:
                 assert len(recovered_data) == lens.salt
-                state['params'] = parameters.bytes2params(recovered_data)
+                header = recovered_data[: parameters.SALT_HEADER_LEN]
+                state['params'] = parameters.bytes2params(header)
                 state['salt'  ] = ct.Salt(recovered_data)
             else:
                 assert len(recovered_data) == lens.brainkey
@@ -526,7 +536,6 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
             brainkey = state['brainkey']
 
             if params and salt and brainkey:
-                params   = params._replace(sss_n=state['num_shares'])
                 raw_salt = ct.RawSalt(bytes(salt)[parameters.SALT_HEADER_LEN :])
                 shares   = shamir.split(params, raw_salt, brainkey)
                 state['shares'] = shares
@@ -558,7 +567,8 @@ def load_wallet() -> None:
     # Delay closing the panel while the wallet loads
     # this is a bit less jarring.
     electrum_daemon_path = pl.Path("~").expanduser() / ".electrum" / "daemon"
-    wait_start           = time.time()
+
+    wait_start = time.time()
     while True:
         if os.path.exists(electrum_daemon_path):
             time.sleep(0.5)
@@ -661,7 +671,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
 
     def secret_len(self) -> int:
         params = gpb.get_params()
-        lens   = parameters.raw_secret_lens(params.paranoid)
+        lens   = parameters.raw_secret_lens()
         return lens.share
 
     def destroy_panel(self) -> None:

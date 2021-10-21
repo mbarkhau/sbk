@@ -352,7 +352,7 @@ lint_pylint:
 	@mkdir -p "reports/";
 
 	@printf "pylint ..\n";
-	@$(DEV_ENV)/bin/pylint-ignore --rcfile=setup.cfg \
+	@$(DEV_ENV)/bin/pylint-ignore --errors-only --rcfile=setup.cfg \
 		src/ test/
 	@printf "\e[1F\e[9C ok\n"
 

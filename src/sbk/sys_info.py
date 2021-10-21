@@ -27,6 +27,7 @@ from typing import NewType
 from typing import Callable
 from typing import Optional
 from typing import Sequence
+from typing import TypeAlias
 from typing import NamedTuple
 from collections.abc import Iterator
 from collections.abc import Generator
@@ -38,11 +39,11 @@ from . import kdf
 from . import parameters
 
 DEFAULT_XDG_CONFIG_HOME = str(pl.Path("~").expanduser() / ".config")
-XDG_CONFIG_HOME         = pl.Path(os.environ.get("XDG_CONFIG_HOME", DEFAULT_XDG_CONFIG_HOME))
+XDG_CONFIG_HOME = pl.Path(os.environ.get("XDG_CONFIG_HOME", DEFAULT_XDG_CONFIG_HOME))
 
-SBK_APP_DIR_STR     = os.getenv("SBK_APP_DIR")
-SBK_APP_DIR         = pl.Path(SBK_APP_DIR_STR) if SBK_APP_DIR_STR else XDG_CONFIG_HOME / "sbk"
-DEFAULT_LANG        = ct.LangCode("en")
+SBK_APP_DIR_STR = os.getenv("SBK_APP_DIR")
+SBK_APP_DIR = pl.Path(SBK_APP_DIR_STR) if SBK_APP_DIR_STR else XDG_CONFIG_HOME / "sbk"
+DEFAULT_LANG = ct.LangCode("en")
 SUPPORTED_LANGUAGES = {"en"}
 
 # PR welcome
@@ -51,7 +52,7 @@ SUPPORTED_LANGUAGES = {"en"}
 # non-phonetic systems may be a design issue for wordlists
 # SUPPORTED_LANGUAGES |= {'ar', 'ko', 'cn', 'jp'}
 
-KB_LAYOUT_TO_LANG = {'us': "en"}
+KB_LAYOUT_TO_LANG = {"us": "en"}
 # Fallback value for systems on which total memory cannot be detected
 FALLBACK_MEM_MB = int(os.getenv("SBK_FALLBACK_MEM_MB", "1024"))
 
@@ -62,8 +63,8 @@ SYSINFO_CACHE_FPATH = SBK_APP_DIR / "sys_info_measurements.json"
 def detect_lang() -> ct.LangCode:
     try:
         localectl_output = sp.check_output("localectl").decode("utf-8")
-        lang             = _parse_lang(localectl_output)
-        kb_lang          = _parse_keyboard_lang(localectl_output)
+        lang = _parse_lang(localectl_output)
+        kb_lang = _parse_keyboard_lang(localectl_output)
         return lang or kb_lang or DEFAULT_LANG
     except Exception:
         logger.warning(f"Fallback to default lang: en", exc_info=True)
@@ -91,8 +92,8 @@ def _parse_keyboard_lang(localectl_output: str) -> Optional[ct.LangCode]:
 
 
 class SystemInfo(NamedTuple):
-    total_mb : ct.MebiBytes
-    free_mb  : ct.MebiBytes
+    total_mb: ct.MebiBytes
+    free_mb: ct.MebiBytes
     usable_mb: ct.MebiBytes
 
 
@@ -146,9 +147,10 @@ def _is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
 
 def load_sys_info(use_cache: bool = True) -> SystemInfo:
     if use_cache:
-        if not _SYS_INFO_KW and SYSINFO_CACHE_FPATH.exists():
+        cache_path = SYSINFO_CACHE_FPATH
+        if not _SYS_INFO_KW and cache_path.exists():
             try:
-                with SYSINFO_CACHE_FPATH.open(mode="rb") as fobj:
+                with cache_path.open(mode="rb") as fobj:
                     _SYS_INFO_KW.update(json.load(fobj))
             except Exception as ex:
                 logger.warning(f"Error reading cache file {cache_path}: {ex}")
@@ -165,9 +167,9 @@ _SYS_INFO_KW: dict[str, int] = {}
 def _dump_sys_info(sys_info: SystemInfo) -> None:
     _SYS_INFO_KW.update(
         {
-            'total_mb' : sys_info.total_mb,
-            'free_mb'  : sys_info.free_mb,
-            'usable_mb': sys_info.usable_mb,
+            "total_mb": sys_info.total_mb,
+            "free_mb": sys_info.free_mb,
+            "usable_mb": sys_info.usable_mb,
         }
     )
 
@@ -187,12 +189,12 @@ def _dump_sys_info(sys_info: SystemInfo) -> None:
 
 def main() -> int:
     # xinclude: common.debug_logging
-    print("lang: "                 , detect_lang())
-    print("Mem Info:"              , memory_info())
+    print("lang: ", detect_lang())
+    print("Mem Info:", memory_info())
     print("Memory Info (uncached):", _init_sys_info())
     print("Memory Info (cached)  :", load_sys_info())
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

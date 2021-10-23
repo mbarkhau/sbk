@@ -69,9 +69,9 @@ if __name__ == '__main__':
 ! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
 ! /home/mbarkhau/miniconda3/envs/sbk_py310/bin/python: No module named sbk.kdf_new
 lang:  en
-Mem Info: (15886, 10863)
-Memory Info (uncached): SystemInfo(total_mb=15886, free_mb=10863, usable_mb=100)
-Memory Info (cached)  : SystemInfo(total_mb=15886, free_mb=10863, usable_mb=100)
+Mem Info: (15886, 11843)
+Memory Info (uncached): SystemInfo(total_mb=15886, free_mb=11843, usable_mb=100)
+Memory Info (cached)  : SystemInfo(total_mb=15886, free_mb=11843, usable_mb=100)
 # exit: 0
 ```
 

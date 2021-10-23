@@ -53,7 +53,7 @@ $ make lint mypy devtest
 
 [repo_ref]: https://gitlab.com/mbarkhau/sbk
 
-[liberachat_img]: https://img.shields.io/static/v1.svg?label=Libera&message=Chat&color=f5d&labelColor=55f
+[liberachat_img]: https://img.shields.io/static/v1.svg?label=Libera.Chat&labelColor=55d&message=%23SBK&color=f3b
 [liberachat_ref]: https://web.libera.chat/#sbk
 
 [github_build_img]: https://github.com/mbarkhau/sbk/workflows/CI/badge.svg

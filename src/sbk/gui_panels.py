@@ -63,20 +63,20 @@ class SelectCommandPanel(gpb.Panel):
             self._layout.addWidget(button)
             return button
 
-        add_button("Open &Wallet", 'open', enabled=False)
-        add_button("&Show Keys"  , 'show', enabled=False)
-        # add_button("&Derive GPG Keypair", 'derive_gpg', enabled=False)
+        add_button("&Create Wallet"      , 'generate').setDefault(True)
+        add_button("&Open Wallet"        , 'open')
+        add_button("&Recover from Shares", 'recover')
 
         self._layout.addStretch(1)
 
-        add_button("&Generate Keys"         , 'generate').setDefault(True)
-        add_button("&Load Salt and Brainkey", 'load')
-        add_button("&Recover from Shares"   , 'recover')
-        self._layout.addStretch(1)
-
-        # add_button("&Debug", 'debug', enabled=False)
+        # add_button("&Load Salt and Brainkey", 'load')
+        # add_button("Derive &GPG Keypair", 'derive_gpg', enabled=False)
+        # add_button("Derive Password", 'derive_password', enabled=False)
         # self._layout.addStretch(1)
-        add_button("&Options", 'options')
+
+        add_button("&Settings", 'settings')
+        # self._layout.addStretch(1)
+        # add_button("&Debug", 'debug', enabled=False)
 
         self._layout.addStretch(8)
         self.setLayout(self._layout)
@@ -87,53 +87,56 @@ class SelectCommandPanel(gpb.Panel):
         self.trace("switch " + str((state['salt'], state['brainkey'], state['params'])))
 
         state['panel_index'] = 0
-        if state['salt'] and state['brainkey'] and state['params']:
-            self.buttons['open'].setEnabled(True)
-            self.buttons['show'].setEnabled(True)
-        else:
-            self.buttons['open'].setEnabled(False)
-            self.buttons['show'].setEnabled(False)
+
+        # if state['salt'] and state['brainkey'] and state['params']:
+        #     self.buttons['derive_gpg'].setEnabled(True)
+        #     self.buttons['derive_pw'].setEnabled(True)
+        #     self.buttons['show'].setEnabled(True)
+        # else:
+        #     self.buttons['derive_gpg'].setEnabled(False)
+        #     self.buttons['derive_pw'].setEnabled(False)
+        #     self.buttons['show'].setEnabled(False)
 
         super().switch()
 
-    def init_button_handler(self, button_name: str) -> typ.Callable:
+    def init_button_handler(self, button_id: str) -> typ.Callable:
         def handler(*args, **kwargs):
-            self.trace(f"handle button {button_name=} {args} {kwargs}")
+            self.trace(f"handle button {button_id=} {args} {kwargs}")
             p = self.parent()
 
-            if button_name in ('generate', 'load', 'recover'):
+            if button_id in ('generate', 'open', 'load', 'recover'):
                 state = gpb.get_state()
                 state['salt'    ] = None
                 state['brainkey'] = None
                 state['shares'  ] = []
                 # state['params'  ] = None
 
-            if button_name == 'generate':
-                p.get_or_init_panel(SeedGenerationPanel).switch()
-            elif button_name == 'load':
-                p.get_or_init_panel(LoadKeysPanel).switch()
-            elif button_name == 'recover':
+            if button_id == 'open':
+                p.get_or_init_panel(OpenWalletPanel).switch()
+            elif button_id == 'recover':
                 p.get_or_init_panel(RecoverKeysPanel).switch()
-            elif button_name == 'options':
-                p.get_or_init_panel(OptionsPanel).switch()
-            elif button_name == 'open':
-                p.get_or_init_panel(OpenWalletPanel).switch()
-            elif button_name == 'show':
-                p.get_or_init_panel(ShowKeysPanel).switch()
-            elif button_name == 'debug':
-                params = parameters.bytes2params(b"\x11\x00\x00")
-                state  = gpb.get_state()
-                state['params'] = params
-                p.get_or_init_panel(OpenWalletPanel).switch()
+            elif button_id == 'generate':
+                p.get_or_init_panel(SeedGenerationPanel).switch()
+            # elif button_id == 'load':
+            #     p.get_or_init_panel(XLoadKeysPanel).switch()
+            # elif button_id == 'show':
+            #     p.get_or_init_panel(ShowKeysPanel).switch()
+            elif button_id == 'settings':
+                p.get_or_init_panel(SettingsPanel).switch()
+            # elif button_id == 'debug':
+            #     params = parameters.bytes2params(b"\x11\x00\x00")
+            #     state  = gpb.get_state()
+            #     state['params'] = params
+            #     p.get_or_init_panel(ShowKeysPanel).switch()
             else:
                 raise NotImplementedError()
 
         return handler
 
 
-class OptionsPanel(gpb.NavigablePanel):
+class SettingsPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
-        self.title            = "SBK - Options"
+        self.title            = "SBK - Settings"
         self.back_panel_clazz = SelectCommandPanel
         self.next_panel_clazz = SelectCommandPanel
 
@@ -161,7 +164,7 @@ class OptionsPanel(gpb.NavigablePanel):
         # form.addRow("&Wallet Name", self.wallet_name)
 
         self.sss_t = qtw.QSpinBox()
-        self.sss_t.setRange(2, 5)
+        self.sss_t.setRange(parameters.MIN_THRESHOLD, parameters.MAX_THRESHOLD)
         form.addRow("&Threshold", self.sss_t)
 
         self.sss_n = qtw.QSpinBox()
@@ -211,8 +214,10 @@ class OptionsPanel(gpb.NavigablePanel):
                 state = gpb.shared_panel_state
                 state['offline'] = self.offline.checkState() == qtc.Qt.Checked
 
-                state['sss_t'] = self.sss_t.value()
-                state['sss_n'] = self.sss_n.value()
+                params = state['params']
+                params = params._replace(sss_t=self.sss_t.value())
+                params = params._replace(sss_n=self.sss_n.value())
+                state['params'] = params
 
                 target_memory = self.target_memory.value()
 
@@ -333,6 +338,20 @@ class SecurityWarningPanel(gpb.NavigablePanel):
         self.setLayout(self._layout)
 
 
+def get_label_text() -> str:
+    secret_type, share_idx = gpb.get_secret_type()
+    if secret_type == 'share':
+        share_no = share_idx + 1
+        sss_n    = len(gpb.shared_panel_state['shares'])
+        return f"Share {share_no}/{sss_n}"
+    elif secret_type == 'salt':
+        return "Salt"
+    elif secret_type == 'brainkey':
+        return "Brainkey"
+    else:
+        raise ValueError(f"Invalid secret_type={secret_type}")
+
+
 class ShowKeysPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
         self.title = "SBK - View Keys"
@@ -354,12 +373,15 @@ class ShowKeysPanel(gpb.NavigablePanel):
         self._layout.addLayout(self.nav_layout)
         self.setLayout(self._layout)
 
+    def get_current_secret(self) -> gpb.CurrentSecret:
+        return gpb.get_current_secret()
+
     def switch(self) -> None:
         self.trace(f"switch {type(self).__name__} {gpb.shared_panel_state['panel_index']}")
 
-        self.header.setText(gpb.get_label_text())
+        self.header.setText(get_label_text())
 
-        secret = gpb.get_current_secret()
+        secret = self.get_current_secret()
 
         intcodes  = ui_common.bytes2intcodes(secret.secret_data)
         mnemonics = ui_common.intcodes2mnemonics(intcodes)
@@ -449,7 +471,7 @@ class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
         super().__init__(index)
 
     def label_text(self) -> str:
-        return gpb.get_label_text()
+        return "Verify " + get_label_text()
 
     def secret_len(self) -> int:
         current_secret = gpb.get_current_secret()
@@ -468,7 +490,7 @@ class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
             state['panel_index'] = max(state['panel_index'] + 1, 0)
             return CreateKeysShowPanel
         else:
-            return SelectCommandPanel
+            return LoadWalletPanel
 
     def is_final_panel(self) -> bool:
         state       = gpb.shared_panel_state
@@ -477,7 +499,7 @@ class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
         return state['panel_index'] + 1 >= num_secrets
 
 
-class LoadKeysPanel(gpb.EnterSecretPanel):
+class OpenWalletPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
         self.title = "SBK - Load Wallet"
         super().__init__(index)
@@ -503,16 +525,16 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
             return SelectCommandPanel
         else:
             state['panel_index'] = max(state['panel_index'] - 1, 0)
-            return LoadKeysPanel
+            return OpenWalletPanel
 
     @property
     def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
         state = gpb.shared_panel_state
         if state['panel_index'] == 0:
             state['panel_index'] = max(state['panel_index'] + 1, 0)
-            return LoadKeysPanel
+            return OpenWalletPanel
         else:
-            return SelectCommandPanel
+            return LoadWalletPanel
 
     def destroy_panel(self) -> None:
         state           = gpb.shared_panel_state
@@ -543,44 +565,7 @@ class LoadKeysPanel(gpb.EnterSecretPanel):
         super().destroy_panel()
 
 
-def progressbar_updater(progressbar: qtw.QProgressBar) -> typ.Callable[[gt.ProgressStatus], None]:
-    def update_progressbar(status: gt.ProgressStatus) -> None:
-        try:
-            progressbar.setRange(0, status.length)
-            progressbar.setValue(round(status.current))
-        except RuntimeError:
-            pass
-
-    return update_progressbar
-
-
-def load_wallet() -> None:
-    def launch():
-        seed_data = gpb.shared_panel_state['seed_data']
-        offline   = gpb.shared_panel_state['offline']
-        assert seed_data is not None
-        ui_common.load_wallet(seed_data, offline)
-
-    launcher_thread = threading.Thread(target=launch, daemon=False)
-    launcher_thread.start()
-
-    # Delay closing the panel while the wallet loads
-    # this is a bit less jarring.
-    electrum_daemon_path = pl.Path("~").expanduser() / ".electrum" / "daemon"
-
-    wait_start = time.time()
-    while True:
-        if os.path.exists(electrum_daemon_path):
-            time.sleep(0.5)
-            return
-
-        if time.time() - wait_start > 5:
-            return
-
-        time.sleep(0.1)
-
-
-class OpenWalletPanel(gpb.Panel):
+class LoadWalletPanel(gpb.Panel):
 
     task: typ.Optional[gt.SeedDerivationTask]
 
@@ -650,6 +635,43 @@ class OpenWalletPanel(gpb.Panel):
         return True
 
 
+def progressbar_updater(progressbar: qtw.QProgressBar) -> typ.Callable[[gt.ProgressStatus], None]:
+    def update_progressbar(status: gt.ProgressStatus) -> None:
+        try:
+            progressbar.setRange(0, status.length)
+            progressbar.setValue(round(status.current))
+        except RuntimeError:
+            pass
+
+    return update_progressbar
+
+
+def load_wallet() -> None:
+    def launch():
+        seed_data = gpb.shared_panel_state['seed_data']
+        offline   = gpb.shared_panel_state['offline']
+        assert seed_data is not None
+        ui_common.load_wallet(seed_data, offline)
+
+    launcher_thread = threading.Thread(target=launch, daemon=False)
+    launcher_thread.start()
+
+    # Delay closing the panel while the wallet loads
+    # this is a bit less jarring.
+    electrum_daemon_path = pl.Path("~").expanduser() / ".electrum" / "daemon"
+
+    wait_start = time.time()
+    while True:
+        if os.path.exists(electrum_daemon_path):
+            time.sleep(0.5)
+            return
+
+        if time.time() - wait_start > 5:
+            return
+
+        time.sleep(0.1)
+
+
 class RecoverKeysPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
         self.title = "SBK - Recover Wallet"
@@ -707,18 +729,61 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
                 state['panel_index'] = panel_index + 1
                 return RecoverKeysPanel
             else:
-                raw_salt, brainkey = shamir.join(params, state['shares'])
+                state['panel_index'] = 0
+
+                raw_salt, brainkey = shamir.join(state['shares'])
                 # recompute shares, because user only enters as many as needed
                 shares = shamir.split(params, raw_salt, brainkey)
 
                 params_data = parameters.params2bytes(params)
-                salt        = ct.Salt(params_data + raw_salt)
+                salt        = ct.Salt(params_data[:2] + raw_salt)
                 state['salt'    ] = salt
                 state['brainkey'] = brainkey
                 state['shares'  ] = shares
-                return SelectCommandPanel
+                return RecoverKeysShowPanel
 
     def is_final_panel(self) -> bool:
         params = gpb.get_params()
         assert params is not None
         return len(gpb.shared_panel_state['shares']) >= params.sss_n
+
+
+class RecoverKeysShowPanel(ShowKeysPanel):
+    def __init__(self, index: int):
+        self.title = "SBK - Recover Keys"
+        super().__init__(index)
+
+    def label_text(self) -> str:
+        panel_index = gpb.shared_panel_state['panel_index']
+        if panel_index == 0:
+            return "Recovered Salt"
+        elif panel_index == 1:
+            return "Recovered Brainkey"
+        else:
+            raise ValueError(f"Invalid state {panel_index:=}")
+
+    def get_current_secret(self) -> gpb.CurrentSecret:
+        panel_index = gpb.shared_panel_state['panel_index']
+        if panel_index == 0:
+            return gpb.get_secret('salt')
+        elif panel_index == 1:
+            return gpb.get_secret('brainkey')
+        else:
+            raise RuntimeError(f"Invalid {panel_index:=}")
+
+    @property
+    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+        self.trace(f"back show {gpb.shared_panel_state['panel_index']}")
+        if gpb.shared_panel_state['panel_index'] == 0:
+            return RecoverKeysPanel
+        else:
+            gpb.shared_panel_state['panel_index'] -= 1
+            return RecoverKeysShowPanel
+
+    @property
+    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+        if gpb.shared_panel_state['panel_index'] == 0:
+            gpb.shared_panel_state['panel_index'] += 1
+            return RecoverKeysShowPanel
+        else:
+            return LoadWalletPanel

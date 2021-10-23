@@ -26,6 +26,7 @@ import mypy_extensions as mypyext
 from . import kdf
 from . import ecc_rs
 from . import shamir
+from . import gf_poly
 from . import enc_util
 from . import mnemonic
 from . import sys_info
@@ -652,6 +653,8 @@ def create_secrets(params: parameters.Parameters) -> tuple[ct.Salt, ct.BrainKey,
 
     if os.getenv('SBK_DEBUG_RANDOM') is None:
         _check_entropy(raw_salt, brainkey)
+    elif os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
+        gf_poly.reset_debug_random()
 
     shares = list(shamir.split(params, raw_salt, brainkey))
 

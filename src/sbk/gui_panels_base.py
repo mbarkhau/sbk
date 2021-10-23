@@ -106,57 +106,55 @@ class CurrentSecret(typ.NamedTuple):
     secret_data: bytes
 
 
-def get_secret_type() -> str:
+def get_secret_type() -> tuple[str, int]:
     sss_n       = len(shared_panel_state['shares'])
     panel_index = shared_panel_state['panel_index']
     if panel_index < sss_n:
-        return 'share'
+        share_index = shared_panel_state['panel_index']
+        return ('share', share_index)
     elif panel_index == sss_n:
-        return 'salt'
+        return ('salt', -1)
     else:
-        return 'brainkey'
+        return ('brainkey', -1)
 
 
-def get_label_text() -> str:
-    secret_type = get_secret_type()
+def get_secret(secret_type: str, share_index: int = -1) -> CurrentSecret:
+    lens = parameters.raw_secret_lens()
+
     if secret_type == 'share':
-        share_no = shared_panel_state['panel_index'] + 1
-        sss_n       = len(shared_panel_state['shares'])
-        return f"Verify Share {share_no}/{sss_n}"
-    elif secret_type == 'salt':
-        return "Verify Salt"
-    elif secret_type == 'brainkey':
-        return "Verify Brainkey"
-    else:
-        raise ValueError(f"Invalid secret_type={secret_type}")
-
-
-def get_current_secret() -> CurrentSecret:
-    params = shared_panel_state['params']
-    lens   = parameters.raw_secret_lens()
-
-    shares = shared_panel_state['shares']
-    sss_n  = len(shares)
-
-    panel_index = shared_panel_state['panel_index']
-    if panel_index < sss_n:
         return CurrentSecret(
             secret_len=lens.raw_share + parameters.SHARE_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SHARE,
-            secret_data=shares[panel_index],
+            secret_data=shared_panel_state['shares'][share_index],
         )
-    elif panel_index == sss_n:
+    elif secret_type == 'salt':
         return CurrentSecret(
             secret_len=lens.raw_salt + parameters.SALT_HEADER_LEN,
             secret_type=cli_io.SECRET_TYPE_SALT,
             secret_data=shared_panel_state['salt'],  # type: ignore
         )
-    else:
+    elif secret_type == 'brainkey':
         return CurrentSecret(
             secret_len=lens.brainkey,
             secret_type=cli_io.SECRET_TYPE_BRAINKEY,
             secret_data=shared_panel_state['brainkey'],  # type: ignore
         )
+    else:
+        raise ValueError(f"Invalid secret_type={secret_type}")
+
+
+def get_current_secret() -> CurrentSecret:
+    sss_n = len(shared_panel_state['shares'])
+
+    panel_index = shared_panel_state['panel_index']
+    if panel_index < sss_n:
+        return get_secret('share', share_index=panel_index)
+    elif panel_index == sss_n:
+        return get_secret('salt')
+    elif panel_index == sss_n + 1:
+        return get_secret('brainkey')
+    else:
+        raise ValueError(f"Invalid panel_index={panel_index}")
 
 
 def get_padded_secret() -> bytes:
@@ -867,8 +865,6 @@ class EnterSecretPanel(NavigablePanel):
 
         recovered_datas = self.recover_datas()
         if all(recovered_datas[:2]):
-            print(state)
-            print()
             if all(recovered_datas[:3]):
                 _recover_data = b"".join(recovered_datas[:3])
             else:
@@ -906,4 +902,6 @@ class EnterSecretPanel(NavigablePanel):
 
         for i, word in enumerate(maybe_mnemonics[: state['num_inputs']]):
             if word:
-                self.mnemonic_widgets[i].setText(word)
+                widget = self.mnemonic_widgets[i]
+                widget.setText(word)
+                widget.completer().setCompletionPrefix(word)

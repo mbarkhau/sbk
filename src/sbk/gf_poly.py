@@ -45,6 +45,11 @@ _debug_rand = DebugRandom()
 _rand       = random.SystemRandom()
 
 
+def reset_debug_random():
+    if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
+        _debug_rand._state = 4294967291
+
+
 def randrange(stop: int) -> int:
     if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
         warnings.warn(DEBUG_WARN_MSG)

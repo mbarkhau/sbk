@@ -40,11 +40,11 @@ import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
-from . import __version__
 from . import shamir
 from . import gui_tasks as gt
 from . import ui_common
 from . import parameters
+from . import __version__
 from . import common_types as ct
 from . import package_data
 from . import gui_panels_base as gpb
@@ -116,7 +116,7 @@ class SelectCommandPanel(gpb.Panel):
         # add_button("Derive Password", 'derive_password', enabled=False)
         # self._layout.addStretch(1)
 
-        add_button("&Settings"  , 'settings')
+        add_button("&Settings"     , 'settings')
         add_button("&Documentation", 'documentation')
         # self._layout.addStretch(1)
         # add_button("&Debug", 'debug', enabled=False)
@@ -383,16 +383,16 @@ class DocumentationPanel(gpb.NavigablePanel):
 
         layout_left = qtw.QVBoxLayout()
         layout_left.addWidget(qtw.QLabel("<center>A4</center>"))
-        layout_left.addWidget(self.new_pdf_button("Share Template", "share_a4.pdf"))
-        layout_left.addWidget(self.new_pdf_button("Dogtag Templates", "grid_a4.pdf"))
-        layout_left.addWidget(self.new_pdf_button("SBK Manual", "sbk_a4.pdf"))
+        layout_left.addWidget(self.new_pdf_button("Share Template"      , "share_a4.pdf"      ))
+        layout_left.addWidget(self.new_pdf_button("Dogtag Templates"    , "grid_a4.pdf"       ))
+        layout_left.addWidget(self.new_pdf_button("SBK Manual"          , "sbk_a4.pdf"        ))
         layout_left.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_a4.pdf"))
 
         layout_right = qtw.QVBoxLayout()
         layout_right.addWidget(qtw.QLabel("<center>US Letter</center>"))
-        layout_right.addWidget(self.new_pdf_button("Share Template", "share_letter.pdf"))
-        layout_right.addWidget(self.new_pdf_button("Dogtag Templates", "grid_letter.pdf"))
-        layout_right.addWidget(self.new_pdf_button("SBK Manual", "sbk_letter.pdf"))
+        layout_right.addWidget(self.new_pdf_button("Share Template"      , "share_letter.pdf"      ))
+        layout_right.addWidget(self.new_pdf_button("Dogtag Templates"    , "grid_letter.pdf"       ))
+        layout_right.addWidget(self.new_pdf_button("SBK Manual"          , "sbk_letter.pdf"        ))
         layout_right.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_letter.pdf"))
 
         docs_layout = qtw.QHBoxLayout()

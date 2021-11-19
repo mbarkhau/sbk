@@ -119,7 +119,7 @@ if __name__ == '__main__':
 ```bash
 # run: python3 scripts/argon2cffi_test.py -t 2 -m 16 -p 4 -l 24 -y 1
 Encoded:	$argon2i$v=19$m=65536,t=2,p=4$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG
-0.045 seconds   0.034 seconds   0.034 seconds   0.036 seconds   0.034 seconds
+0.205 seconds   0.252 seconds   0.181 seconds   0.314 seconds   0.602 seconds
 # exit: 0
 ```
 
@@ -146,7 +146,7 @@ Encoded:	$argon2id$v=19$m=131072,t=3,p=1$c29tZXNhbHQ$mKtFTe5acsEv/wtRdOwuOxxX2Qm
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 17 -p 1 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=131072,t=3,p=1$c29tZXNhbHQ$mKtFTe5acsEv/wtRdOwuOxxX2QmF8+hu
-0.283 seconds   0.287 seconds   0.277 seconds   0.276 seconds   0.279 seconds
+0.764 seconds   1.425 seconds   1.774 seconds   0.688 seconds   0.905 seconds
 # exit: 0
 ```
 
@@ -167,7 +167,7 @@ Encoded:	$argon2id$v=19$m=131072,t=3,p=8$c29tZXNhbHQ$0g5ayzO4asYRYEIckSx6gB21upJ
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 17 -p 8 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=131072,t=3,p=8$c29tZXNhbHQ$0g5ayzO4asYRYEIckSx6gB21upJ11Gih
-0.082 seconds   0.072 seconds   0.071 seconds   0.071 seconds   0.074 seconds
+0.488 seconds   0.704 seconds   0.903 seconds   0.699 seconds   1.030 seconds
 # exit: 0
 ```
 
@@ -186,7 +186,7 @@ in the salt.
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 20 -p 8 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=1048576,t=3,p=8$c29tZXNhbHQ$rPe+PH3lwPgbjSq65GVqTLxDkmSCtetd
-0.567 seconds   0.564 seconds   0.564 seconds   0.564 seconds   0.565 seconds
+3.629 seconds
 # exit: 0
 ```
 
@@ -194,7 +194,7 @@ Encoded:	$argon2id$v=19$m=1048576,t=3,p=8$c29tZXNhbHQ$rPe+PH3lwPgbjSq65GVqTLxDkm
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 20 -p 128 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=1048576,t=3,p=128$c29tZXNhbHQ$b9PXPtsjVyrVQQLCK5+ZpQ0qzoAVX763
-0.679 seconds   0.659 seconds   0.661 seconds   0.666 seconds   0.650 seconds
+2.322 seconds   1.678 seconds   1.561 seconds   1.076 seconds   0.985 seconds
 # exit: 0
 ```
 
@@ -202,7 +202,7 @@ Encoded:	$argon2id$v=19$m=1048576,t=3,p=128$c29tZXNhbHQ$b9PXPtsjVyrVQQLCK5+ZpQ0q
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 20 -p 1024 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=1048576,t=3,p=1024$c29tZXNhbHQ$w1lfUA36hCMZgJ37QjHmkm5FTx4giq7G
-0.853 seconds   0.869 seconds   0.858 seconds   0.857 seconds   0.854 seconds
+4.396 seconds
 # exit: 0
 ```
 
@@ -255,7 +255,7 @@ of $`5 \times 1.125^{63} \approx 134k`$ iterations.
 # run: python3 scripts/argon2cffi_test.py -t 1000 -m 16.6 -p 8 -l 24 -y 2
 # timeout: 100
 Encoded:	$argon2id$v=19$m=99334,t=1000,p=8$c29tZXNhbHQ$yXZeXaquxQcv/bLPKtfccNQyBZN/64rM
-14.326 seconds
+22.545 seconds
 # exit: 0
 ```
 

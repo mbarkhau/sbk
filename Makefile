@@ -79,19 +79,20 @@ assets: \
 		landingpage/favico_48.png \
 		landingpage/favico_96.png \
 		pdf_templates/share_a4.pdf \
+		pdf_templates/share_letter.pdf \
 		pdf_templates/auth_a4.pdf \
-		pdf_templates/share_usletter.pdf \
-		pdf_templates/auth_usletter.pdf
+		pdf_templates/auth_letter.pdf \
+		pdf_templates/grid_a4.pdf \
+		pdf_templates/grid_letter.pdf
 	cp src/sbk/assets/*.png landingpage/
+	cp pdf_templates/*.pdf landingpage/
 
 
 ## Create release iso
 ## createds venv with validated dependencies
 .PHONY: release
 release:
-	rm -rf $(ENV_PREFIX)/sbk_release_py37/;
-	$(CONDA_BIN) create --yes --name sbk_release_py37 python=3.7;
-	$(ENV_PREFIX)/sbk_release_py37/bin/python -m pip install -r requirements/pypi.txt;
+	bash scripts/gen_iso.sh
 
 
 ## Add sign-off to requirements/pypi.txt

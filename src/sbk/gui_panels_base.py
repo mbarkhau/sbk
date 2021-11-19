@@ -887,20 +887,20 @@ class EnterSecretPanel(NavigablePanel):
         maybe_share_header    = recovered_datas[:3]
         maybe_brainkey_header = recovered_datas[:2]
 
-        _recover_data: Optional[List[bytes]]
+        _header_data: Optional[List[bytes]] = None
 
         if all(maybe_share_header):
-            _recover_data = typ.cast(List[bytes], maybe_share_header)
+            _header_data = typ.cast(List[bytes], maybe_share_header)
         elif all(maybe_brainkey_header):
-            _recover_data = typ.cast(List[bytes], maybe_brainkey_header)
-        elif all(recovered_datas):
-            _recover_data = None
+            _header_data = typ.cast(List[bytes], maybe_brainkey_header)
+        else:
+            _header_data = None
 
         params: Optional[parameters.Parameters] = None
 
-        if _recover_data:
+        if _header_data:
             try:
-                params = parameters.bytes2params(b"".join(_recover_data))
+                params = parameters.bytes2params(b"".join(_header_data))
 
                 idx = shared_panel_state['panel_index']
                 self.widget_states[idx]['header_text'] = self.label_text()

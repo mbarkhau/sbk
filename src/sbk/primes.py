@@ -16,6 +16,7 @@ import math
 import time
 import base64
 import struct
+import typing as typ
 import hashlib
 import logging
 import pathlib as pl
@@ -24,119 +25,133 @@ import itertools as it
 import threading
 import subprocess as sp
 from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
 from typing import NewType
+from typing import TypeVar
 from typing import Callable
+from typing import Iterable
+from typing import Iterator
 from typing import Optional
+from typing import Protocol
 from typing import Sequence
-from typing import TypeAlias
+from typing import Generator
 from typing import NamedTuple
-from collections.abc import Iterator
-from collections.abc import Generator
+
+# from collections.abc import Generator, Iterator, Counter
+
+# from typing import TypeAlias
+TypeAlias = Any
 
 import sbk.common_types as ct
 
 logger = logging.getLogger(__name__)
-Pow2PrimeN: TypeAlias = int
-Pow2PrimeK: TypeAlias = int
-Pow2PrimeItem: TypeAlias = tuple[Pow2PrimeN, Pow2PrimeK]
+Pow2PrimeN    : TypeAlias = int
+Pow2PrimeK    : TypeAlias = int
+Pow2PrimeItem : TypeAlias = Tuple[Pow2PrimeN, Pow2PrimeK]
 Pow2PrimeItems: TypeAlias = Iterator[Pow2PrimeItem]
 
-POW2_PRIME_PARAMS: dict[Pow2PrimeN, Pow2PrimeK] = {
-    8: 5,
-    16: 15,
-    24: 3,
-    32: 5,
-    40: 87,
-    48: 59,
-    56: 5,
-    64: 59,
-    72: 93,
-    80: 65,
-    88: 299,
-    96: 17,
-    104: 17,
-    112: 75,
-    120: 119,
-    128: 159,
-    136: 113,
-    144: 83,
-    152: 17,
-    160: 47,
-    168: 257,
-    176: 233,
-    184: 33,
-    192: 237,
-    200: 75,
-    208: 299,
-    216: 377,
-    224: 63,
-    232: 567,
-    240: 467,
-    248: 237,
-    256: 189,
-    264: 275,
-    272: 237,
-    280: 47,
-    288: 167,
-    296: 285,
-    304: 75,
-    312: 203,
-    320: 197,
-    328: 155,
-    336: 3,
-    344: 119,
-    352: 657,
-    360: 719,
-    368: 315,
-    376: 57,
-    384: 317,
-    392: 107,
-    400: 593,
+POW2_PRIME_PARAMS: Dict[Pow2PrimeN, Pow2PrimeK] = {
+      8:    5,
+     16:   15,
+     24:    3,
+     32:    5,
+     40:   87,
+     48:   59,
+     56:    5,
+     64:   59,
+     72:   93,
+     80:   65,
+     88:  299,
+     96:   17,
+    104:   17,
+    112:   75,
+    120:  119,
+    128:  159,
+    136:  113,
+    144:   83,
+    152:   17,
+    160:   47,
+    168:  257,
+    176:  233,
+    184:   33,
+    192:  237,
+    200:   75,
+    208:  299,
+    216:  377,
+    224:   63,
+    232:  567,
+    240:  467,
+    248:  237,
+    256:  189,
+    264:  275,
+    272:  237,
+    280:   47,
+    288:  167,
+    296:  285,
+    304:   75,
+    312:  203,
+    320:  197,
+    328:  155,
+    336:    3,
+    344:  119,
+    352:  657,
+    360:  719,
+    368:  315,
+    376:   57,
+    384:  317,
+    392:  107,
+    400:  593,
     408: 1005,
-    416: 435,
-    424: 389,
-    432: 299,
-    440: 33,
-    448: 203,
-    456: 627,
-    464: 437,
-    472: 209,
-    480: 47,
-    488: 17,
-    496: 257,
-    504: 503,
-    512: 569,
-    520: 383,
-    528: 65,
-    536: 149,
-    544: 759,
-    552: 503,
-    560: 717,
-    568: 645,
-    576: 789,
-    584: 195,
-    592: 935,
-    600: 95,
-    608: 527,
-    616: 459,
-    624: 117,
-    632: 813,
-    640: 305,
-    648: 195,
-    656: 143,
-    664: 17,
-    672: 399,
-    680: 939,
-    688: 759,
-    696: 447,
-    704: 245,
-    712: 489,
-    720: 395,
-    728: 77,
-    736: 509,
-    744: 173,
-    752: 875,
-    760: 173,
+    416:  435,
+    424:  389,
+    432:  299,
+    440:   33,
+    448:  203,
+    456:  627,
+    464:  437,
+    472:  209,
+    480:   47,
+    488:   17,
+    496:  257,
+    504:  503,
+    512:  569,
+    520:  383,
+    528:   65,
+    536:  149,
+    544:  759,
+    552:  503,
+    560:  717,
+    568:  645,
+    576:  789,
+    584:  195,
+    592:  935,
+    600:   95,
+    608:  527,
+    616:  459,
+    624:  117,
+    632:  813,
+    640:  305,
+    648:  195,
+    656:  143,
+    664:   17,
+    672:  399,
+    680:  939,
+    688:  759,
+    696:  447,
+    704:  245,
+    712:  489,
+    720:  395,
+    728:   77,
+    736:  509,
+    744:  173,
+    752:  875,
+    760:  173,
     768: 825
     # 768:  825, 776: 1539, 784:  759, 792: 1299,  800:  105,
     # 808:   17, 816:  959, 824:  209, 832:  143,  840:  213,
@@ -149,38 +164,38 @@ POW2_PRIME_PARAMS: dict[Pow2PrimeN, Pow2PrimeK] = {
 
 def pow2prime(n: Pow2PrimeN, k: Pow2PrimeK) -> int:
     if n % 8 == 0:
-        return 2 ** n - k
+        return int(2 ** n - k)
     else:
         raise ValueError(f"Invalid n={n} (n % 8 != 0)")
 
 
-POW2_PRIMES = [pow2prime(n, k) for n, k in sorted(POW2_PRIME_PARAMS.items())]
+POW2_PRIMES  = [pow2prime(n, k) for n, k in sorted(POW2_PRIME_PARAMS.items())]
 SMALL_PRIMES = [
-    2,
-    3,
-    5,
-    7,
-    11,
-    13,
-    17,
-    19,
-    23,
-    29,
-    31,
-    37,
-    41,
-    43,
-    47,
-    53,
-    59,
-    61,
-    67,
-    71,
-    73,
-    79,
-    83,
-    89,
-    97,
+      2,
+      3,
+      5,
+      7,
+     11,
+     13,
+     17,
+     19,
+     23,
+     29,
+     31,
+     37,
+     41,
+     43,
+     47,
+     53,
+     59,
+     61,
+     67,
+     71,
+     73,
+     79,
+     83,
+     89,
+     97,
     101,
     103,
     107,
@@ -266,7 +281,7 @@ from random import randrange
 _mr_js_bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022}
 
 
-def _miller_test_bases(n: int, k: int, accuracy: int = 100) -> Iterator[int]:
+def _miller_test_bases(n: int, k: int, accuracy: int = 100) -> Set[int]:
     if n < 2 ** 64:
         return _mr_js_bases
     else:
@@ -305,20 +320,16 @@ def is_probable_prime(n: int, k: int = 100) -> bool:
 
 
 # Hardcoded digest of POW2_PRIME_PARAMS
-_V1_PRIMES_VERIFICATION_SHA256 = (
-    "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
-)
+_V1_PRIMES_VERIFICATION_SHA256 = "8303b97ae70cb01e36abd0a625d7e8a427569cc656e861d90a94c3bc697923e7"
 
 
 def validate_pow2_prime_params() -> None:
     sha256 = hashlib.sha256()
     for n, k in sorted(POW2_PRIME_PARAMS.items()):
-        sha256.update(str((n, k)).encode("ascii"))
+        sha256.update(str((n, k)).encode('ascii'))
 
-    digest = sha256.hexdigest()
-    has_changed = (
-        len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
-    )
+    digest      = sha256.hexdigest()
+    has_changed = len(POW2_PRIME_PARAMS) != 96 or digest != _V1_PRIMES_VERIFICATION_SHA256
 
     if has_changed:
         logger.error(f"Current  hash: {digest}")
@@ -348,21 +359,24 @@ def a014234_verify(a014234_content: str) -> Pow2PrimeItems:
 
 
 def read_oeis_org_a014234() -> str:
-    import time
-    import pathlib as pl
     import tempfile
     import urllib.request
 
     cache_path = pl.Path(tempfile.gettempdir()) / "oeis_org_b014234.txt"
-    min_mtime = time.time() - 10000
+    min_mtime  = time.time() - 10000
     if cache_path.exists() and cache_path.stat().st_mtime > min_mtime:
         with cache_path.open(mode="r") as fobj:
             content = fobj.read()
     else:
         a014234_url = "https://oeis.org/A014234/b014234.txt"
         with urllib.request.urlopen(a014234_url) as fobj:
-            data = fobj.read()
-        content = data.decode("utf-8")
+            data = typ.cast(Union[bytes, str], fobj.read())
+
+        if isinstance(data, bytes):
+            content = data.decode("utf-8")
+        else:
+            content = data
+
         with cache_path.open(mode="w") as fobj:
             fobj.write(content)
     return content
@@ -376,11 +390,9 @@ def download_oeis_org_a014234() -> None:
     """
     content = read_oeis_org_a014234()
     for exp, k in a014234_verify(content):
-        verification_url = (
-            f"https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
-        )
+        verification_url = f"https://www.wolframalpha.com/input/?i=factors(2%5E{exp}+-+{k})"
         print(f"2**{exp:<4} - {k:<4}", verification_url)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     download_oeis_org_a014234()

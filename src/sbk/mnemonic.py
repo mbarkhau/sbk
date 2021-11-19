@@ -8,7 +8,24 @@
 
 import os
 import struct
-import typing as typ
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import pylev
 
@@ -41,7 +58,7 @@ def byte2word(data: bytes) -> str:
     return WORDLIST[word_idx]
 
 
-def _bytes2phrase_words(data: bytes) -> typ.Iterable[str]:
+def _bytes2phrase_words(data: bytes) -> Iterator[str]:
     for i in range(len(data)):
         word_idx = enc_util.char_at(data, i)
         word     = WORDLIST[word_idx]
@@ -79,7 +96,7 @@ def fuzzy_match(word: str) -> str:
         raise ValueError(errmsg, word)
 
 
-def phrase2words(phrase: PhraseStr) -> typ.Iterable[str]:
+def phrase2words(phrase: PhraseStr) -> Iterator[str]:
     for word in phrase.split():
         word = word.strip().lower()
         if word not in WORDSET:
@@ -87,7 +104,7 @@ def phrase2words(phrase: PhraseStr) -> typ.Iterable[str]:
         yield word
 
 
-def _phrase2bytes(phrase: PhraseStr) -> typ.Iterable[bytes]:
+def _phrase2bytes(phrase: PhraseStr) -> Iterator[bytes]:
     for word in phrase2words(phrase):
         yield struct.pack("B", wordlist_index(word))
 

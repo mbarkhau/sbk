@@ -12,15 +12,35 @@
 """GUI Panels for SBK."""
 import os
 import time
-import typing as typ
 import logging
 import pathlib as pl
+import tempfile
 import threading
+import subprocess as sp
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 
+from . import __version__
 from . import shamir
 from . import gui_tasks as gt
 from . import ui_common
@@ -32,9 +52,30 @@ from . import gui_panels_base as gpb
 logger = logging.getLogger("sbk.gui_panels")
 
 
+GUIDE_TEXT = f"""
+<html><head/><body style="white-space:pre-wrap;">
+<p style="font-family:monospace;font-size:12px;line-height:92%;">
+{ui_common.USER_GUIDE_QR_CODE}<p>
+<center>{ui_common.USER_GUIDE_TEXT.strip()}</center>
+</body></html>
+"""
+
+
+WARNING_TEXT = f"""
+<html><head/><body style="white-space:pre-wrap;">
+<p>
+{ui_common.SECURITY_WARNING_TEXT.strip()}
+</p>
+<p style="font-family:monospace;line-height:100%;">
+{ui_common.SECURITY_WARNING_QR_CODE}
+<p>
+</body></html>
+"""
+
+
 class SelectCommandPanel(gpb.Panel):
 
-    buttons: typ.Dict[str, qtw.QPushButton]
+    buttons: Dict[str, qtw.QPushButton]
 
     def __init__(self, index: int):
         self.title = "SBK"
@@ -45,6 +86,7 @@ class SelectCommandPanel(gpb.Panel):
 
         pixmap = qtg.QPixmap()
         pixmap.loadFromData(package_data.read_binary("nostroke_logo_64.png"))
+
         icon_label = qtw.QLabel(self)
         icon_label.setPixmap(pixmap.scaledToWidth(64))
         icon_label.setAlignment(qtc.Qt.AlignCenter)
@@ -74,11 +116,24 @@ class SelectCommandPanel(gpb.Panel):
         # add_button("Derive Password", 'derive_password', enabled=False)
         # self._layout.addStretch(1)
 
-        add_button("&Settings", 'settings')
+        add_button("&Settings"  , 'settings')
+        add_button("&User Guide", 'userguide')
         # self._layout.addStretch(1)
         # add_button("&Debug", 'debug', enabled=False)
 
-        self._layout.addStretch(8)
+        self._layout.addStretch(2)
+
+        version_text = f"""
+        <p style="font-family:monospace;font-size:10px;">
+            version: {__version__}
+        </a>
+        """
+        version_label = qtw.QLabel(version_text)
+        version_label.setAlignment(qtc.Qt.AlignRight)
+
+        self._layout.addStretch(1)
+        self._layout.addWidget(version_label)
+
         self.setLayout(self._layout)
 
     def switch(self) -> None:
@@ -99,7 +154,7 @@ class SelectCommandPanel(gpb.Panel):
 
         super().switch()
 
-    def init_button_handler(self, button_id: str) -> typ.Callable:
+    def init_button_handler(self, button_id: str) -> Callable:
         def handler(*args, **kwargs):
             self.trace(f"handle button {button_id=} {args} {kwargs}")
             p = self.parent()
@@ -123,6 +178,8 @@ class SelectCommandPanel(gpb.Panel):
             #     p.get_or_init_panel(ShowKeysPanel).switch()
             elif button_id == 'settings':
                 p.get_or_init_panel(SettingsPanel).switch()
+            elif button_id == 'userguide':
+                p.get_or_init_panel(UserGuidePanel).switch()
             # elif button_id == 'debug':
             #     params = parameters.bytes2params(b"\x11\x00\x00")
             #     state  = gpb.get_state()
@@ -199,14 +256,17 @@ class SettingsPanel(gpb.NavigablePanel):
 
     def switch(self) -> None:
         super().switch()
-        state = gpb.get_state()
+        state  = gpb.get_state()
+        params = state['params']
+        assert params is not None
+
         self.offline.setCheckState(qtc.Qt.Checked if state['offline'] else qtc.Qt.Unchecked)
-        self.sss_t.setValue(state['params'].sss_t)
-        self.sss_n.setValue(state['params'].sss_n)
+        self.sss_t.setValue(params.sss_t)
+        self.sss_n.setValue(params.sss_n)
         self.target_memory.setValue(state['target_memory'])
         self.target_duration.setValue(state['target_duration'])
 
-    def nav_handler(self, eventtype: str) -> typ.Callable:
+    def nav_handler(self, eventtype: str) -> Callable:
         super_handler = super().nav_handler(eventtype)
 
         def handler() -> None:
@@ -215,6 +275,8 @@ class SettingsPanel(gpb.NavigablePanel):
                 state['offline'] = self.offline.checkState() == qtc.Qt.Checked
 
                 params = state['params']
+                assert params is not None
+
                 params = params._replace(sss_t=self.sss_t.value())
                 params = params._replace(sss_n=self.sss_n.value())
                 state['params'] = params
@@ -223,18 +285,18 @@ class SettingsPanel(gpb.NavigablePanel):
 
                 state['target_memory'  ] = target_memory
                 state['target_duration'] = self.target_duration.value()
-            return super_handler()
+            super_handler()
 
         return handler
 
 
 class SeedGenerationPanel(gpb.Panel):
 
-    task1: typ.Optional[gt.ParametersWorker]
-    task2: typ.Optional[gt.SeedGenerationTask]
+    task1: Optional[gt.ParametersWorker]
+    task2: Optional[gt.SeedGenerationTask]
 
     def __init__(self, index: int):
-        self.title = "SBK - Key Derivation ..."
+        self.title = "Key Derivation ..."
 
         super().__init__(index)
 
@@ -268,13 +330,15 @@ class SeedGenerationPanel(gpb.Panel):
         self.progressbar1.setValue(0)
         self.progressbar2.setValue(0)
 
-        state = gpb.get_state()
+        state  = gpb.get_state()
+        params = state['params']
+        assert params is not None
 
         self.task1 = gt.ParametersWorker(
             state['target_memory'],
             state['target_duration'],
-            state['params'].sss_t,
-            state['params'].sss_n,
+            params.sss_t,
+            params.sss_n,
         )
         self.task1.progress.connect(progressbar_updater(self.progressbar1))
         self.task1.finished.connect(self.on_param_config_done)
@@ -304,21 +368,66 @@ class SeedGenerationPanel(gpb.Panel):
             self.parent().close()
 
 
-WARNING_TEXT = f"""
-<html><head/><body style="white-space:pre-wrap;">
-<p>
-{ui_common.SECURITY_WARNING_TEXT.strip()}
-</p>
-<p style="font-family:monospace;line-height:100%;">
-{ui_common.SECURITY_WARNING_QR_CODE}
-<p>
-</body></html>
-"""
+class UserGuidePanel(gpb.NavigablePanel):
+    def __init__(self, index: int):
+        self.title            = "User Guide"
+        self.back_panel_clazz = SelectCommandPanel
+        self.next_panel_clazz = SelectCommandPanel
+
+        super().__init__(index)
+
+        label      = qtw.QLabel(GUIDE_TEXT.strip())
+        label_wrap = qtw.QHBoxLayout()
+        label_wrap.addStretch(1)
+        label_wrap.addWidget(label)
+        label_wrap.addStretch(1)
+
+        self._layout = qtw.QVBoxLayout()
+        self._layout.addLayout(label_wrap)
+        self._layout.addStretch(2)
+
+        self._layout.addWidget(self.new_pdf_button("Share A4", "share_a4.pdf"))
+        self._layout.addWidget(self.new_pdf_button("Guide A4", "sbk_a4.pdf"))
+        self._layout.addWidget(self.new_pdf_button("Guide A4 Booklet", "sbk_booklet_letter.pdf"))
+        # self._layout.addWidget(self.new_pdf_button("Grid A4", "grid_a4.pdf"))
+
+        self._layout.addWidget(self.new_pdf_button("Share US Letter", "share_letter.pdf"))
+        self._layout.addWidget(self.new_pdf_button("Guide US Letter", "sbk_letter.pdf"))
+        self._layout.addWidget(self.new_pdf_button("Guide US Letter Booklet", "sbk_booklet_letter.pdf"))
+        # self._layout.addWidget(self.new_pdf_button("Grid US Letter", "grid_letter.pdf"))
+
+        self._layout.addStretch(1)
+
+        self._layout.addLayout(self.nav_layout)
+        self.setLayout(self._layout)
+
+        # self.next_button.setEnabled(False)
+        self.next_button.setVisible(False)
+
+    def new_pdf_button(self, label: str, pdf_name: str) -> qtw.QPushButton:
+        button = qtw.QPushButton(label)
+        button.clicked.connect(self.init_button_handler(pdf_name))
+        return button
+
+    def init_button_handler(self, pdf_name: str) -> Callable:
+        def launch():
+            pdf_data = package_data.read_binary(pdf_name)
+            tmp_path = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+            tmp_path.write(pdf_data)
+            tmp_path.close()
+            sp.run(["evince", tmp_path.name])
+            os.unlink(tmp_path.name)
+
+        def handler(*args, **kwargs):
+            launcher_thread = threading.Thread(target=launch, daemon=False)
+            launcher_thread.start()
+
+        return handler
 
 
 class SecurityWarningPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
-        self.title            = "SBK - Create New Wallet"
+        self.title            = "Create New Wallet"
         self.back_panel_clazz = SelectCommandPanel
         self.next_panel_clazz = CreateKeysShowPanel
 
@@ -354,14 +463,14 @@ def get_label_text() -> str:
 
 class ShowKeysPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
-        self.title = "SBK - View Keys"
+        self.title = "View Keys"
 
         super().__init__(index)
 
         self.header = gpb.header_widget()
         self.text   = qtw.QLabel()
 
-        self.grid_widgets: typ.List[qtw.QWidget] = []
+        self.grid_widgets: List[qtw.QWidget] = []
         self.grid_layout = qtw.QGridLayout()
 
         self._layout = qtw.QVBoxLayout()
@@ -413,7 +522,7 @@ class ShowKeysPanel(gpb.NavigablePanel):
         super().switch()
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         state = gpb.shared_panel_state
         self.trace(f"back show {state['panel_index']}")
         if state['panel_index'] == 0:
@@ -423,7 +532,7 @@ class ShowKeysPanel(gpb.NavigablePanel):
             return ShowKeysPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         state = gpb.shared_panel_state
         self.trace(f"next show {state['panel_index']}")
         if state['panel_index'] + 1 < len(state['shares']) + 2:
@@ -444,11 +553,11 @@ class ShowKeysPanel(gpb.NavigablePanel):
 
 class CreateKeysShowPanel(ShowKeysPanel):
     def __init__(self, index: int):
-        self.title = "SBK - Create New Wallet"
+        self.title = "Create New Wallet"
         super().__init__(index)
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         self.trace(f"back show {gpb.shared_panel_state['panel_index']}")
         if gpb.shared_panel_state['panel_index'] == 0:
             return SecurityWarningPanel
@@ -457,17 +566,17 @@ class CreateKeysShowPanel(ShowKeysPanel):
             return CreateKeysVerifyPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         self.trace(f"next show {gpb.shared_panel_state['panel_index']}")
         return CreateKeysVerifyPanel
 
 
-MaybeBytes = typ.Union[bytes, None]
+MaybeBytes = Union[bytes, None]
 
 
 class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
-        self.title = "SBK - Create New Wallet"
+        self.title = "Create New Wallet"
         super().__init__(index)
 
     def label_text(self) -> str:
@@ -478,11 +587,11 @@ class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
         return len(current_secret.secret_data)
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         return CreateKeysShowPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         state       = gpb.shared_panel_state
         num_shares  = len(state['shares'])
         num_secrets = num_shares + 2
@@ -501,7 +610,7 @@ class CreateKeysVerifyPanel(gpb.EnterSecretPanel):
 
 class OpenWalletPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
-        self.title = "SBK - Load Wallet"
+        self.title = "Load Wallet"
         super().__init__(index)
 
     def label_text(self) -> str:
@@ -511,15 +620,14 @@ class OpenWalletPanel(gpb.EnterSecretPanel):
             return "Enter Brainkey"
 
     def secret_len(self) -> int:
-        params = gpb.get_params()
-        lens   = parameters.raw_secret_lens()
+        lens = parameters.raw_secret_lens()
         if gpb.shared_panel_state['panel_index'] == 0:
             return lens.salt
         else:
             return lens.brainkey
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         state = gpb.shared_panel_state
         if state['panel_index'] == 0:
             return SelectCommandPanel
@@ -528,7 +636,7 @@ class OpenWalletPanel(gpb.EnterSecretPanel):
             return OpenWalletPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         state = gpb.shared_panel_state
         if state['panel_index'] == 0:
             state['panel_index'] = max(state['panel_index'] + 1, 0)
@@ -567,10 +675,10 @@ class OpenWalletPanel(gpb.EnterSecretPanel):
 
 class LoadWalletPanel(gpb.Panel):
 
-    task: typ.Optional[gt.SeedDerivationTask]
+    task: Optional[gt.SeedDerivationTask]
 
     def __init__(self, index: int):
-        self.title = "SBK - Key Derivation ..."
+        self.title = "Key Derivation ..."
 
         super().__init__(index)
 
@@ -635,7 +743,7 @@ class LoadWalletPanel(gpb.Panel):
         return True
 
 
-def progressbar_updater(progressbar: qtw.QProgressBar) -> typ.Callable[[gt.ProgressStatus], None]:
+def progressbar_updater(progressbar: qtw.QProgressBar) -> Callable[[gt.ProgressStatus], None]:
     def update_progressbar(status: gt.ProgressStatus) -> None:
         try:
             progressbar.setRange(0, status.length)
@@ -674,7 +782,7 @@ def load_wallet() -> None:
 
 class RecoverKeysPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
-        self.title = "SBK - Recover Wallet"
+        self.title = "Recover Wallet"
         super().__init__(index)
 
     def label_text(self) -> str:
@@ -692,8 +800,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
             return f"Enter Share {share_no}/{num_shares}"
 
     def secret_len(self) -> int:
-        params = gpb.get_params()
-        lens   = parameters.raw_secret_lens()
+        lens = parameters.raw_secret_lens()
         return lens.share
 
     def destroy_panel(self) -> None:
@@ -706,7 +813,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
         super().destroy_panel()
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         panel_index = gpb.shared_panel_state['panel_index']
         if panel_index == 0:
             return SelectCommandPanel
@@ -715,7 +822,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
             return RecoverKeysPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         state       = gpb.shared_panel_state
         panel_index = state['panel_index']
         if panel_index == 0:
@@ -750,7 +857,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
 
 class RecoverKeysShowPanel(ShowKeysPanel):
     def __init__(self, index: int):
-        self.title = "SBK - Recover Keys"
+        self.title = "Recover Keys"
         super().__init__(index)
 
     def label_text(self) -> str:
@@ -772,7 +879,7 @@ class RecoverKeysShowPanel(ShowKeysPanel):
             raise RuntimeError(f"Invalid {panel_index:=}")
 
     @property
-    def back_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def back_panel_clazz(self) -> Type[gpb.Panel]:
         self.trace(f"back show {gpb.shared_panel_state['panel_index']}")
         if gpb.shared_panel_state['panel_index'] == 0:
             return RecoverKeysPanel
@@ -781,7 +888,7 @@ class RecoverKeysShowPanel(ShowKeysPanel):
             return RecoverKeysShowPanel
 
     @property
-    def next_panel_clazz(self) -> typ.Type[gpb.Panel]:
+    def next_panel_clazz(self) -> Type[gpb.Panel]:
         if gpb.shared_panel_state['panel_index'] == 0:
             gpb.shared_panel_state['panel_index'] += 1
             return RecoverKeysShowPanel

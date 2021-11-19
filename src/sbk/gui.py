@@ -18,6 +18,24 @@ import sys
 import typing as typ
 import logging
 import platform
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import PyQt5.Qt as qt
 import PyQt5.QtGui as qtg
@@ -44,9 +62,9 @@ class MainGUI(qtw.QStackedWidget):
         self.addWidget(select_command_panel)
         select_command_panel.switch()
 
-    def get_or_init_panel(self, clazz: typ.Type[gpb.Panel]) -> gpb.Panel:
+    def get_or_init_panel(self, clazz: Type[gpb.Panel]) -> gpb.Panel:
         _panel      = self.findChild(clazz)
-        maybe_panel = typ.cast(typ.Optional[gpb.Panel], _panel)
+        maybe_panel = typ.cast(Optional[gpb.Panel], _panel)
         if maybe_panel is None:
             logger.info(f"get_or_init_panel init: {clazz.__name__}")
             index = self.count()
@@ -66,13 +84,13 @@ class MainGUI(qtw.QStackedWidget):
             self.close()
 
 
-def _screen_size(app: qtw.QApplication) -> typ.Tuple[int, int]:
+def _screen_size(app: qtw.QApplication) -> Tuple[int, int]:
     screen = app.primaryScreen()
     size   = screen.size()
     return (size.width(), size.height())
 
 
-def gui() -> None:
+def run_gui() -> None:
     # cargo cult qt initialization
     qtw.QApplication.setAttribute(qtc.Qt.AA_EnableHighDpiScaling, True)
     if platform.system() == 'Linux':
@@ -98,7 +116,7 @@ def main() -> None:
     import sbk.cli
 
     sbk.cli._configure_logging(verbosity=2)
-    gui()
+    run_gui()
 
 
 if __name__ == '__main__':

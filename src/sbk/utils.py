@@ -15,6 +15,7 @@ import math
 import time
 import base64
 import struct
+import typing as typ
 import hashlib
 import logging
 import pathlib as pl
@@ -23,14 +24,28 @@ import itertools as it
 import threading
 import subprocess as sp
 from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
 from typing import NewType
+from typing import TypeVar
 from typing import Callable
+from typing import Iterable
+from typing import Iterator
 from typing import Optional
+from typing import Protocol
 from typing import Sequence
-from typing import TypeAlias
+from typing import Generator
 from typing import NamedTuple
-from collections.abc import Iterator
-from collections.abc import Generator
+
+# from collections.abc import Generator, Iterator, Counter
+
+# from typing import TypeAlias
+TypeAlias = Any
 
 import sbk.common_types as ct
 
@@ -92,7 +107,7 @@ def int2bytes(num: int, zfill_bytes: int = 1) -> bytes:
 
 class ProgressSmoother:
 
-    increments: list[float]
+    increments: List[float]
 
     def __init__(self, progress_cb: ct.ProgressCallback) -> None:
         self.increments = [0]

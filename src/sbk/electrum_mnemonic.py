@@ -21,9 +21,26 @@ These are replicated so that SBK can invoke "electrum restore <mnemonic>".
 import os
 import hmac
 import string
-import typing as typ
 import hashlib
 import binascii
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 from . import common_types as ct
 from . import package_data
@@ -43,7 +60,7 @@ assert N == 1626
 #
 # US patent no 5892470 has expired in the meantime.
 
-Mnemonic = typ.List[str]
+Mnemonic = List[str]
 
 
 def old_mn_encode(message: str) -> Mnemonic:
@@ -197,7 +214,7 @@ def bytes2int(data: bytes) -> int:
     return int(binascii.hexlify(data), 16)
 
 
-RandomFn = typ.Callable[[int], bytes]
+RandomFn = Callable[[int], bytes]
 
 
 def gen_raw_seed(num_bits: int, random_fn: RandomFn = os.urandom) -> RawSeed:

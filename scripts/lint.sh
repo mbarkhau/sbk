@@ -1,3 +1,4 @@
+#!/bin/bash
 set -e;
 black --quiet $@;
 isort --quiet $@;

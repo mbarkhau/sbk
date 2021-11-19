@@ -17,6 +17,7 @@
 
 ```bash
 # file: scripts/lint.sh
+#!/bin/bash
 set -e;
 black --quiet $@;
 isort --quiet $@;

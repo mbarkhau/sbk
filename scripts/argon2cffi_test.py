@@ -1,10 +1,12 @@
 import sys
 import time
 import argon2
+from typing import Tuple, List
+
 
 def _measure_argon2(
     t: int, m: float, p: int, l: int = 24, y: int = 2
-) -> tuple[str, float]:
+) -> Tuple[str, float]:
     tzero = time.time()
     hash_encoded = argon2.low_level.hash_secret(
         b"password",
@@ -30,10 +32,11 @@ def measure_argon2(*args, **kwargs) -> None:
         print(f"{duration:.3f} seconds", end="   ")
 
 
-def main(args: list[str]) -> None:
+def main(args: List[str]) -> None:
     _t, t, _m, m, _p, p, _l, l, _y, y = args
     assert [_t, _m, _p, _l, _y] == ['-t', '-m', '-p', '-l', '-y']
     measure_argon2(int(t), float(m), int(p), int(l), int(y))
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])

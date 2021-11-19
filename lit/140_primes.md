@@ -1,15 +1,18 @@
 # Primes where p < 2^n for GF(p)
 
-As mentioned in [[030_user_guide]], the Galois Field we use can either be of
-the form $` GF(p) `$ (where $`p`$ is a prime number) or $` GF(p^n) `$
-(and a reducing polynomial). This chapter concerns the prime numbers
-needed for  $` GF(p) `$ .
+As mentioned in [[030_user_guide]], the Galois
+Field we use can either be of the form $` GF(p) `$
+(where $`p`$ is a prime number) or $` GF(p^n) `$
+(and a reducing polynomial). This chapter concerns
+the prime numbers needed for  $` GF(p) `$ .
 
-While we don't use $` GF(p) `$ in practice, the arithmetic in $` GF(p) `$
-is less complicated, so SBK includes a GF implementation for
-use with a prime number. In other words, this chapter is to help validate
-the GF logic on more simple case, it is not a functional part of the
-implementation of SBK.
+While we don't use $` GF(p) `$ in practice, the
+arithmetic in $` GF(p) `$ is less complicated, so
+SBK includes a GF implementation for use with a
+prime number. In other words, this chapter is to
+help validate the GF logic on more simple case, it
+is not a functional part of the implementation of
+SBK.
 
 
 ## API of `sbk.primes`
@@ -21,23 +24,27 @@ def get_pow2prime(num_bits: int) -> int:
     ...
 ```
 
-`get_pow2prime` returns the largest prime number for which
-$` 2^n - k \le 2^{num\_bits} `$.
+`get_pow2prime` returns the largest prime number
+for which $` 2^n - k \le 2^{num\_bits} `$.
 
-When we create a $` GF(p) `$, we want to pick a prime that is
-appropriate for the amount of data we want to encode. If we want to
-encode a secret which has 128 bits, then we should pick a prime that
-is very close to $`2^{128}`$ . If we picked a larger prime, then the
-points we generate would be larger than needed, which would mean a
-longer mnemonic to write down, without any additional security (i.e.
-for no good reason). If we picked a smaller prime, then security
-would be compromised.
+When we create a $` GF(p) `$, we want to pick a
+prime that is appropriate for the amount of data
+we want to encode. If we want to encode a secret
+which has 128 bits, then we should pick a prime
+that is very close to $` 2^{128} `$ . If we picked a
+larger prime, then the points we generate would be
+larger than needed, which would mean a longer
+mnemonic to write down, without any additional
+security (i.e. for no good reason). If we picked a
+smaller prime, then security would be compromised.
 
-If we don't want to deal with such large primes, we need to chunk the
-secret and encode points separately. This is what we do in practice
-anyway [[user_guide#What is an SBK Share]], where each byte of a share
-represents a point in $` GF(2^8) `$, but again, that is an extra
-complication. The use of larger primes allows us to validate with a
+If we don't want to deal with such large primes,
+we need to chunk the secret and encode points
+separately. This is what we do in practice anyway
+[[user_guide#What is an SBK Share]], where each
+byte of a share represents a point in $` GF(2^8) `$,
+but again, that is an extra complication. The
+use of larger primes allows us to validate with a
 simplified implementation.
 
 ```python
@@ -45,12 +52,14 @@ def is_prime(n: int) -> bool:
     ...
 ```
 
-The main thing to know about `is_prime` is that it does not perform
-and exhaustive test of primality. It will return `True` or `False` if
-the primality of `n` can be determined with certainty, otherwise it
-will `raise NotImplementedError`. This function is only used for
-sanity checks, so it's fine that it only works with the subset of
-primes we're actually interested in.
+The main thing to know about `is_prime` is that it
+does not perform and exhaustive test of primality.
+It will return `True` or `False` if the primality
+of `n` can be determined with certainty, otherwise
+it will `raise NotImplementedError`. This function
+is only used for sanity checks, so it's fine that
+it only works with the subset of primes we're
+actually interested in.
 
 
 ## Implementation of `sbk.primes`
@@ -64,17 +73,13 @@ We generate a python module and a test script.
 # dep: common.imports, constants, impl*
 ```
 
-```bash
-# run: bash scripts/lint.sh src/sbk/primes.py
-# exit: 0
-```
-
 
 ### Constants
 
-We start with a static/hardcoded definition of the primes we care
-about. We only care about exponents $`n`$ which are mutliples of 8
-because we will only be encoding secrets with a length in bytes.
+We start with a static/hardcoded definition of the
+primes we care about. We only care about exponents
+$`n`$ which are mutliples of 8 because we will
+only be encoding secrets with a length in bytes.
 
 ```python
 # def: constants
@@ -118,9 +123,11 @@ POW2_PRIME_PARAMS: Dict[Pow2PrimeN, Pow2PrimeK] = {
 }
 ```
 
-If we *do* ever want to serialize a share that uses $` GF(p) `$, then
-we will somehow have to encode which prime is used. That would be
-done most easilly as an index of `POW2_PRIMES` using only one byte.
+If we *do* ever want to serialize a share that
+uses $` GF(p) `$, then we will somehow have to
+encode which prime is used. That would be done
+most easilly as an index of `POW2_PRIMES` using
+only one byte.
 
 ```python
 # exec
@@ -129,7 +136,8 @@ assert len(POW2_PRIME_PARAMS) < 256
 ```
 
 
-Evaluate of the parameters into the actual `POW2_PRIMES`.
+Evaluate of the parameters into the actual
+`POW2_PRIMES`.
 
 ```python
 # def: pow2primes
@@ -148,10 +156,12 @@ POW2_PRIMES = [
 ```
 
 
-Now we can provide accessor methods to get the appropriate prime for
-a given length of data. In some cases we may not want to store the
-actual prime itself, but rather we can just store the much smaller
-index the prime in `POW2_PRIME_PARAMS`.
+Now we can provide accessor methods to get the
+appropriate prime for a given length of data. In
+some cases we may not want to store the actual
+prime itself, but rather we can just store the
+much smaller index the prime in
+`POW2_PRIME_PARAMS`.
 
 ```python
 # def: impl_get_pow2prime
@@ -177,9 +187,10 @@ def get_pow2prime(num_bits: int) -> int:
 
 ### Basic Validation
 
-Our main concern here is that we define a constant that isn't
-actually a prime (presumably by accident), so let's start with some
-basic sanity checks based on [numbers we know to be prime](https://oeis.org/A132358).
+Our main concern here is that we define a constant
+that isn't actually a prime (presumably by
+accident), so let's start with some basic sanity
+checks based on [numbers we know to be prime](https://oeis.org/A132358).
 
 ```python
 # exec
@@ -199,10 +210,11 @@ missing_primes = set(known_primes) - set(POW2_PRIMES)
 assert not any(missing_primes)
 ```
 
-We use the small primes for the `basic_prime_test` and as bases for
-the Miller-Rabin test. I'm not actually sure that prime bases are any
-better for the MR test than random numbers, it's just a visible
-pattern from the [wikipedia article][href_wiki_mrtest_bases].
+We use the small primes for the `basic_prime_test`
+and as bases for the Miller-Rabin test. I'm not
+actually sure that prime bases are any better for
+the MR test than random numbers, it's just a
+visible pattern from the [wikipedia article][href_wiki_mrtest_bases].
 
 Primes [oeis.org/A000040](https://oeis.org/A000040/list)
 
@@ -226,10 +238,11 @@ PRIMES = sorted(set(SMALL_PRIMES + POW2_PRIMES))
 
 ### Primality Testing
 
-All the primes we actually use are constants and are well known. The
-primality testing code here is for verification and as a safety net
-against accidental changes. We start with the most basic test if `n`
-is a prime.
+All the primes we actually use are constants and
+are well known. The primality testing code here is
+for verification and as a safety net against
+accidental changes. We start with the most basic
+test if `n` is a prime.
 
 ```python
 # def: impl_is_prime
@@ -251,8 +264,9 @@ def is_prime(n: int) -> bool:
         return True
 ```
 
-The MR test is only used for validation of the constants declared in
-`POW2_PRIMES`. The implementation was developed using the following
+The MR test is only used for validation of the
+constants declared in `POW2_PRIMES`. The
+implementation was developed using the following
 resources:
 
 - [en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Miller_test](https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Miller_test)
@@ -348,9 +362,22 @@ for i, (n, k) in enumerate(POW2_PRIME_PARAMS.items()):
 
 ### Validation
 
-Here we want to make sure the parameters don't change inadvertantly. If we encode any shares that use these primes, we want to be sure that we can decode them later on. We could encode the prime we use for the share (or the parameters `n` and `k`, but the smallest encoding uses only the index of the prime in the `POW2_PRIMES` list. For such an encoding to work, we have to be sure that we preserve the same primes at the same indexs, otherwise a share would become useless or the user would have to know which version of the software was used to create some old shares.
+Here we want to make sure the parameters don't
+change inadvertantly. If we encode any shares that
+use these primes, we want to be sure that we can
+decode them later on. We could encode the prime we
+use for the share (or the parameters `n` and `k`,
+but the smallest encoding uses only the index of
+the prime in the `POW2_PRIMES` list. For such an
+encoding to work, we have to be sure that we
+preserve the same primes at the same indexs,
+otherwise a share would become useless or the user
+would have to know which version of the software
+was used to create some old shares.
 
-For the verification, we simply greate a string representation of the `POW2_PRIME_PARAMS` and hard-code its digest, which should never change.
+For the verification, we simply greate a string
+representation of the `POW2_PRIME_PARAMS` and
+hard-code its digest, which should never change.
 
 
 ```python
@@ -376,7 +403,9 @@ def validate_pow2_prime_params() -> None:
 validate_pow2_prime_params()
 ```
 
-With this test, we verify that any manipulation the `POW2_PRIME_PARAMS` list will cause the digest to change.
+With this test, we verify that any manipulation
+the `POW2_PRIME_PARAMS` list will cause the digest
+to change.
 
 ```python
 # def: test_primelist_validation
@@ -393,9 +422,15 @@ def test_primelist_validation():
         sbk.primes.POW2_PRIME_PARAMS = _original
 ```
 
-Finally we perform some validation against oeis.org. This is where the parameters for `n` and `k` originally came from, so it is mainly a validation in the sense that it help to convince you that no mistake was made.
+Finally we perform some validation against
+oeis.org. This is where the parameters for `n` and
+`k` originally came from, so it is mainly a
+validation in the sense that it help to convince
+you that no mistake was made.
 
-The format from aeis.org is a text file where each line consists of `n` and the largest prime `p` such that $` p \lt 2^n `$.
+The format from aeis.org is a text file where each
+line consists of `n` and the largest prime `p`
+such that $` p \lt 2^n `$.
 
 ```bash
 # run: bash -c "head test/test_primes_a014234.txt | tr ' ' ':' | tr '\n' ' '"
@@ -403,7 +438,10 @@ The format from aeis.org is a text file where each line consists of `n` and the 
 # exit: 0
 ```
 
-We can calculate $` k = 2^n - p `$ , e.g. $` 2^{8} - 251 = 5 `$ . Assuming we have the content of such a file, we can use it to verify the constants of `POW2_PRIME_PARAMS`.
+We can calculate $` k = 2^n - p `$ , e.g. $` 2^{8} - 251 = 5 `$ .
+Assuming we have the content of such a file, we
+can use it to verify the constants of
+`POW2_PRIME_PARAMS`.
 
 ```python
 # def: impl_a014234_verify
@@ -425,7 +463,13 @@ def a014234_verify(a014234_content: str) -> Pow2PrimeItems:
         yield (n, k)
 ```
 
-For the tests we'll be nice and not download the file for every test run and instead use a local copy. Note that `a014234_verify` uses assertions internally and the assertions of the test itself just make sure that the content had some entries that were yielded (which wouldn't be the case if `content` were empty for example).
+For the tests we'll be nice and not download the
+file for every test run and instead use a local
+copy. Note that `a014234_verify` uses assertions
+internally and the assertions of the test itself
+just make sure that the content had some entries
+that were yielded (which wouldn't be the case if
+`content` were empty for example).
 
 
 ```python
@@ -439,7 +483,9 @@ def test_a014234_verfiy():
     assert len(p2p_primes) >= 96, "not enough entries in content"
 ```
 
-So that you don't need to run the test suite, the `sbk.primes` module is has a `main` funciton which downloads the A014234 dataset...
+So that you don't need to run the test suite, the
+`sbk.primes` module is has a `main` funciton which
+downloads the A014234 dataset...
 
 ```python
 # def: impl_read_oeis_org_a014234
@@ -467,7 +513,10 @@ def read_oeis_org_a014234() -> str:
     return content
 ```
 
-..., runs it throught the `a014234_verify` validation and generates urls for wolframalpha.com, that you can use to double check the constants.
+..., runs it throught the `a014234_verify`
+validation and generates urls for
+wolframalpha.com, that you can use to double check
+the constants.
 
 
 ```python

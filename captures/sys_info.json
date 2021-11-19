@@ -1,0 +1,24 @@
+{
+  "command": "python -m sbk.sys_info",
+  "exit_status": 0,
+  "runtime": 6.884458780288696,
+  "lines_args": [
+    [
+      1636725795.9367092,
+      "lang:  en\n",
+      false
+    ],
+    [      1636725795.9367297,
+      "Mem Info: (15886, 13722)\n",
+      false
+    ],
+    [      1636725795.9367318,
+      "Memory Info (uncached): SystemInfo(total_mb=15886, usable_mb=10291)\n",
+      false
+    ],
+    [      1636725795.9367332,
+      "Memory Info (cached)  : SystemInfo(total_mb=15886, usable_mb=10291)\n",
+      false
+    ]
+  ]
+}

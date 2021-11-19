@@ -15,6 +15,7 @@ import math
 import time
 import base64
 import struct
+import typing as typ
 import hashlib
 import logging
 import pathlib as pl
@@ -23,14 +24,28 @@ import itertools as it
 import threading
 import subprocess as sp
 from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
 from typing import NewType
+from typing import TypeVar
 from typing import Callable
+from typing import Iterable
+from typing import Iterator
 from typing import Optional
+from typing import Protocol
 from typing import Sequence
-from typing import TypeAlias
+from typing import Generator
 from typing import NamedTuple
-from collections.abc import Iterator
-from collections.abc import Generator
+
+# from collections.abc import Generator, Iterator, Counter
+
+# from typing import TypeAlias
+TypeAlias = Any
 
 import sbk.common_types as ct
 
@@ -43,6 +58,7 @@ MAX_THRESHOLD = 10
 
 KDF_PARALLELISM = ct.Parallelism(128)  # hardcoded
 DEFAULT_KDF_T_TARGET = ct.Seconds(90)
+DEFAULT_KDF_M_PERCENT = 100
 
 DEFAULT_SSS_T = 3
 DEFAULT_SSS_N = 5
@@ -52,8 +68,8 @@ SHARE_HEADER_LEN = 3
 DEFAULT_RAW_SALT_LEN = 13
 DEFAULT_BRAINKEY_LEN = 8
 
-DEFAULT_RAW_SALT_LEN = 5
-DEFAULT_BRAINKEY_LEN = 4
+# DEFAULT_RAW_SALT_LEN  = 5
+# DEFAULT_BRAINKEY_LEN  = 4
 if "SBK_DEBUG_RAW_SALT_LEN" in os.environ:
     DEFAULT_RAW_SALT_LEN = int(os.environ["SBK_DEBUG_RAW_SALT_LEN"])
 
@@ -64,6 +80,7 @@ MIN_ENTROPY = int(os.getenv("SBK_MIN_ENTROPY", "16"))
 MAX_ENTROPY_WAIT = int(os.getenv("SBK_MAX_ENTROPY_WAIT", "10"))
 
 DEFAULT_KDF_T_TARGET = int(os.getenv("SBK_KDF_T_TARGET") or DEFAULT_KDF_T_TARGET)
+DEFAULT_KDF_M_PERCENT = int(os.getenv("SBK_KDF_M_PERCENT") or DEFAULT_KDF_M_PERCENT)
 
 DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD") or DEFAULT_SSS_T)
 DEFAULT_SSS_N = int(os.getenv("SBK_NUM_SHARES") or DEFAULT_SSS_N)
@@ -88,7 +105,7 @@ class KDFParams(NamedTuple):
     kdf_t: ct.Iterations
 
 
-def _param_coefficients(b: float) -> tuple[int, int]:
+def param_coeffs(b: float) -> Tuple[int, int]:
     assert b > 1
     s = int(1 / (b - 1))
     o = int(1 - s)
@@ -104,13 +121,13 @@ from math import log
 
 
 def param_exp(n: int, b: float) -> int:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     v = round(b ** n * s + o)
     return v
 
 
 def param_log(v: int, b: float) -> int:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     n = log((v - o) / s) / log(b)
     return min(max(round(n), 0), 2 ** 63)
 

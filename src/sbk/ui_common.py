@@ -11,7 +11,6 @@ import re
 import pwd
 import math
 import time
-import typing as typ
 import logging
 import pathlib as pl
 import tempfile
@@ -19,6 +18,23 @@ import functools as ft
 import threading
 import subprocess as sp
 import collections
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import click
 import mypy_extensions as mypyext
@@ -37,6 +53,28 @@ from . import electrum_mnemonic
 logger = logging.getLogger("sbk.ui_common")
 
 
+USER_GUIDE_TEXT = """
+https://sbk.dev/guide
+"""
+
+# python experiments/qr_test.py 'https://sbk.dev/guide'
+USER_GUIDE_QR_CODE = """
+█▀▀▀▀▀█ ▀▄▄▀▀█  ▄ █▀▀▀▀▀█
+█ ███ █   ▀ ██▀ ▄ █ ███ █
+█ ▀▀▀ █  ▀▄▀▄▀▀ ▀ █ ▀▀▀ █
+▀▀▀▀▀▀▀ █ █▄▀▄▀▄█ ▀▀▀▀▀▀▀
+█▀ █▀▄▀▄▄█▀▀▄ █▄█ ▀▄▄▄▄▄▀
+ ▄█ ▄▄▀▀▀▄██▄  █ █▀▀ █▄▄█
+██▀▀▄ ▀▄▄▀ ▀▀▄▄█▄ ▀ ▄  ▄▀
+█▀██▀▀▀█ ▀▄█▀▀▀▀ ▄ ▄▀██▀█
+▀     ▀▀██ ▄▄▄▀▀█▀▀▀█ ██
+█▀▀▀▀▀█  █▄▀▄ ▄▄█ ▀ █  ▄█
+█ ███ █ █▀▄ ▀▀█▀█▀█▀▀  ██
+█ ▀▀▀ █ ▄██ ▀ █  ▀ ▄█▀███
+▀▀▀▀▀▀▀ ▀ ▀  ▀▀ ▀▀   ▀  ▀
+"""
+
+
 SECURITY_WARNING_TEXT = """
 Security Warning
 
@@ -50,6 +88,7 @@ For more information on setting up a secure air-gapped system
 see: https://sbk.dev/airgap
 """
 
+# python experiments/qr_test.py 'https://sbk.dev/airgap'
 SECURITY_WARNING_QR_CODES = """
                                 █████████████████████████████████
                                 █████████████████████████████████
@@ -171,25 +210,25 @@ FORMATTED_LINE_PATTERN = r"""
 FORMATTED_LINE_RE = re.compile(FORMATTED_LINE_PATTERN, flags=re.VERBOSE)
 
 
-Lines = typ.Iterable[str]
+Lines = Iterable[str]
 
-PhraseLines = typ.Sequence[str]
+PhraseLines = Sequence[str]
 
 PartIndex = int
 PartVal   = bytes
-PartVals  = typ.Sequence[PartVal]
+PartVals  = Sequence[PartVal]
 # A PartVal can be b"" to mark its value is not known yet.
 
 
 BYTES_PER_INTCODE = 2
 
 IntCode       = str
-IntCodes      = typ.Sequence[IntCode]
-MaybeIntCode  = typ.Optional[IntCode]
-MaybeIntCodes = typ.Sequence[MaybeIntCode]
+IntCodes      = Sequence[IntCode]
+MaybeIntCode  = Optional[IntCode]
+MaybeIntCodes = Sequence[MaybeIntCode]
 
 
-def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> typ.Iterable[IntCode]:
+def bytes2intcode_parts(data: bytes, idx_offset: int = 0) -> Iterator[IntCode]:
     if len(data) % 2 != 0:
         errmsg = f"Invalid data, must be divisible by 2, got: {len(data)}"
         raise ValueError(errmsg)
@@ -281,7 +320,7 @@ def intcodes2parts(intcodes: MaybeIntCodes, idx_offset: int = 0) -> PartVals:
     return part_vals
 
 
-def intcodes2mnemonics(intcodes: typ.Sequence[str]) -> typ.Sequence[str]:
+def intcodes2mnemonics(intcodes: Sequence[str]) -> Sequence[str]:
     data_with_ecc = intcodes2parts(intcodes)
     parts         = data_with_ecc[: len(data_with_ecc) // 2]
     return mnemonic.bytes2phrase(b"".join(parts)).split()
@@ -299,16 +338,16 @@ def intcodes2bytes(intcodes: IntCodes, msg_len: int) -> bytes:
     return maybe_intcodes2bytes(intcodes, msg_len=msg_len)
 
 
-class ParsedSecret(typ.NamedTuple):
-    words     : tuple[str    , ...]
-    data_codes: tuple[IntCode, ...]
-    ecc_codes : tuple[IntCode, ...]
+class ParsedSecret(NamedTuple):
+    words     : Tuple[str    , ...]
+    data_codes: Tuple[IntCode, ...]
+    ecc_codes : Tuple[IntCode, ...]
 
 
 def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
-    words     : list[str    ] = []
-    data_codes: list[IntCode] = []
-    ecc_codes : list[IntCode] = []
+    words     : List[str    ] = []
+    data_codes: List[IntCode] = []
+    ecc_codes : List[IntCode] = []
 
     for i, line in enumerate(text.splitlines()):
         line = line.strip().lower()
@@ -333,7 +372,7 @@ def parse_formatted_secret(text: str, strict: bool = True) -> ParsedSecret:
     return ParsedSecret(tuple(words), tuple(data_codes), tuple(ecc_codes))
 
 
-class Scheme(typ.NamedTuple):
+class Scheme(NamedTuple):
 
     threshold : int
     num_shares: int
@@ -365,15 +404,15 @@ def parse_scheme(scheme_arg: str) -> Scheme:
     return Scheme(threshold, num_shares)
 
 
-T = typ.TypeVar('T')
+T = TypeVar('T')
 
 
-class ThreadRunner(threading.Thread, typ.Generic[T]):
+class ThreadRunner(threading.Thread, Generic[T]):
 
-    _exception: typ.Optional[Exception]
-    _return   : typ.Optional[T]
+    _exception: Optional[Exception]
+    _return   : Optional[T]
 
-    def __init__(self, target: typ.Callable[[], T]) -> None:
+    def __init__(self, target: Callable[[], T]) -> None:
         threading.Thread.__init__(self, target=target)
         self._target    = target
         self._exception = None
@@ -418,18 +457,18 @@ DEFAULT_WALLET_NAME = "empty"
 SEED_DATA_LEN = 16
 
 
-class ProgressbarUpdater(typ.Protocol):
+class ProgressbarUpdater(Protocol):
     def update(self, n_steps: int) -> None:
         ...
 
-    def __enter__(self) -> typ.Any:
+    def __enter__(self) -> Any:
         ...
 
     def __exit__(self, exc_type, exc_value, tb) -> None:
         ...
 
 
-InitProgressbar = typ.Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpdater]
+InitProgressbar = Callable[[mypyext.NamedArg(int, 'length')], ProgressbarUpdater]  # noqa: F821
 
 
 class DummyProgressbar(ProgressbarUpdater):
@@ -439,7 +478,7 @@ class DummyProgressbar(ProgressbarUpdater):
     def update(self, n_steps: int) -> None:
         pass
 
-    def __enter__(self) -> typ.Any:
+    def __enter__(self) -> Any:
         return self
 
     def __exit__(self, exc_type, exc_value, tb) -> None:
@@ -454,12 +493,12 @@ def fallback_progressbar(label: str) -> InitProgressbar:
 
 
 def derive_seed(
-    kdf_params      : parameters.KDFParams,
+    kdf_params      : Union[parameters.Parameters, parameters.KDFParams],
     salt            : ct.Salt,
     brainkey        : ct.BrainKey,
     label           : str,
     wallet_name     : str = DEFAULT_WALLET_NAME,
-    init_progressbar: typ.Optional[InitProgressbar] = None,
+    init_progressbar: Optional[InitProgressbar] = None,
 ) -> ct.SeedData:
     if init_progressbar is None:
         _init_progressbar = fallback_progressbar(label)
@@ -489,7 +528,7 @@ def derive_seed(
 
 
 def run_with_progress_bar(
-    target          : typ.Callable[[], T],
+    target          : Callable[[], T],
     eta_sec         : float,
     init_progressbar: InitProgressbar,
 ) -> T:
@@ -527,12 +566,17 @@ def run_with_progress_bar(
 
 def parse_kdf_params(
     target_duration : ct.Seconds,
-    memory_cost     : typ.Optional[ct.MebiBytes],
-    time_cost       : typ.Optional[ct.Iterations],
+    memory_cost     : Optional[ct.MebiBytes],
+    time_cost       : Optional[ct.Iterations],
     init_progressbar: InitProgressbar,
 ) -> parameters.KDFParams:
-    nfo        = sys_info.load_sys_info()
-    kdf_params = parameters.init_kdf_params(kdf_m=memory_cost or nfo.usable_mb, kdf_t=time_cost or 1)
+    nfo           = sys_info.load_sys_info()
+    target_memory = nfo.usable_mb * parameters.DEFAULT_KDF_M_PERCENT / 100
+
+    kdf_m = int((memory_cost or target_memory) / 100) * 100
+    kdf_t = time_cost or 1
+
+    kdf_params = parameters.init_kdf_params(kdf_m=kdf_m, kdf_t=kdf_t)
 
     if time_cost is None:
         # time_cost estimated based on duration
@@ -544,11 +588,11 @@ def parse_kdf_params(
 
 def init_params(
     target_duration : ct.Seconds,
-    memory_cost     : typ.Optional[ct.MebiBytes],
-    time_cost       : typ.Optional[ct.Iterations],
+    memory_cost     : Optional[ct.MebiBytes],
+    time_cost       : Optional[ct.Iterations],
     threshold       : int,
     num_shares      : int,
-    init_progressbar: typ.Optional[InitProgressbar] = None,
+    init_progressbar: Optional[InitProgressbar] = None,
 ) -> parameters.Parameters:
     if init_progressbar is None:
         _init_progressbar = fallback_progressbar("KDF Calibration")
@@ -641,7 +685,7 @@ def validate_wallet_name(wallet_name: str) -> None:
     raise ValueError(errmsg)
 
 
-def create_secrets(params: parameters.Parameters) -> tuple[ct.Salt, ct.BrainKey, ct.Shares]:
+def create_secrets(params: parameters.Parameters) -> Tuple[ct.Salt, ct.BrainKey, ct.Shares]:
     params_data = validated_param_data(params)
     salt_header = params_data[: parameters.SALT_HEADER_LEN]
 
@@ -721,7 +765,7 @@ def clean_wallet(wallet_fpath: pl.Path) -> None:
     assert not wallet_fpath.exists()
 
 
-Command = list[str]
+Command = List[str]
 
 
 def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
@@ -729,7 +773,7 @@ def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
     return electrum_mnemonic.raw_seed2phrase(seed_int)
 
 
-def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> tuple[pl.Path, Command, Command]:
+def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> Tuple[pl.Path, Command, Command]:
     wallet_fpath = mk_tmp_wallet_fpath()
 
     restore_cmd = [

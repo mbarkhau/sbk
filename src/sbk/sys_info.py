@@ -15,6 +15,7 @@ import math
 import time
 import base64
 import struct
+import typing as typ
 import hashlib
 import logging
 import pathlib as pl
@@ -23,14 +24,28 @@ import itertools as it
 import threading
 import subprocess as sp
 from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
 from typing import NewType
+from typing import TypeVar
 from typing import Callable
+from typing import Iterable
+from typing import Iterator
 from typing import Optional
+from typing import Protocol
 from typing import Sequence
-from typing import TypeAlias
+from typing import Generator
 from typing import NamedTuple
-from collections.abc import Iterator
-from collections.abc import Generator
+
+# from collections.abc import Generator, Iterator, Counter
+
+# from typing import TypeAlias
+TypeAlias = Any
 
 import sbk.common_types as ct
 
@@ -67,7 +82,7 @@ def detect_lang() -> ct.LangCode:
         kb_lang = _parse_keyboard_lang(localectl_output)
         return lang or kb_lang or DEFAULT_LANG
     except Exception:
-        logger.warning(f"Fallback to default lang: en", exc_info=True)
+        logger.warning("Fallback to default lang: en", exc_info=True)
         return ct.LangCode("en")
 
 
@@ -93,11 +108,10 @@ def _parse_keyboard_lang(localectl_output: str) -> Optional[ct.LangCode]:
 
 class SystemInfo(NamedTuple):
     total_mb: ct.MebiBytes
-    free_mb: ct.MebiBytes
     usable_mb: ct.MebiBytes
 
 
-def _parse_meminfo(meminfo_text: str) -> tuple[ct.MebiBytes, ct.MebiBytes]:
+def _parse_meminfo(meminfo_text: str) -> Tuple[ct.MebiBytes, ct.MebiBytes]:
     total_mb = FALLBACK_MEM_MB
     avail_mb = FALLBACK_MEM_MB
 
@@ -113,7 +127,7 @@ def _parse_meminfo(meminfo_text: str) -> tuple[ct.MebiBytes, ct.MebiBytes]:
     return (total_mb, avail_mb)
 
 
-def memory_info() -> tuple[ct.MebiBytes, ct.MebiBytes]:
+def memory_info() -> Tuple[ct.MebiBytes, ct.MebiBytes]:
     meminfo_path = pl.Path("/proc/meminfo")
     if meminfo_path.exists():
         try:
@@ -135,13 +149,14 @@ def _init_sys_info() -> SystemInfo:
         else:
             check_mb = int(check_mb * 0.75)  # try a bit less
 
-    nfo = SystemInfo(total_mb, avail_mb, max(check_mb, 100))
+    usable_mb = max(check_mb, 100)
+    nfo = SystemInfo(total_mb, usable_mb)
     _dump_sys_info(nfo)
     return nfo
 
 
 def _is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
-    retcode = sp.call([sys.executable, "-m", "sbk.kdf_new", str(memory_mb)])
+    retcode = sp.call([sys.executable, "-m", "sbk.kdf", str(memory_mb)])
     return retcode == 0
 
 
@@ -156,19 +171,21 @@ def load_sys_info(use_cache: bool = True) -> SystemInfo:
                 logger.warning(f"Error reading cache file {cache_path}: {ex}")
 
         if _SYS_INFO_KW:
-            return SystemInfo(**_SYS_INFO_KW)
+            return SystemInfo(
+                total_mb=_SYS_INFO_KW["total_mb"],
+                usable_mb=_SYS_INFO_KW["usable_mb"],
+            )
 
     return _init_sys_info()
 
 
-_SYS_INFO_KW: dict[str, int] = {}
+_SYS_INFO_KW: Dict[str, int] = {}
 
 
 def _dump_sys_info(sys_info: SystemInfo) -> None:
     _SYS_INFO_KW.update(
         {
             "total_mb": sys_info.total_mb,
-            "free_mb": sys_info.free_mb,
             "usable_mb": sys_info.usable_mb,
         }
     )

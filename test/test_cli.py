@@ -21,7 +21,7 @@ import click.testing
 import sbk.cli
 import sbk.cli_io
 import sbk.ecc_rs
-import sbk.params
+import sbk.parameters
 from sbk import electrum_mnemonic
 from sbk.mnemonic import *
 from sbk.ui_common import *
@@ -76,7 +76,7 @@ def test_intcode_fuzz_loss(data_len):
 
 def test_intcode_odd_data_len():
     in_data = b"\x11\x00\x004444444444444"
-    assert len(in_data) == sbk.params.SALT_LEN
+    assert len(in_data) == sbk.parameters.DEFAULT_RAW_SALT_LEN
     expected_inputs = [
         "004-352",
         "065-588",
@@ -98,7 +98,7 @@ def test_intcode_odd_data_len():
 
     inputs = bytes2intcodes(in_data)
     assert inputs == expected_inputs
-    result = maybe_intcodes2bytes(inputs, msg_len=sbk.params.SALT_LEN)
+    result = maybe_intcodes2bytes(inputs, msg_len=sbk.parameters.DEFAULT_RAW_SALT_LEN)
     assert result == in_data
 
 
@@ -141,7 +141,7 @@ def test_format_secret(data_len):
     formatted = sbk.cli_io.format_secret('salt', data)
     parsed    = parse_formatted_secret(formatted)
 
-    assert phrase2bytes(" ".join(parsed.words)) == data
+    assert phrase2bytes(" ".join(parsed.words), msg_len=data_len) == data
     intcodes = parsed.data_codes + parsed.ecc_codes
     assert len(intcodes) * 2 == block_len
     decoded = maybe_intcodes2bytes(intcodes, data_len)

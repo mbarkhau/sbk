@@ -1,25 +1,31 @@
 ## Parameter Range and Encoding
 
-For the remaining parameters `-m` and `-t`, we do want to encode them
-in the salt, as memory availability is widely variable and the number
-of iterations is the most straight forward way for users to trade off
-protection vs how long they are willing to wait when they access their
-wallet.
+For the remaining parameters `-m` and `-t`, we do
+want to encode them in the salt, as memory
+availability is widely variable and the number of
+iterations is the most straight forward way for
+users to trade off protection vs how long they are
+willing to wait when they access their wallet.
 
-For `-m` we don't want to support low end hardware, as we expect to
-run on PC hardware starting with the x64 generation of multi-core
-CPUs. We would like to use a substantial portion of the available
-memory of systems starting from 1GB.
+For `-m` we don't want to support low end
+hardware, as we expect to run on PC hardware
+starting with the x64 generation of multi-core
+CPUs. We would like to use a substantial portion
+of the available memory of systems starting from
+1GB.
 
-We chose an encoding where we cover a range that is large in magnitude
-rather than precision, which means that key derivation will use a
-lower value for `-m` than might exhaust a systems memory and a higher
-value for `-t` than would correspond exactly to how long the user
-chose as their preference to wait.
+We chose an encoding where we cover a range that
+is large in magnitude rather than precision, which
+means that key derivation will use a lower value
+for `-m` than might exhaust a systems memory and a
+higher value for `-t` than would correspond
+exactly to how long the user chose as their
+preference to wait.
 
-The general principle of encoding is to chose a base `b` for each
-parameter such that integer `n` encoded in 6bits covers our desired
-range for each parameter. We have `n` during decoding and our
+The general principle of encoding is to chose a
+base `b` for each parameter such that integer `n`
+encoded in 6bits covers our desired range for each
+parameter. We have `n` during decoding and our
 function `d(n: int) -> float`:
 
 ```math
@@ -42,9 +48,11 @@ d(n) &\approx b^n \\
 \end{align}
 ```
 
-To satisfy $`(4)`$ we can scale $`b^n`$ by a factor $`s`$ and then
-pull the curve down with an offset $`o`$ so we satisfy $`(1)`$. We
-first derive $`s`$ from our constraints and then we have $`o = 1 - s`$.
+To satisfy $`(4)`$ we can scale $`b^n`$ by a
+factor $`s`$ and then pull the curve down with an
+offset $`o`$ so we satisfy $`(1)`$. We first
+derive $`s`$ from our constraints and then we have
+$`o = 1 - s`$.
 
 ```math
 \begin{align}
@@ -78,9 +86,10 @@ def param_coeffs(b: float) -> Tuple[int, int]:
 
 ## `param_exp` and `param_log`
 
-In the context of the `kdf` module, for a given base, we will use
-`param_exp` to convert `n -> v` and `param_log` to convert `v -> n`, where
-`v` is the value for a parameter `-m` or `-t`.
+In the context of the `kdf` module, for a given
+base, we will use `param_exp` to convert `n -> v`
+and `param_log` to convert `v -> n`, where `v` is
+the value for a parameter `-m` or `-t`.
 
 ```math
 \begin{align}
@@ -147,10 +156,11 @@ b=1.125 s=8.000 o=-7.000
 # exit: 0
 ```
 
-With different choices for $`b`$ we can now trade off precision vs
-magnitude. With a base of 11/10 we can have a magnitude of 4000x of
-our lowest value, where each increment is roughly 1/10 larger than
-the previous.
+With different choices for $`b`$ we can now trade
+off precision vs magnitude. With a base of 11/10
+we can have a magnitude of 4000x of our lowest
+value, where each increment is roughly 1/10 larger
+than the previous.
 
 
 ```python

@@ -20,6 +20,24 @@ import random
 import typing as typ
 import itertools
 import collections
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 from . import gf
 from . import gf_poly
@@ -30,10 +48,10 @@ Message = bytes
 Block = bytes
 # Packet: Individual byte in a block
 Packet  = int
-Packets = typ.List[Packet]
+Packets = List[Packet]
 # Erasures signified by None
 # position in the sequence implies the x-coordinate
-MaybePackets = typ.List[typ.Optional[Packet]]
+MaybePackets = List[Optional[Packet]]
 
 
 def _nCr(n: int, r: int) -> float:
@@ -79,7 +97,7 @@ def _encode(msg: Message, ecc_len: int) -> Block:
         raise AssertionError()
 
 
-def encode(msg: Message, ecc_len: typ.Optional[int] = None, verify: bool = True) -> Block:
+def encode(msg: Message, ecc_len: Optional[int] = None, verify: bool = True) -> Block:
     """Encode message to a Block with RS Code as ECC data."""
     if ecc_len is None:
         total_len = math.ceil(len(msg) / 2) * 4
@@ -103,10 +121,10 @@ def encode(msg: Message, ecc_len: typ.Optional[int] = None, verify: bool = True)
     return block
 
 
-Indexes = typ.Tuple[int, ...]
+Indexes = Tuple[int, ...]
 
 
-def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
+def _iter_indexes(msg_len: int, num_points: int) -> Iterable[Indexes]:
     assert num_points >= msg_len
 
     all_indexes = tuple(range(num_points))
@@ -122,7 +140,7 @@ def _iter_indexes(msg_len: int, num_points: int) -> typ.Iterable[Indexes]:
         for combo in all_combos:
             yield tuple(combo)
     else:
-        sample_combos: typ.Set[Indexes] = set()
+        sample_combos: Set[Indexes] = set()
         while len(sample_combos) < num_combos // 3:
             sample_combo = tuple(random.sample(all_indexes, msg_len))
             if sample_combo not in sample_combos:
@@ -224,7 +242,7 @@ Example usage:
 """
 
 
-def main(args: typ.Sequence[str] = sys.argv[1:], stdin: typ.TextIO = sys.stdin) -> int:
+def main(args: Sequence[str] = sys.argv[1:], stdin: typ.TextIO = sys.stdin) -> int:
     # pylint: disable=dangerous-default-value; we don't modify it, I promise.
     if "-h" in args or "--help" in args or not args:
         print(main.__doc__)

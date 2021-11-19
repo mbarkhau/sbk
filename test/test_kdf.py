@@ -93,37 +93,6 @@ def test_kdf_params(p, m, t):
     assert kdf_params.t == t
 
 
-def test_kdf_curve_params():
-    bases = [
-        (2     ,  1, 0),
-        (1.5   ,  2, - 1),
-        (1.25  ,  4, - 3),
-        (1.125 ,  8, - 7),
-        (1.0625, 16, -15),
-    ]
-
-    for base, expected_s, expected_o in bases:
-        s, o = kdf.curve_params(base)
-
-        assert s == expected_s
-        assert o == expected_o
-
-        assert kdf.exp(0, base) == 1
-        assert kdf.exp(1, base) == 2
-
-        prev_raw_val = -1
-        for field_val in range(0, 2 ** 6):
-            raw_val = kdf.exp(field_val, base)
-            assert raw_val > prev_raw_val
-            prev_raw_val = raw_val
-
-            out_field_val = kdf.log(raw_val      , base)
-            raw_val_2     = kdf.exp(out_field_val, base)
-            assert raw_val_2 == raw_val
-            eps = abs(field_val - out_field_val)
-            assert eps < 0.0001, (base, field_val, out_field_val)
-
-
 def test_kdf_params_fuzz():
     r = random.Random(0)
 

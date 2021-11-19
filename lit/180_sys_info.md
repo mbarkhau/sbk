@@ -50,11 +50,11 @@ if __name__ == '__main__':
 
 ```bash
 # run: python -m sbk.sys_info
-# timeout: 90
+# options: {"timeout": 90, "capture_file": "captures/sys_info.json"}
 lang:  en
-Mem Info: (15886, 12557)
-Memory Info (uncached): SystemInfo(total_mb=15886, usable_mb=9417)
-Memory Info (cached)  : SystemInfo(total_mb=15886, usable_mb=9417)
+Mem Info: (15886, 13722)
+Memory Info (uncached): SystemInfo(total_mb=15886, usable_mb=10291)
+Memory Info (cached)  : SystemInfo(total_mb=15886, usable_mb=10291)
 # exit: 0
 ```
 

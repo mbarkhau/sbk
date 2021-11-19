@@ -10,9 +10,28 @@
 # pylint: disable=too-many-return-statements
 
 """GUI Baseclasses for Panels of SBK."""
+import os
 import time
 import typing as typ
 import logging
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import PyQt5.Qt as qt
 import PyQt5.QtGui as qtg
@@ -28,19 +47,23 @@ from . import ui_common
 from . import parameters
 from . import common_types as ct
 
+GUI_DEBUG_MODE = os.getenv('SBK_GUI_DEBUG_MODE') == "1"
+
+
 logger = logging.getLogger("sbk.gui_panels")
+
 
 PanelState = typext.TypedDict(
     'PanelState',
     {
         'panel_index': int,
-        'salt'       : typ.Optional[ct.Salt],
-        'brainkey'   : typ.Optional[ct.BrainKey],
+        'salt'       : Optional[ct.Salt],
+        'brainkey'   : Optional[ct.BrainKey],
         'shares'     : ct.Shares,
-        'params'     : typ.Optional[parameters.Parameters],
-        'seed_data'  : typ.Optional[ct.SeedData],
+        'params'     : Optional[parameters.Parameters],
+        'seed_data'  : Optional[ct.SeedData],
         # options
-        'sys_info'   : typ.Optional[sys_info.SystemInfo],
+        'sys_info'   : Optional[sys_info.SystemInfo],
         'offline'    : bool,
         'wallet_name': str,
         # 'sss_t'          : int,
@@ -79,13 +102,16 @@ def get_state() -> PanelState:
 
     if state['sys_info'] is None:
         _sys_info = sys_info.load_sys_info()
+
+        target_memory = _sys_info.usable_mb * parameters.DEFAULT_KDF_M_PERCENT / 100
+
         state['sys_info'     ] = _sys_info
-        state['max_memory'   ] = int(_sys_info.total_mb / 100) * 100
-        state['target_memory'] = int(_sys_info.free_mb  / 100) * 100
+        state['target_memory'] = int(target_memory       / 100) * 100
+        state['max_memory'   ] = int(_sys_info.usable_mb / 100) * 100
 
     if state['params'] is None:
         state['params'] = parameters.init_parameters(
-            kdf_m=state['sys_info'].usable_mb,
+            kdf_m=state['target_memory'],
             kdf_t=parameters.DEFAULT_KDF_T_TARGET,
             sss_x=1,
             sss_t=parameters.DEFAULT_SSS_T,
@@ -95,18 +121,18 @@ def get_state() -> PanelState:
     return state
 
 
-def get_params() -> typ.Optional[parameters.Parameters]:
+def get_params() -> Optional[parameters.Parameters]:
     return get_state()['params']
 
 
-class CurrentSecret(typ.NamedTuple):
+class CurrentSecret(NamedTuple):
 
     secret_len : int
     secret_type: str
     secret_data: bytes
 
 
-def get_secret_type() -> tuple[str, int]:
+def get_secret_type() -> Tuple[str, int]:
     sss_n       = len(shared_panel_state['shares'])
     panel_index = shared_panel_state['panel_index']
     if panel_index < sss_n:
@@ -222,7 +248,7 @@ class NavigablePanel(Panel):
         # pylint: disable=no-self-use   # ABC default implementation
         return False
 
-    def nav_handler(self, eventtype: str) -> typ.Callable:
+    def nav_handler(self, eventtype: str) -> Callable:
         def handler() -> None:
             self.destroy_panel()
             p = self.parent()
@@ -241,8 +267,8 @@ class NavigablePanel(Panel):
 
         return handler
 
-    def set_nav(self, pack_enabled: bool, next_enabled: bool) -> None:
-        self.back_button.setEnabled(pack_enabled)
+    def set_nav(self, back_enabled: bool, next_enabled: bool) -> None:
+        self.back_button.setEnabled(back_enabled)
         self.next_button.setEnabled(next_enabled)
 
 
@@ -436,10 +462,10 @@ def header_widget() -> qtw.QLabel:
     return header
 
 
-MaybeBytes = typ.Union[bytes, None]
+MaybeBytes = Union[bytes, None]
 
 
-def _parse_intcodes(datas: typ.Sequence[MaybeBytes]) -> typ.Iterable[ui_common.MaybeIntCode]:
+def _parse_intcodes(datas: Sequence[MaybeBytes]) -> Iterator[ui_common.MaybeIntCode]:
     for i in range(0, len(datas), 2):
         idx = i // 2
         if i + 2 <= len(datas):
@@ -453,7 +479,7 @@ def _parse_intcodes(datas: typ.Sequence[MaybeBytes]) -> typ.Iterable[ui_common.M
             yield None
 
 
-def _parse_mnemonics(datas: typ.Sequence[MaybeBytes]) -> typ.Iterable[typ.Optional[str]]:
+def _parse_mnemonics(datas: Sequence[MaybeBytes]) -> Iterator[Optional[str]]:
     for data in datas:
         if data:
             yield mnemonic.byte2word(data)
@@ -461,7 +487,7 @@ def _parse_mnemonics(datas: typ.Sequence[MaybeBytes]) -> typ.Iterable[typ.Option
             yield None
 
 
-def _recover_datas(valid_datas: typ.Sequence[MaybeBytes], msg_len: int) -> typ.Sequence[MaybeBytes]:
+def _recover_datas(valid_datas: Sequence[MaybeBytes], msg_len: int) -> Sequence[MaybeBytes]:
     valid_data_len = sum(1 for vd in valid_datas if vd)
     is_recoverable = valid_data_len >= msg_len
 
@@ -487,15 +513,15 @@ def column_headers(parent: qtw.QWidget) -> qtw.QHBoxLayout:
     return headers
 
 
-RowWidgets = list[tuple[qtw.QWidget, qtw.QWidget, qtw.QWidget, qtw.QWidget]]
+RowWidgets = List[Tuple[qtw.QWidget, qtw.QWidget, qtw.QWidget, qtw.QWidget]]
 
 
 def init_grid(
     parent         : qtw.QWidget,
     grid_layout    : qtw.QGridLayout,
     all_row_widgets: RowWidgets,
-) -> typ.Sequence[qtw.QWidget]:
-    all_widgets: list[qtw.QWidget] = []
+) -> Sequence[qtw.QWidget]:
+    all_widgets: List[qtw.QWidget] = []
 
     num_rows = len(all_row_widgets)
     for row, (i1, m1, m2, i2) in enumerate(all_row_widgets):
@@ -526,12 +552,15 @@ def init_grid(
 
     if num_rows % 4 == 0:
         spacers = [4, 9]
+    elif num_rows % 3 == 0:
+        spacers = [3, 7, 11]
     else:
         spacers = []
 
     for row in spacers:
         col    = 0
         widget = qtw.QLabel(" ", parent)
+        all_widgets.append(widget)
         grid_layout.addWidget(widget, row, col)
 
     grid_layout.setColumnStretch(0, 2)
@@ -551,10 +580,10 @@ def init_grid(
 
 class EnterSecretPanel(NavigablePanel):
 
-    widget_states   : dict[int, dict[str, typ.Any]]
-    grid_widgets    : list[qtw.QWidget]
-    intcode_widgets : list[IntCodeEdit]
-    mnemonic_widgets: list[MnemonicEdit]
+    widget_states   : Dict[int, Dict[str, Any]]
+    grid_widgets    : List[qtw.QWidget]
+    intcode_widgets : List[IntCodeEdit]
+    mnemonic_widgets: List[MnemonicEdit]
 
     def __init__(self, index: int):
         super().__init__(index)
@@ -589,7 +618,7 @@ class EnterSecretPanel(NavigablePanel):
     def secret_len(self) -> int:
         raise NotImplementedError()
 
-    def get_or_init_state(self) -> dict[str, typ.Any]:
+    def get_or_init_state(self) -> Dict[str, Any]:
         # NOTE (mb 2021-06-04): This whole state business may well be an artifact
         #   of (ab)using the Panel classes in NavigablePanel.nav_handler
 
@@ -726,7 +755,7 @@ class EnterSecretPanel(NavigablePanel):
         del self.intcode_widgets[:]
         del self.mnemonic_widgets[:]
 
-    def _known_secret_iter_valid_intcode_datas(self) -> typ.Iterable[MaybeBytes]:
+    def _known_secret_iter_valid_intcode_datas(self) -> Iterator[MaybeBytes]:
         expected_data_and_ecc = get_padded_secret()
         data_unpadded         = get_current_secret().secret_data
         expected_intcodes     = ui_common.bytes2intcodes(data_unpadded)
@@ -749,7 +778,7 @@ class EnterSecretPanel(NavigablePanel):
                 yield None
                 yield None
 
-    def _unknown_secret_iter_valid_intcode_datas(self) -> typ.Iterable[MaybeBytes]:
+    def _unknown_secret_iter_valid_intcode_datas(self) -> Iterator[MaybeBytes]:
         for idx, widget in enumerate(self.intcode_widgets):
             widget.setStyleSheet("")
 
@@ -772,7 +801,7 @@ class EnterSecretPanel(NavigablePanel):
             yield None
             yield None
 
-    def _known_secret_iter_valid_mnemonic_datas(self) -> typ.Iterable[MaybeBytes]:
+    def _known_secret_iter_valid_mnemonic_datas(self) -> Iterator[MaybeBytes]:
         expected_data_and_ecc = get_padded_secret()
         expected_data_padded  = expected_data_and_ecc[: len(expected_data_and_ecc) // 2]
         expected_words        = mnemonic.bytes2phrase(expected_data_padded).split()
@@ -789,7 +818,7 @@ class EnterSecretPanel(NavigablePanel):
             else:
                 yield None
 
-    def _unknown_secret_iter_valid_mnemonic_datas(self) -> typ.Iterable[MaybeBytes]:
+    def _unknown_secret_iter_valid_mnemonic_datas(self) -> Iterator[MaybeBytes]:
         for widget in self.mnemonic_widgets:
             widget.setStyleSheet("")
             word = widget.text().strip()
@@ -806,25 +835,25 @@ class EnterSecretPanel(NavigablePanel):
         for _ in range(state['num_inputs'] - len(self.mnemonic_widgets)):
             yield None
 
-    def iter_valid_intcode_datas(self) -> typ.Iterable[MaybeBytes]:
+    def iter_valid_intcode_datas(self) -> Iterator[MaybeBytes]:
         if has_secrets():
             return self._known_secret_iter_valid_intcode_datas()
         else:
             return self._unknown_secret_iter_valid_intcode_datas()
 
-    def iter_valid_mnemonic_datas(self) -> typ.Iterable[MaybeBytes]:
+    def iter_valid_mnemonic_datas(self) -> Iterator[MaybeBytes]:
         if has_secrets():
             return self._known_secret_iter_valid_mnemonic_datas()
         else:
             return self._unknown_secret_iter_valid_mnemonic_datas()
 
-    def parse_accepted_datas(self) -> typ.Iterable[MaybeBytes]:
+    def parse_accepted_datas(self) -> Iterator[MaybeBytes]:
         state    = self.get_or_init_state()
         data_len = state['num_inputs']
         ecc_len  = state['num_inputs']
 
-        valid_intcode_datas : typ.Sequence[MaybeBytes] = list(self.iter_valid_intcode_datas())
-        valid_mnemonic_datas: typ.Sequence[MaybeBytes] = list(self.iter_valid_mnemonic_datas())
+        valid_intcode_datas : Sequence[MaybeBytes] = list(self.iter_valid_intcode_datas())
+        valid_mnemonic_datas: Sequence[MaybeBytes] = list(self.iter_valid_mnemonic_datas())
 
         assert len(valid_intcode_datas) == len(valid_mnemonic_datas) * 2
         assert len(valid_intcode_datas) == data_len + ecc_len
@@ -847,10 +876,55 @@ class EnterSecretPanel(NavigablePanel):
             else:
                 yield None
 
-    def recover_datas(self) -> typ.Sequence[MaybeBytes]:
+    def recover_datas(self) -> Sequence[MaybeBytes]:
         valid_datas = list(self.parse_accepted_datas())
         state       = self.get_or_init_state()
         return list(_recover_datas(valid_datas, msg_len=state['msg_len']))
+
+    def _parse_datas(
+        self, recovered_datas: Sequence[MaybeBytes]
+    ) -> tuple[Optional[parameters.Parameters], List[Optional[str]], List[Optional[str]]]:
+        maybe_share_header    = recovered_datas[:3]
+        maybe_brainkey_header = recovered_datas[:2]
+
+        _recover_data: Optional[List[bytes]]
+
+        if all(maybe_share_header):
+            _recover_data = typ.cast(List[bytes], maybe_share_header)
+        elif all(maybe_brainkey_header):
+            _recover_data = typ.cast(List[bytes], maybe_brainkey_header)
+        elif all(recovered_datas):
+            _recover_data = None
+
+        params: Optional[parameters.Parameters] = None
+
+        if _recover_data:
+            try:
+                params = parameters.bytes2params(b"".join(_recover_data))
+
+                idx = shared_panel_state['panel_index']
+                self.widget_states[idx]['header_text'] = self.label_text()
+
+                state = self.get_or_init_state()
+                self.header.setText(state['header_text'])
+            except (ValueError, AssertionError) as err:
+                logger.error(f"Error parsing params {err}")
+                if "Unsupported Version" in str(err):
+                    self.mnemonic_widgets[0].setStyleSheet("background-color: #F66;")
+
+        maybe_intcodes : List[Optional[str]]
+        maybe_mnemonics: List[Optional[str]]
+
+        if all(recovered_datas):
+            _recover_data   = typ.cast(List[bytes], recovered_datas)
+            maybe_intcodes  = list(ui_common.bytes2intcodes(b"".join(_recover_data)))
+            data_and_ecc    = list(ui_common.intcodes2parts(maybe_intcodes))
+            maybe_mnemonics = list(_parse_mnemonics(data_and_ecc))
+        else:
+            maybe_intcodes  = list(_parse_intcodes(recovered_datas))
+            maybe_mnemonics = list(_parse_mnemonics(recovered_datas))
+
+        return (params, maybe_intcodes, maybe_mnemonics)
 
     def autofill(self, accept_intcode: int = -1, accept_mnemonic: int = -1) -> None:
         self.trace(f"autofill i:{accept_intcode} m:{accept_mnemonic}")
@@ -864,37 +938,13 @@ class EnterSecretPanel(NavigablePanel):
         #     return
 
         recovered_datas = self.recover_datas()
-        if all(recovered_datas[:2]):
-            if all(recovered_datas[:3]):
-                _recover_data = b"".join(recovered_datas[:3])
-            else:
-                _recover_data = b"".join(recovered_datas[:2])
+        params, maybe_intcodes, maybe_mnemonics = self._parse_datas(recovered_datas)
+        shared_panel_state['params'] = params
 
-            try:
-                params = parameters.bytes2params(_recover_data)
-                shared_panel_state['params'] = params
-
-                idx = shared_panel_state['panel_index']
-                self.widget_states[idx]['header_text'] = self.label_text()
-                self.header.setText(state['header_text'])
-            except (ValueError, AssertionError) as err:
-                logger.error(f"Error parsing params {err}")
-                if "Unsupported Version" in str(err):
-                    self.mnemonic_widgets[0].setStyleSheet("background-color: #F66;")
-
-        maybe_intcodes : typ.Sequence[typ.Optional[str]]
-        maybe_mnemonics: typ.Sequence[typ.Optional[str]]
-
-        if all(recovered_datas):
-            _recover_data = b"".join(recovered_datas)  # type: ignore
+        if GUI_DEBUG_MODE or all(recovered_datas):
             self.set_nav(True, True)
-            maybe_intcodes  = ui_common.bytes2intcodes(_recover_data)
-            data_and_ecc    = list(ui_common.intcodes2parts(maybe_intcodes))
-            maybe_mnemonics = list(_parse_mnemonics(data_and_ecc))
         else:
             self.set_nav(True, False)
-            maybe_intcodes  = list(_parse_intcodes(recovered_datas))
-            maybe_mnemonics = list(_parse_mnemonics(recovered_datas))
 
         for i, intcode in enumerate(maybe_intcodes[: state['num_inputs']]):
             if intcode:

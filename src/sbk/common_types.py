@@ -9,13 +9,19 @@
 # SPDX-License-Identifier: MIT
 """Types used across multiple modules."""
 
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
 from typing import NewType
 from typing import Callable
 from typing import Optional
 from typing import Sequence
-from typing import TypeAlias
 from typing import NamedTuple
 
+# from typing import TypeAlias
+TypeAlias = Any
 RawSalt: TypeAlias = bytes
 
 # ParamConfig data + RawSalt

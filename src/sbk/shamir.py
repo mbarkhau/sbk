@@ -8,7 +8,13 @@
 """Shamir Share generation."""
 
 import math
-import typing as typ
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Iterator
+from typing import Sequence
 
 from . import gf
 from . import primes
@@ -17,7 +23,7 @@ from . import enc_util
 from . import parameters
 from . import common_types as ct
 
-RawShares = typ.Sequence[ct.RawShare]
+RawShares = Sequence[ct.RawShare]
 
 
 def _gfpoint2bytes(point: gf_poly.Point) -> bytes:
@@ -33,7 +39,7 @@ def _split_data_gf_p(
     threshold : int,
     num_shares: int,
     prime     : int,
-) -> typ.Iterable[ct.RawShare]:
+) -> Iterator[ct.RawShare]:
     secret_int = enc_util.bytes2int(data)
     assert secret_int < prime
 
@@ -72,10 +78,10 @@ def _join_gf_p(raw_shares: RawShares, threshold: int, prime: int) -> ct.MasterKe
 # x=3   y03 y31 y32 y33 y34 y35 y36 y37
 Index   = int
 XCoord  = int
-YCoords = dict[tuple[XCoord, Index], int]
+YCoords = Dict[Tuple[XCoord, Index], int]
 
 
-def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> typ.Iterable[ct.RawShare]:
+def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> Iterator[ct.RawShare]:
     field = gf.FieldGF256()
 
     y_coords_by_x: YCoords = {}
@@ -109,9 +115,9 @@ def _join_gf_256(raw_shares: RawShares, threshold: int) -> ct.MasterKey:
     assert all(0 < x < 64 for x in x_coords)
     assert len(x_coords) >= threshold
 
-    secret_ints: list[int] = []
+    secret_ints: List[int] = []
     for i in range(data_len):
-        gfpoints: list[gf_poly.Point] = []
+        gfpoints: List[gf_poly.Point] = []
         for x_coord in x_coords:
             y_coord  = y_coords[x_coord, i]
             gf_point = gf_poly.Point(field[x_coord], field[y_coord])
@@ -127,7 +133,7 @@ def split(
     raw_salt: ct.RawSalt,
     brainkey: ct.BrainKey,
     use_gf_p: bool = False,
-) -> list[ct.Share]:
+) -> List[ct.Share]:
     lens = parameters.raw_secret_lens()
 
     assert len(raw_salt) == lens.raw_salt
@@ -143,7 +149,7 @@ def split(
     else:
         raw_shares = list(_split_data_gf_256(master_key, params.sss_t, params.sss_n))
 
-    shares: list[ct.Share] = []
+    shares: List[ct.Share] = []
     for raw_share in raw_shares:
         assert len(raw_share.data) == lens.raw_share
         share_params = params._replace(sss_x=raw_share.x_coord)
@@ -154,10 +160,10 @@ def split(
     return shares
 
 
-def join(shares: list[ct.Shares], use_gf_p: bool = False) -> tuple[ct.RawSalt, ct.BrainKey]:
+def join(shares: List[ct.Shares], use_gf_p: bool = False) -> Tuple[ct.RawSalt, ct.BrainKey]:
     # strip off params
-    raw_shares      : RawShares = []
-    all_share_params: list[parameters.Parameters] = []
+    raw_shares      : List[ct.RawShare          ] = []
+    all_share_params: List[parameters.Parameters] = []
     for share in shares:
         params_data  = share[: parameters.SHARE_HEADER_LEN]
         share_data   = share[parameters.SHARE_HEADER_LEN :]
@@ -166,7 +172,10 @@ def join(shares: list[ct.Shares], use_gf_p: bool = False) -> tuple[ct.RawSalt, c
         raw_shares.append(ct.RawShare(share_params.sss_x, share_data))
         all_share_params.append(share_params)
 
-    unique_params = {params._replace(sss_x=None) for params in all_share_params}
+    unique_params = {
+        (params.version, params.kdf_p, params.kdf_m, params.kdf_t, params.sss_t)
+        for params in all_share_params
+    }
     if len(unique_params) > 1:
         errmsg = f"Invalid shares using different parameters {unique_params}"
         raise ValueError(errmsg)

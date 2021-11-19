@@ -54,11 +54,11 @@ def test_bytes2phrase_fail():
 
 
 def test_phrase2bytes_fail():
-    assert phrase2bytes("abacus abraham"   ) == b"\x00\x01"
-    assert phrase2bytes("abbakus abbrahame") == b"\x00\x01"
+    assert phrase2bytes("abacus abraham"   , msg_len=2) == b"\x00\x01"
+    assert phrase2bytes("abbakus abbrahame", msg_len=2) == b"\x00\x01"
 
     try:
-        phrase2bytes("abbakuss xanadu")
+        phrase2bytes("abbakuss xanadu", msg_len=2)
         assert False, "Expected ValueError"
     except ValueError as ex:
         assert "Unknown word" in str(ex)
@@ -66,9 +66,10 @@ def test_phrase2bytes_fail():
 
 def test_fuzz_bytes2phrase():
     for i in range(2, 100, 2):
-        data   = os.urandom(i % 20)
-        phrase = bytes2phrase(data)
-        assert phrase2bytes(phrase) == data
+        msg_len = i % 20
+        data    = os.urandom(msg_len)
+        phrase  = bytes2phrase(data)
+        assert phrase2bytes(phrase, msg_len=msg_len) == data
 
         # provoke encoding errors
         assert phrase.encode('ascii').decode('ascii') == phrase
@@ -80,7 +81,7 @@ def test_fuzz_phrase2bytes():
         words_2 = random.sample(WORDLIST, 8)
         words   = "\n".join(w1.ljust(9) + " " + w2.ljust(9) for w1, w2 in zip(words_1, words_2))
 
-        data = phrase2bytes(words)
+        data = phrase2bytes(words, msg_len=16)
         assert len(data) == 16
         assert bytes2phrase(data) == words
 
@@ -103,7 +104,7 @@ def test_fuzz_phrase2words_fuzzymatch(num_typos, max_fail_ratio):
             _sim_typo(w1, num_typos=num_typos).ljust(9) + " " + _sim_typo(w2, num_typos=num_typos).ljust(9)
             for w1, w2 in zip(words_1, words_2)
         )
-        data          = phrase2bytes(typo_words)
+        data          = phrase2bytes(typo_words, msg_len=16)
         result_phrase = bytes2phrase(data)
 
         result_words   = result_phrase.replace("\n", " ").split()

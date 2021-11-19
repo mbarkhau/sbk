@@ -12,18 +12,35 @@ is too tedious. The tests do use
 int and GFP though.
 """
 
-import typing as typ
 import functools
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 from . import gf_lut
 from . import primes
 from . import gf_util
 
-Num     = typ.TypeVar('Num', 'GFP', 'GF256')
-NumType = typ.Type[Num]
+Num     = TypeVar('Num', 'GFP', 'GF256')
+NumType = Type[Num]
 
 
-class GFNum(typ.Protocol[Num]):
+class GFNum(Protocol[Num]):
 
     val  : int
     order: int
@@ -274,7 +291,7 @@ class FieldGF256:
         return ALL_GF256[val]
 
 
-AnyField = typ.Union[FieldGFP, FieldGF256]
+AnyField = Union[FieldGFP, FieldGF256]
 
 
 def init_field(order: int) -> AnyField:

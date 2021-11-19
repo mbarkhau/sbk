@@ -22,6 +22,23 @@ import random
 import typing as typ
 import warnings
 import itertools
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 from . import gf
 from . import gf_lut
@@ -45,7 +62,7 @@ _debug_rand = DebugRandom()
 _rand       = random.SystemRandom()
 
 
-def reset_debug_random():
+def reset_debug_random() -> None:
     if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
         _debug_rand._state = 4294967291
 
@@ -60,7 +77,7 @@ def randrange(stop: int) -> int:
     return result
 
 
-Coefficients = typ.List[gf.GF256]
+Coefficients = List[gf.GF256]
 
 
 class Point:
@@ -83,15 +100,15 @@ class Point:
     def __repr__(self) -> str:
         return f"Point(x={self.x}, y={self.y})"
 
-    def __iter__(self) -> typ.Iterable[gf.GF256]:
+    def __iter__(self) -> Iterator[gf.GF256]:
         yield self.x
         yield self.y
 
 
-Points = typ.Tuple[Point, ...]
+Points = Tuple[Point, ...]
 
 
-def prod(vals: typ.Sequence[gf.GF256]) -> gf.GF256:
+def prod(vals: Sequence[gf.GF256]) -> gf.GF256:
     """Product of numbers.
 
     This is sometimes also denoted by Π (upper case PI).
@@ -106,7 +123,7 @@ def prod(vals: typ.Sequence[gf.GF256]) -> gf.GF256:
     return accu
 
 
-def _interpolation_terms_256(points: Points, at_x: gf.GF256) -> typ.Iterable[gf.GF256]:
+def _interpolation_terms_256(points: Points, at_x: gf.GF256) -> Iterator[gf.GF256]:
     # Specialization to speed up ecc_rs.decode_packets. This should return
     # the exact same result as _interpolation_terms in principle.
     assert isinstance(at_x, gf.GF256)
@@ -180,7 +197,7 @@ def interpolate(points: Points, at_x: gf.GF256) -> gf.GF256:
     return accu
 
 
-def val_of(n: typ.Union[int, float, gf.GFP, gf.GF256]) -> int:
+def val_of(n: Union[int, float, gf.GFP, gf.GF256]) -> int:
     # Helper function to allow n to be a plain integer or float in tests.
     if isinstance(n, int):
         return n
@@ -191,7 +208,7 @@ def val_of(n: typ.Union[int, float, gf.GFP, gf.GF256]) -> int:
         return n.val
 
 
-def poly_eval_fn(field: gf.FieldGF256, coeffs: Coefficients) -> typ.Callable[[int], int]:
+def poly_eval_fn(field: gf.FieldGF256, coeffs: Coefficients) -> Callable[[int], int]:
     """Return function to evaluate polynomial at x."""
 
     def eval_at(at_x: int) -> int:

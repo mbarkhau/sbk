@@ -8,6 +8,22 @@
 
 import re
 import typing as typ
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import click
 
@@ -33,7 +49,7 @@ def _clear() -> bool:
     return True
 
 
-def _prompt(text: str, default: typ.Optional[str] = None) -> str:
+def _prompt(text: str, default: Optional[str] = None) -> str:
     result = click.prompt(text, default=default, show_default=False)
     assert isinstance(result, str)
     return result
@@ -54,7 +70,7 @@ MESSAGES = {
 }
 
 
-MaybeCommand = typ.Optional[str]
+MaybeCommand = Optional[str]
 
 
 def _parse_command(in_val: str) -> MaybeCommand:
@@ -74,12 +90,12 @@ def _parse_command(in_val: str) -> MaybeCommand:
 
 
 # Decoded inputs
-Inputs      = typ.List[ui_common.MaybeIntCode]
+Inputs      = List[ui_common.MaybeIntCode]
 DataLen     = int
-MaybeInputs = typ.Optional[Inputs]
+MaybeInputs = Optional[Inputs]
 
 # Markers for which inputs were entered/accepted by user
-Accepted = typ.List[bool]
+Accepted = List[bool]
 
 
 def _data_len(secret_type: str) -> DataLen:
@@ -127,7 +143,7 @@ class PromptState:
         secret_type: InputType,
         inputs     : Inputs,
         cursor     : int = 0,
-        accepted   : typ.Optional[Accepted] = None,
+        accepted   : Optional[Accepted] = None,
     ) -> None:
         assert len(inputs) % 2 == 0
 
@@ -180,7 +196,7 @@ class PromptState:
                 return f"Enter code/words at {cursor_marker}"
         return MESSAGES[self.secret_type][key]
 
-    def _formatted_lines(self) -> typ.List[str]:
+    def _formatted_lines(self) -> List[str]:
         num_lines = len(self.inputs) // 2
         lines     = [""] * num_lines
 
@@ -216,7 +232,7 @@ class PromptState:
 
         return lines
 
-    def _iter_out_lines(self, show_cursor: bool) -> typ.Iterator[str]:
+    def _iter_out_lines(self, show_cursor: bool) -> Iterator[str]:
         lines       = self._formatted_lines()
         newline_mod = _newline_mod(len(lines))
 
@@ -235,7 +251,7 @@ class PromptState:
 
             yield prefix + line + suffix
 
-    def formatted_input_lines(self, show_cursor: bool = True) -> typ.List[str]:
+    def formatted_input_lines(self, show_cursor: bool = True) -> List[str]:
         header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
         return [header] + list(self._iter_out_lines(show_cursor))
 
@@ -265,7 +281,7 @@ class PromptState:
         else:
             raise Exception(f"Invalid command {cmd}")
 
-    def parse_input(self, in_val: str) -> typ.Optional['PromptState']:
+    def parse_input(self, in_val: str) -> Optional['PromptState']:
         in_val, _ = re.subn(r"[^\w\s]", "", in_val.lower().strip())
         cmd: MaybeCommand = None
 
@@ -303,7 +319,7 @@ class PromptState:
 
         return self._copy(cursor=new_cursor, inputs=new_inputs, accepted=new_accepted)
 
-    def _updated_input_data(self, in_data: bytes) -> typ.Tuple[Inputs, Accepted]:
+    def _updated_input_data(self, in_data: bytes) -> Tuple[Inputs, Accepted]:
         new_accepted = list(self.accepted)
         new_inputs   = [
             (input_value if accepted else None) for input_value, accepted in zip(self.inputs, self.accepted)
@@ -337,7 +353,7 @@ class PromptState:
         return (new_inputs, new_accepted)
 
 
-def format_secret_lines(secret_type: str, data: bytes) -> typ.Sequence[str]:
+def format_secret_lines(secret_type: str, data: bytes) -> Sequence[str]:
     intcodes     = list(ui_common.bytes2intcodes(data))
     inputs       = typ.cast(Inputs, intcodes)
     prompt_state = PromptState(secret_type, inputs)
@@ -348,7 +364,7 @@ def format_secret(secret_type: str, data: bytes) -> str:
     return "\n".join(format_secret_lines(secret_type, data))
 
 
-def prompt(secret_type: str, header_text: typ.Optional[str] = None) -> bytes:
+def prompt(secret_type: str, header_text: Optional[str] = None) -> bytes:
     blank_inputs = _init_blank_inputs(secret_type)
     current_ps   = PromptState(secret_type, blank_inputs)
 
@@ -375,7 +391,7 @@ def prompt(secret_type: str, header_text: typ.Optional[str] = None) -> bytes:
             _echo()
             _echo("    A/Accept: Accept input and continue")
 
-        new_ps: typ.Optional[PromptState] = None
+        new_ps: Optional[PromptState] = None
         while new_ps is None:
             _echo()
             in_val = _prompt(current_ps.message('prompt'), default="")

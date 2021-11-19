@@ -11,12 +11,27 @@
 
 import sys
 import time
-import typing as typ
 import logging
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import click
-
-import sbk
 
 from . import cli_io
 from . import shamir
@@ -38,21 +53,24 @@ click.disable_unicode_literals_warning = True  # type: ignore[attr-defined]
 logger = logging.getLogger("sbk.cli")
 
 
-class LogConfig(typ.NamedTuple):
+class LogConfig(NamedTuple):
     fmt: str
     lvl: int
 
 
+LOG_FORMAT_DEFAULT = "%(levelname)-7s - %(message)s"
+
+LOG_FORMAT_VERBOSE = "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)-16s - %(message)s"
+
+
 def _parse_logging_config(verbosity: int) -> LogConfig:
     if verbosity == 0:
-        return LogConfig("%(levelname)-7s - %(message)s", logging.WARNING)
-
-    log_format = "%(asctime)s.%(msecs)03d %(levelname)-7s " + "%(name)-16s - %(message)s"
-    if verbosity == 1:
-        return LogConfig(log_format, logging.INFO)
-
-    assert verbosity >= 2
-    return LogConfig(log_format, logging.DEBUG)
+        return LogConfig(LOG_FORMAT_DEFAULT, logging.WARNING)
+    elif verbosity == 1:
+        return LogConfig(LOG_FORMAT_VERBOSE, logging.INFO)
+    else:
+        assert verbosity >= 2
+        return LogConfig(LOG_FORMAT_VERBOSE, logging.DEBUG)
 
 
 _PREV_VERBOSITY: int = -1
@@ -220,7 +238,7 @@ def cli(verbose: int = 0) -> None:
 @click.version_option(version="2021.1002-beta")
 def version() -> None:
     """Show version number."""
-    echo(f"SBK version: {sbk.__version__}")
+    echo("SBK version: 2021.1002-beta")
 
 
 @cli.command()
@@ -230,8 +248,8 @@ def version() -> None:
 @_opt_verbose
 def kdf_test(
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
-    memory_cost    : typ.Optional[ct.MebiBytes ] = None,
-    time_cost      : typ.Optional[ct.Iterations] = None,
+    memory_cost    : Optional[ct.MebiBytes ] = None,
+    time_cost      : Optional[ct.Iterations] = None,
     verbose        : int = 0,
 ) -> None:
     """Test KDF difficulty settings."""
@@ -357,8 +375,8 @@ def create(
     scheme_arg     : str        = DEFAULT_SCHEME,
     yes_all        : bool       = False,
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
-    memory_cost    : typ.Optional[ct.MebiBytes ] = None,
-    time_cost      : typ.Optional[ct.Iterations] = None,
+    memory_cost    : Optional[ct.MebiBytes ] = None,
+    time_cost      : Optional[ct.Iterations] = None,
     verbose        : int = 0,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
@@ -435,8 +453,8 @@ def recover_salt(verbose: int = 0) -> None:
 def recover(verbose: int = 0) -> None:
     """Recover Salt and BrainKey by combining Shares."""
     _configure_logging(verbose)
-    params: typ.Optional[parameters.Parameters] = None
-    shares: list[ct.Share] = []
+    params: Optional[parameters.Parameters] = None
+    shares: List[ct.Share] = []
 
     while params is None or len(shares) < params.sss_t:
         share_num = len(shares) + 1
@@ -539,12 +557,12 @@ def load_wallet(
 
 @cli.command()
 @_opt_verbose
-def gui(verbose: int = 0) -> None:
+def qt_gui(verbose: int = 0) -> None:
     """Start sbk gui."""
-    import sbk.gui
+    from . import gui
 
     _configure_logging(verbose)
-    sbk.gui.gui()
+    gui.run_gui()  # type: ignore
 
 
 if __name__ == '__main__':

@@ -116,9 +116,9 @@ with access to the salt (treating it similarly to a traditional wallet
 seed) and should be aware if it may have been compromised, giving them
 enough time to create a new wallet.
 
-The resulting total entropy is at least `13 + 8 = 15byte = 168bit`. The
-headers are somewhat variable, but nonetheless predictable so they are
-not counted as part of the entropy.
+The resulting total entropy is at least `13 + 8 = 15byte = 168bit`.
+The headers are not completely random, so they are not counted as
+part of the entropy.
 
 ```python
 # def: constants_lens

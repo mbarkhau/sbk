@@ -6,7 +6,24 @@
 
 """Galois Field arithmetic functions."""
 
-import typing as typ
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Type
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 from . import gf_lut
 
@@ -84,7 +101,7 @@ def div_slow(a: int, b: int) -> int:
     return val
 
 
-DIV_LUT: typ.Dict[int, int] = {}
+DIV_LUT: Dict[int, int] = {}
 
 
 def div(a: int, b: int) -> int:
@@ -182,7 +199,7 @@ def inverse(val: int) -> int:
 # expressed in this way is known as Bézout's identity.
 
 
-class XGCDResult(typ.NamedTuple):
+class XGCDResult(NamedTuple):
     g: int
     s: int  # sometimes called x
     t: int  # sometimes called y

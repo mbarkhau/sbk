@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: MIT
 
 """Package data access helpers"""
-import typing as typ
+from typing import List
+from typing import ContextManager
 
 try:
     import importlib.resources as importlib_resources
@@ -14,7 +15,7 @@ except ImportError:
     import importlib_resources  # type: ignore
 
 
-def path(filename: str) -> typ.ContextManager:
+def path(filename: str) -> ContextManager:
     return importlib_resources.path("sbk.assets", filename)
 
 
@@ -22,7 +23,7 @@ def read_binary(filename: str) -> bytes:
     return importlib_resources.read_binary("sbk.assets", filename)
 
 
-def read_wordlist(filename: str) -> list[str]:
+def read_wordlist(filename: str) -> List[str]:
     result = []
     with importlib_resources.path("sbk.wordlist", filename) as path:
         with path.open() as fobj:

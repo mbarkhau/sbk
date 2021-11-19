@@ -5,7 +5,23 @@
 # SPDX-License-Identifier: MIT
 
 """Lookup tables for multiplication in GF(2**8)."""
-import typing as typ
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 EXP_LUT_STR = """
 01 03 05 0f 11 33 55 ff 1a 2e 72 96 a1 f8 13 35
@@ -83,7 +99,7 @@ MUL_INVERSE_LUT = [int(val, 16) for val in MUL_INVERSE_LUT_STR.split()]
 #   (0x01 + 0xC6) % 255 = 0xC7
 # - Look up the sum, 0xC7, on the exponentiation table. We get 0x09.
 
-MUL_LUT: typ.List[typ.List[int]] = []
+MUL_LUT: List[List[int]] = []
 
 
 def init_mul_lut() -> None:

@@ -7,8 +7,24 @@
 
 """GUI Tasks (on threads) for SBK."""
 import time
-import typing as typ
 import logging
+from typing import Any
+from typing import Set
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from typing import Generic
+from typing import NewType
+from typing import TypeVar
+from typing import Callable
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Protocol
+from typing import Sequence
+from typing import Generator
+from typing import NamedTuple
 
 import PyQt5.QtCore as qtc
 
@@ -20,13 +36,13 @@ from . import gui_panels_base as gpb
 logger = logging.getLogger("sbk.gui_tasks")
 
 
-class ProgressStatus(typ.NamedTuple):
+class ProgressStatus(NamedTuple):
 
     current: int
     length : int
 
 
-def init_progres_status_emitter_clazz(signal) -> typ.Callable:
+def init_progres_status_emitter_clazz(signal) -> Callable:
     """Create a class that can be used with ui_common.run_with_progress_bar."""
 
     class _ProgressStatusEmitter:

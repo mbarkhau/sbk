@@ -37,10 +37,12 @@ if [[ ! -f $ELECTRUM_PATH ]]; then
     wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz -O $ELECTRUM_PATH
     wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.ThomasV.asc
     wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.sombernight_releasekey.asc
+    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.Emzy.asc
 fi
 
 gpg --verify Electrum-4.1.5.tar.gz.ThomasV.asc $ELECTRUM_PATH
 gpg --verify Electrum-4.1.5.tar.gz.sombernight_releasekey.asc $ELECTRUM_PATH
+gpg --verify Electrum-4.1.5.tar.gz.Emzy.asc $ELECTRUM_PATH
 
 # create a directory to build the ISO from
 rm -rf iso

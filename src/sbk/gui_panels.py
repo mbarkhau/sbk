@@ -54,7 +54,7 @@ logger = logging.getLogger("sbk.gui_panels")
 
 GUIDE_TEXT = f"""
 <html><head/><body style="white-space:pre-wrap;">
-<p style="font-family:monospace;font-size:12px;line-height:92%;">
+<p style="font-family:monospace;font-size:10px;line-height:92%;">
 {ui_common.USER_GUIDE_QR_CODE}<p>
 <center>{ui_common.USER_GUIDE_TEXT.strip()}</center>
 </body></html>
@@ -117,7 +117,7 @@ class SelectCommandPanel(gpb.Panel):
         # self._layout.addStretch(1)
 
         add_button("&Settings"  , 'settings')
-        add_button("&User Guide", 'userguide')
+        add_button("&Documentation", 'documentation')
         # self._layout.addStretch(1)
         # add_button("&Debug", 'debug', enabled=False)
 
@@ -178,8 +178,8 @@ class SelectCommandPanel(gpb.Panel):
             #     p.get_or_init_panel(ShowKeysPanel).switch()
             elif button_id == 'settings':
                 p.get_or_init_panel(SettingsPanel).switch()
-            elif button_id == 'userguide':
-                p.get_or_init_panel(UserGuidePanel).switch()
+            elif button_id == 'documentation':
+                p.get_or_init_panel(DocumentationPanel).switch()
             # elif button_id == 'debug':
             #     params = parameters.bytes2params(b"\x11\x00\x00")
             #     state  = gpb.get_state()
@@ -368,34 +368,41 @@ class SeedGenerationPanel(gpb.Panel):
             self.parent().close()
 
 
-class UserGuidePanel(gpb.NavigablePanel):
+class DocumentationPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
-        self.title            = "User Guide"
+        self.title            = "Documentation"
         self.back_panel_clazz = SelectCommandPanel
         self.next_panel_clazz = SelectCommandPanel
 
         super().__init__(index)
 
-        label      = qtw.QLabel(GUIDE_TEXT.strip())
         label_wrap = qtw.QHBoxLayout()
         label_wrap.addStretch(1)
-        label_wrap.addWidget(label)
+        label_wrap.addWidget(qtw.QLabel(GUIDE_TEXT.strip()))
         label_wrap.addStretch(1)
+
+        layout_left = qtw.QVBoxLayout()
+        layout_left.addWidget(qtw.QLabel("<center>A4</center>"))
+        layout_left.addWidget(self.new_pdf_button("Share Template", "share_a4.pdf"))
+        layout_left.addWidget(self.new_pdf_button("Dogtag Templates", "grid_a4.pdf"))
+        layout_left.addWidget(self.new_pdf_button("SBK Manual", "sbk_a4.pdf"))
+        layout_left.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_a4.pdf"))
+
+        layout_right = qtw.QVBoxLayout()
+        layout_right.addWidget(qtw.QLabel("<center>US Letter</center>"))
+        layout_right.addWidget(self.new_pdf_button("Share Template", "share_letter.pdf"))
+        layout_right.addWidget(self.new_pdf_button("Dogtag Templates", "grid_letter.pdf"))
+        layout_right.addWidget(self.new_pdf_button("SBK Manual", "sbk_letter.pdf"))
+        layout_right.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_letter.pdf"))
+
+        docs_layout = qtw.QHBoxLayout()
+        docs_layout.addLayout(layout_left)
+        docs_layout.addLayout(layout_right)
 
         self._layout = qtw.QVBoxLayout()
         self._layout.addLayout(label_wrap)
-        self._layout.addStretch(2)
-
-        self._layout.addWidget(self.new_pdf_button("Share A4", "share_a4.pdf"))
-        self._layout.addWidget(self.new_pdf_button("Guide A4", "sbk_a4.pdf"))
-        self._layout.addWidget(self.new_pdf_button("Guide A4 Booklet", "sbk_booklet_letter.pdf"))
-        # self._layout.addWidget(self.new_pdf_button("Grid A4", "grid_a4.pdf"))
-
-        self._layout.addWidget(self.new_pdf_button("Share US Letter", "share_letter.pdf"))
-        self._layout.addWidget(self.new_pdf_button("Guide US Letter", "sbk_letter.pdf"))
-        self._layout.addWidget(self.new_pdf_button("Guide US Letter Booklet", "sbk_booklet_letter.pdf"))
-        # self._layout.addWidget(self.new_pdf_button("Grid US Letter", "grid_letter.pdf"))
-
+        self._layout.addStretch(1)
+        self._layout.addLayout(docs_layout)
         self._layout.addStretch(1)
 
         self._layout.addLayout(self.nav_layout)

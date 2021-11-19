@@ -49,10 +49,9 @@ setuptools.setup(
     package_dir={"": "src"},
     zip_safe=False,
     include_package_data=True,
-    python_requires=">=3.10",
+    python_requires=">=3.8",
     install_requires=install_requires,
     setup_requires=['lib3to6>=202110.1050b0'],
-    lib3to6_default_mode='enabled',
     distclass=distclass,
     entry_points="""
         [console_scripts]
@@ -72,6 +71,7 @@ setuptools.setup(
         # "Operating System :: MacOS :: MacOS X",
         # "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: Implementation :: CPython",

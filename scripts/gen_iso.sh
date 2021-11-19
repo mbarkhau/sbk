@@ -50,7 +50,6 @@ rm -f newfilesystem*
 
 # rm -f filesystem.squashfs
 # 7z e -o. "$ISO_PATH" casper/filesystem.squashfs
-
 # sqfs2tar filesystem.squashfs | docker import - "ubuntulive:base"
 
 
@@ -344,7 +343,7 @@ RUN apt-get install -y grub2-common grub-pc-bin grub-efi-amd64-bin grub-efi-amd6
 # install electrum dependencies
 RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-pyqt5
 
-RUN python3 -m pip install lib3to6 argon2-cffi
+RUN python3 -m pip install argon2-cffi
 
 # install electrum
 ADD Electrum-4.1.5.tar.gz /opt/
@@ -352,9 +351,10 @@ RUN mv /opt/Electrum-4.1.5 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk
+ADD sbk-2021.1002b0-py3-none-any.whl /opt/
 ADD sbk-2021.1002b0.tar.gz /opt/
 RUN mv /opt/sbk-2021.1002b0 /opt/sbk
-RUN bash -c "cd /opt/sbk; python3 -m pip install ."
+RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1002b0-py3-none-any.whl"
 
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp

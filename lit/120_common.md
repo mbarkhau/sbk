@@ -32,6 +32,19 @@ individual module this may be excessive, but it greatly reduces
 boilerplate throughout the program.
 
 ```python
+# def: typing
+import typing as typ
+from typing import NewType, Callable, NamedTuple, Optional
+from typing import Tuple, List, Dict, Set, Any
+from typing import Generator, Iterator, Iterable, Sequence
+from typing import Type, TypeVar, Generic, Union, Protocol
+# from collections.abc import Generator, Iterator, Counter
+
+# from typing import TypeAlias
+TypeAlias = Any
+```
+
+```python
 # def: imports
 import os
 import re
@@ -49,9 +62,7 @@ import functools as ft
 import itertools as it
 import subprocess as sp
 
-from typing import NewType, TypeAlias, Callable, Sequence, NamedTuple, Optional, Any
-from collections.abc import Generator, Iterator
-
+# dep: typing
 import sbk.common_types as ct
 
 logger = logging.getLogger(__name__)
@@ -70,7 +81,10 @@ logging.basicConfig(level=logging.DEBUG, format=_logfmt, datefmt="%Y-%m-%dT%H:%M
 # dep: common.boilerplate
 """Types used across multiple modules."""
 
-from typing import NewType, TypeAlias, Sequence, Callable, Optional, NamedTuple
+from typing import NewType, Sequence, Callable, Optional, NamedTuple
+from typing import Tuple, List, Dict, Set, Any
+# from typing import TypeAlias
+TypeAlias = Any
 # dep: types
 ```
 

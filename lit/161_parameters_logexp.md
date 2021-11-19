@@ -61,8 +61,9 @@ g(0) + 1 &= g(1)           \\
 ```
 
 ```python
-# def: _param_coefficients
-def _param_coefficients(b: float) -> tuple[int, int]:
+# def: param_coeffs
+# dep: common.typing
+def param_coeffs(b: float) -> Tuple[int, int]:
     assert b > 1
     s = int(1 / (b - 1))
     o = int(1 - s)
@@ -91,16 +92,16 @@ In the context of the `kdf` module, for a given base, we will use
 
 ```python
 # def: impl_log_and_exp
-# dep: _param_coefficients
+# dep: param_coeffs
 from math import log
 
 def param_exp(n: int, b: float) -> int:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     v = round(b ** n * s + o)
     return v
 
 def param_log(v: int, b: float) -> int:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     n = log((v - o) / s) / log(b)
     return min(max(round(n), 0), 2**63)
 ```
@@ -114,7 +115,7 @@ def param_log(v: int, b: float) -> int:
 import terminaltables as tt
 
 for b in [1+1/10, 1+1/8]:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     print(f"{b=:.3f} {s=:.3f} {o=:.3f}")
 
     data = [["n"], ["log(exp(n))"], ["exp(n)"]]
@@ -156,7 +157,7 @@ the previous.
 # exec
 # dep: impl_log_and_exp
 for b in [17/16, 11/10, 9/8, 6/5, 5/4]:
-    s, o = _param_coefficients(b)
+    s, o = param_coeffs(b)
     maxval = round(b**63 * s + o)
     print(f"{b=:.3f} {s=:<2} {o=:<3} {maxval=}")
 ```

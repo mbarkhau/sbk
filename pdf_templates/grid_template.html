@@ -13,7 +13,7 @@
   @page {
     padding: 0;
     margin: 0;
-    size: {{w}}mm {{h}}mm;
+    size: {{h}}mm {{w}}mm;
   }
 
   body {
@@ -26,13 +26,28 @@
     display: inline-block;
     position: relative;
     height: 35mm;
-    width: 23mm;
-    margin: 8.0mm 8.0mm;
-    /*border: 1px dashed red;*/
+    width: 22mm;
+    margin: 4.0mm 10.0mm;
+    /* border: 1px dashed red; */
   }
   .dogtag div {
     position: absolute;
   }
+  .number {
+    left: -0.7mm;
+    top: 33mm;
+    width: 22.5mm;
+    font-family: monospace;
+  }
+  .number .left {text-align: left;}
+  .number .right {text-align: right;}
+  .number .center {
+    display: inline-block;
+    width: 18mm;
+    text-align: center;
+    letter-spacing: -.8mm;
+  }
+
   .vline, .hline {
     position: absolute;
     border: 1px solid black;
@@ -42,35 +57,38 @@
   }
   .vline {
     top: 0;
+    height: 31.0mm;
     border-width: 0 0 0 1px;
-    height: 33.0mm;
   }
   .splitline {
-    position: absolute;
-    top: 14.25mm;
-    left: -1mm;
-    width: 24.0mm;
-    height: 2.55mm;
     background: white;
+    position: absolute;
+    height: 2.6mm;
+    width: 24.0mm;
+    left: -1mm;
+    top: 14.25mm;
   }
   .hline {
-    left: 0;
     border-width: 1px 0 0 0;
-    width: 22.0mm;
+    width: 20.0mm;
+    left: 0;
   }
   .hline:before,
   .vline:before {
     position: relative;
-    font-size: 6pt;
     font-family: sans-serif;
+    font-size: 6pt;
   }
   .vline:before {
     left: -0.8mm;
     top: -4.0mm;
   }
   .hline:before {
-    left: -2.5mm;
-    top: -2.0mm;
+    text-align: right;
+    display: block;
+    left: -3.8mm;
+    top: -1.4mm;
+    width: 2.5mm;
   }
 
   .vline:nth-child(1) {left: {{0 * 2.2}}mm;}
@@ -95,6 +113,9 @@
   .vline:nth-child(9):before {content: "8";}
   .vline:nth-child(10):before {content: "9";}
 
+  .vline:nth-child(4) {border-width: 0 0 0 1.5px;}
+  .vline:nth-child(7) {border-width: 0 0 0 1.5px;}
+
   .hline:nth-child(1) {top: {{0 * 2.8}}mm;}
   .hline:nth-child(2) {top: {{1 * 2.8}}mm;}
   .hline:nth-child(3) {top: {{2 * 2.8}}mm;}
@@ -107,6 +128,12 @@
   .hline:nth-child(10) {top: {{9 * 2.8}}mm;}
   .hline:nth-child(11) {top: {{10 * 2.8}}mm;}
   .hline:nth-child(12) {top: {{11 * 2.8}}mm;}
+  .hline:nth-child(13) {top: {{12 * 2.8}}mm;}
+
+/*
+  .hline:nth-child(4) {border-width: 1.5px 0 0 0;}
+  .hline:nth-child(8) {border-width: 1.5px 0 0 0;}
+*/
 
   .hline:nth-child(1):before {content: "1";}
   .hline:nth-child(2):before {content: "2";}
@@ -114,6 +141,7 @@
   .hline:nth-child(4):before {content: "4";}
   .hline:nth-child(5):before {content: "5";}
   .hline:nth-child(6):before {content: "6";}
+
   .hline:nth-child(7):before {content: "1";}
   .hline:nth-child(8):before {content: "2";}
   .hline:nth-child(9):before {content: "3";}
@@ -125,19 +153,24 @@
 <title>Grid</title>
 </head>
 <body class="{{fmt}}">
-  {% for _ in range(20) %}
+  {% for num in range(24) %}
   <div class="dogtag">
     <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
     </div>
     <div>
-      <div class="vline"></div> <div class="vline"></div> <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div> <div class="vline"></div> <div class="vline"></div>
+      <div class="vline"></div> <div class="vline"></div>
+      <div class="vline"></div> <div class="vline"></div>
+      <div class="vline"></div> <div class="vline"></div>
+      <div class="vline"></div> <div class="vline"></div>
       <div class="vline"></div> <div class="vline"></div>
     </div>
-    <div class="splitline"></div>
+     <div class="splitline"></div>
+     <div class="number"><span class="left">.</span><span class="center">{{[".", ":", "...", "::", "::.", ":::"][num % 6]}}</span><span class="right">.</span>
+    </div>
    </div>
  {% endfor %}
 </body>

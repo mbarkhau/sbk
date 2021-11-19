@@ -85,10 +85,10 @@ because we will only be encoding secrets with a length in bytes.
 # def: pow2prime_params
 Pow2PrimeN     : TypeAlias = int
 Pow2PrimeK     : TypeAlias = int
-Pow2PrimeItem  : TypeAlias = tuple[Pow2PrimeN, Pow2PrimeK]
+Pow2PrimeItem  : TypeAlias = Tuple[Pow2PrimeN, Pow2PrimeK]
 Pow2PrimeItems : TypeAlias = Iterator[Pow2PrimeItem]
 
-POW2_PRIME_PARAMS: dict[Pow2PrimeN, Pow2PrimeK] = {
+POW2_PRIME_PARAMS: Dict[Pow2PrimeN, Pow2PrimeK] = {
       8:    5,  16:   15,  24:    3,  32:    5,   40:   87,
      48:   59,  56:    5,  64:   59,  72:   93,   80:   65,
      88:  299,  96:   17, 104:   17, 112:   75,  120:  119,
@@ -136,7 +136,7 @@ Evaluate of the parameters into the actual `POW2_PRIMES`.
 # dep: pow2prime_params
 def pow2prime(n: Pow2PrimeN, k: Pow2PrimeK) -> int:
     if n % 8 == 0:
-        return 2 ** n - k
+        return int(2 ** n - k)
     else:
         raise ValueError(f"Invalid n={n} (n % 8 != 0)")
 
@@ -294,7 +294,7 @@ from random import randrange
 _mr_js_bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022}
 
 
-def _miller_test_bases(n: int, k: int, accuracy: int = 100) -> Iterator[int]:
+def _miller_test_bases(n: int, k: int, accuracy: int = 100) -> Set[int]:
     if n < 2 ** 64:
         return _mr_js_bases
     else:
@@ -444,9 +444,7 @@ So that you don't need to run the test suite, the `sbk.primes` module is has a `
 ```python
 # def: impl_read_oeis_org_a014234
 def read_oeis_org_a014234() -> str:
-    import time
     import tempfile
-    import pathlib as pl
     import urllib.request
 
     cache_path = pl.Path(tempfile.gettempdir()) / "oeis_org_b014234.txt"
@@ -457,8 +455,13 @@ def read_oeis_org_a014234() -> str:
     else:
         a014234_url = "https://oeis.org/A014234/b014234.txt"
         with urllib.request.urlopen(a014234_url) as fobj:
-            data = fobj.read()
-        content = data.decode("utf-8")
+            data = typ.cast(Union[bytes, str], fobj.read())
+
+        if isinstance(data, bytes):
+            content = data.decode("utf-8")
+        else:
+            content = data
+
         with cache_path.open(mode="w") as fobj:
             fobj.write(content)
     return content

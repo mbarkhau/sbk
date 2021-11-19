@@ -39,12 +39,12 @@ AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("https://sbk.dev/auth")
 
 
 CONTEXTS = [
-    {'tmpl': "share", 'w': 210, 'h': 297, 'wc': 24, 'fmt': "a4", 'qr_src': SHARE_QR_SRC},
-    {'tmpl': "share", 'w': 8.5, 'h': 11 , 'wc': 24, 'fmt': "usletter", 'qr_src': SHARE_QR_SRC},
-    {'tmpl': "auth", 'w': 210, 'h': 297, 'fmt': "a4", 'qr_src': AUTH_QR_SRC},
-    {'tmpl': "auth", 'w': 8.5, 'h': 11, 'fmt': "usletter", 'qr_src': AUTH_QR_SRC},
+    # {'tmpl': "share", 'w': 210, 'h': 297, 'wc': 24, 'fmt': "a4", 'qr_src': SHARE_QR_SRC},
+    # {'tmpl': "share", 'w': 8.5, 'h': 11 , 'wc': 24, 'fmt': "usletter", 'qr_src': SHARE_QR_SRC},
+    # {'tmpl': "auth", 'w': 210, 'h': 297, 'fmt': "a4", 'qr_src': AUTH_QR_SRC},
+    # {'tmpl': "auth", 'w': 8.5, 'h': 11, 'fmt': "usletter", 'qr_src': AUTH_QR_SRC},
     {'tmpl': "grid", 'w': 210, 'h': 297, 'fmt': "a4"},
-    {'tmpl': "grid", 'w': 8.5, 'h': 11, 'fmt': "usletter"},
+    # {'tmpl': "grid", 'w': 8.5, 'h': 11, 'fmt': "usletter"},
 ]
 
 

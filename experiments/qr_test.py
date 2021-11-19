@@ -6,12 +6,15 @@ import qrcode
 
 def main(args=sys.argv[1:]):
     qr = qrcode.QRCode(
-        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4,
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
     )
     if args:
         data = " ".join(args)
     else:
-        data = "https://gitlab.com/mbarkhau/sbk#air-gap-computer"
+        data = "https://sbk.dev/airgap"
 
     qr.add_data(data)
 
@@ -21,8 +24,13 @@ def main(args=sys.argv[1:]):
     qr.print_ascii(out=bw_buf, invert=False)
     qr.print_ascii(out=wb_buf, invert=True)
 
-    bw_lines = bw_buf.getvalue().replace("\x0a", " ").splitlines()
-    wb_lines = wb_buf.getvalue().replace("\x0a", " ").splitlines()
+    bw_text = bw_buf.getvalue().replace("\x0a", "\n").replace("\xa0", " ")
+    wb_text = wb_buf.getvalue().replace("\x0a", "\n").replace("\xa0", " ")
+
+    print(bw_text)
+
+    bw_lines = bw_text.splitlines()
+    wb_lines = wb_text.splitlines()
 
     print()
     for bw_line, wb_line in zip(bw_lines, wb_lines):

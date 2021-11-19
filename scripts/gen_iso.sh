@@ -7,9 +7,14 @@
 BUILD_DIR=../sbk-live-build
 mkdir -p $BUILD_DIR
 
+rm -f $BUILD_DIR/sbk*.tar.gz
+rm -f $BUILD_DIR/sbk*.whl
+
 cp dist/*.tar.gz $BUILD_DIR
-cp static/* $BUILD_DIR
+cp dist/*.whl $BUILD_DIR
+cp pdf_templates/*.pdf $BUILD_DIR
 cp sbk-live-data/* $BUILD_DIR
+cp src/sbk/assets/* $BUILD_DIR
 
 # gpg --import sbk-live-data/ThomasV.asc
 # gpg --sign-key 6694D8DE7BE8EE5631BED9502BD5824B7F9470E6

@@ -71,7 +71,7 @@ def int2bytes(num: int, zfill_bytes: int = 1) -> bytes:
 # def: impl_progressbar
 class ProgressSmoother:
 
-    increments: list[float]
+    increments: List[float]
 
     def __init__(self, progress_cb: ct.ProgressCallback) -> None:
         self.increments = [0]

@@ -58,7 +58,7 @@ conventions once.
 ```python
 # def: impl_digest_step
 def _digest(data: bytes, p: ct.Parallelism, m: ct.MebiBytes, t: ct.Iterations) -> bytes:
-    return argon2.low_level.hash_secret_raw(
+    result = argon2.low_level.hash_secret_raw(
         secret=data,
         salt=data,
         hash_len=HASH_LEN,
@@ -67,6 +67,7 @@ def _digest(data: bytes, p: ct.Parallelism, m: ct.MebiBytes, t: ct.Iterations) -
         time_cost=t,
         type=argon2.low_level.Type.ID,
     )
+    return typ.cast(bytes, result)
 ```
 
 ```python
@@ -137,7 +138,7 @@ def digest(
 
 ```python
 # def: main
-def main(args: list[str]) -> int:
+def main(args: List[str]) -> int:
     memory_mb  = int(args[0])
     kdf_p, kdf_m, kdf_t = parameters.init_kdf_params(kdf_m=memory_mb, kdf_t=1)
     try:
@@ -145,7 +146,6 @@ def main(args: list[str]) -> int:
         return 0
     except argon2.exceptions.HashingError:
         return -1
-    return -1
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

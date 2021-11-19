@@ -3,13 +3,14 @@
 ```python
 # def: measure_digest
 import time
+from typing import Tuple
 import argon2
 from argon2.low_level import ffi
 
 Seconds = float
 
 
-def measure_digest(p: int, m: int, t: int) -> tuple[str, Seconds]:
+def measure_digest(p: int, m: int, t: int) -> Tuple[str, Seconds]:
     version = argon2.low_level.ARGON2_VERSION
     assert version == 19, version
 

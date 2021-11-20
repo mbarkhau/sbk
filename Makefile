@@ -143,4 +143,5 @@ serve_doc:
 
 .PHONY: landingpage_sync
 landingpage_sync:
+	rsync landingpage/static/*.* root@vserver:/var/www/html/sbk/static/
 	rsync landingpage/*.* root@vserver:/var/www/html/sbk/

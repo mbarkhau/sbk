@@ -330,7 +330,7 @@ def maybe_intcodes2bytes(intcodes: MaybeIntCodes, msg_len: int) -> bytes:
     data_with_ecc = intcodes2parts(intcodes)
 
     assert all(len(part) <= 1 for part in data_with_ecc)
-    maybe_packets = [part[0] if part else None for part in data_with_ecc]
+    maybe_packets = tuple(part[0] if part else None for part in data_with_ecc)
     return ecc_rs.decode_packets(maybe_packets, msg_len)
 
 

@@ -99,9 +99,10 @@ def fuzzy_match(word: str) -> str:
 def phrase2words(phrase: PhraseStr) -> Iterator[str]:
     for word in phrase.split():
         word = word.strip().lower()
-        if word not in WORDSET:
-            word = fuzzy_match(word)
-        yield word
+        if word in WORDSET:
+            yield word
+        else:
+            yield fuzzy_match(word)
 
 
 def _phrase2bytes(phrase: PhraseStr) -> Iterator[bytes]:

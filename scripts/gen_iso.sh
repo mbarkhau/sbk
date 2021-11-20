@@ -353,10 +353,10 @@ RUN mv /opt/Electrum-4.1.5 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk
-ADD sbk-2021.1002b0-py3-none-any.whl /opt/
-ADD sbk-2021.1002b0.tar.gz /opt/
-RUN mv /opt/sbk-2021.1002b0 /opt/sbk
-RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1002b0-py3-none-any.whl"
+ADD sbk-2021.1003b0-py3-none-any.whl /opt/
+ADD sbk-2021.1003b0.tar.gz /opt/
+RUN mv /opt/sbk-2021.1003b0 /opt/sbk
+RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1003b0-py3-none-any.whl"
 
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp

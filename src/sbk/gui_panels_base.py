@@ -493,7 +493,7 @@ def _recover_datas(valid_datas: Sequence[MaybeBytes], msg_len: int) -> Sequence[
 
     if is_recoverable:
         try:
-            maybe_packets = [part[0] if part else None for part in valid_datas]
+            maybe_packets = tuple(part[0] if part else None for part in valid_datas)
             result        = ecc_rs.decode_packets(maybe_packets, msg_len)
             return [result[i : i + 1] for i in range(len(result))]
         except ecc_rs.ECCDecodeError as err:

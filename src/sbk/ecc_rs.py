@@ -18,6 +18,7 @@ import math
 import base64
 import random
 import typing as typ
+import functools
 import itertools
 import collections
 from typing import Any
@@ -51,7 +52,7 @@ Packet  = int
 Packets = List[Packet]
 # Erasures signified by None
 # position in the sequence implies the x-coordinate
-MaybePackets = List[Optional[Packet]]
+MaybePackets = Sequence[Optional[Packet]]
 
 
 def _nCr(n: int, r: int) -> float:
@@ -97,6 +98,7 @@ def _encode(msg: Message, ecc_len: int) -> Block:
         raise AssertionError()
 
 
+@functools.lru_cache(maxsize=128)
 def encode(msg: Message, ecc_len: Optional[int] = None, verify: bool = True) -> Block:
     """Encode message to a Block with RS Code as ECC data."""
     if ecc_len is None:
@@ -148,6 +150,7 @@ def _iter_indexes(msg_len: int, num_points: int) -> Iterable[Indexes]:
                 yield sample_combo
 
 
+@functools.lru_cache(maxsize=128)
 def decode_packets(packets: MaybePackets, msg_len: int) -> Message:
     field  = gf.FieldGF256()
     points = tuple(gf_poly.Point(field[x], field[y]) for x, y in enumerate(packets) if y is not None)
@@ -189,7 +192,7 @@ def decode(block: Block, msg_len: int) -> Message:
     if ecc_len == 0:
         return block
     elif ecc_len > 0:
-        return decode_packets(list(block), msg_len)
+        return decode_packets(tuple(block), msg_len)
     else:
         raise AssertionError(f"Invalid {ecc_len=}")
 
@@ -203,7 +206,8 @@ def _cli_encode(msg: str) -> str:
 
 def _cli_decode(block_b16_str: str) -> str:
     block_b16 = block_b16_str.rstrip("\n").upper().encode("ascii")
-    packets: MaybePackets = []
+    packets: List[Optional[Packet]] = []
+
     for i in range(0, len(block_b16), 2):
         packet_b16 = block_b16[i : i + 2]
         try:
@@ -213,7 +217,7 @@ def _cli_decode(block_b16_str: str) -> str:
             packets.append(None)
 
     assert len(packets) == len(block_b16) // 2
-    msg_data = decode_packets(packets, msg_len=len(block_b16) // 4)
+    msg_data = decode_packets(tuple(packets), msg_len=len(block_b16) // 4)
     return msg_data.decode("utf-8")
 
 

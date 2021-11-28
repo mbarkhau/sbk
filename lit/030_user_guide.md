@@ -107,7 +107,7 @@ Once you've decided on a scheme and after you have made plans about where you wi
 There are more materials that you could prepare to make your shares more robust, but this will do for now to understand the basic idea.
 
 
-[href_sbk_download_sbklive_x64]: TODO
+[href_sbk_download_sbklive_x64]: https://sbk.dev/#sbk-live
 
 [href_rufus_ie]: https://rufus.ie/
 

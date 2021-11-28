@@ -158,3 +158,24 @@ a:hover {text-decoration: underline;}
 ::selection {
     background: #BBB;
 }
+
+.bootable-tutorial-links li {
+  display: inline-block;
+  border-radius: 0.2em;
+  border: 1px solid black;
+  text-align: center;
+  font-weight: bold;
+}
+.bootable-tutorial-links li a {
+  display: inline-block;
+  min-width: 7em;
+  padding: 0.5em;
+  color: #444;
+  text-decoration: none;
+}
+.bootable-tutorial-links li.active {
+  background: #6E6;
+}
+.bootable-tutorial-links li:hover {
+  background: #1C1;
+}

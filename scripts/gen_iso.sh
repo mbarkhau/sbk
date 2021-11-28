@@ -353,10 +353,10 @@ RUN mv /opt/Electrum-4.1.5 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk
-ADD sbk-2021.1004b0-py3-none-any.whl /opt/
-ADD sbk-2021.1004b0.tar.gz /opt/
-RUN mv /opt/sbk-2021.1004b0 /opt/sbk
-RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1004b0-py3-none-any.whl"
+ADD sbk-2021.1005b0-py3-none-any.whl /opt/
+ADD sbk-2021.1005b0.tar.gz /opt/
+RUN mv /opt/sbk-2021.1005b0 /opt/sbk
+RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1005b0-py3-none-any.whl"
 
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp
@@ -484,9 +484,9 @@ mkisofs -o sbklive.iso \
     -J -joliet-long \
     -boot-info-table iso;
 
-mv sbklive.iso sbklive_2021.1004-beta.iso
-echo "wrote $BUILD_DIR/sbklive_2021.1004-beta.iso"
+mv sbklive.iso sbklive_2021.1005-beta.iso
+echo "wrote $BUILD_DIR/sbklive_2021.1005-beta.iso"
 
 # echo ""
-# echo "      qemu-system-x86_64 -boot d -cdrom $BUILD_DIR/sbklive_2021.1004-beta.iso -m 2048"
+# echo "      qemu-system-x86_64 -boot d -cdrom $BUILD_DIR/sbklive_2021.1005-beta.iso -m 2048"
 # echo ""

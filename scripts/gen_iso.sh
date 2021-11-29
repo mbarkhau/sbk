@@ -4,8 +4,12 @@
 
 # apt-get install p7zip-full grub2-common mtools xorriso squashfs-tools-ng
 
+SBK_DIR=$(pwd)
 BUILD_DIR=../sbk-live-build
 mkdir -p $BUILD_DIR
+
+which transmission-create
+which xorriso
 
 rm -f $BUILD_DIR/sbk*.tar.gz
 rm -f $BUILD_DIR/sbk*.whl
@@ -463,6 +467,8 @@ stat --printf="%s" iso/casper/filesystem.squashfs > iso/casper/filesystem.size
 cp newfilesystem.manifest iso/casper/filesystem.manifest
 cp grub.cfg iso/boot/grub/grub.cfg
 
+echo 'SBK Live 2021.1005-beta (based on Ubuntu 20.04.2.0 LTS "Focal Fossa" - Release amd64 20210209.1)' > iso/.disk/info
+
 # update state files
 (cd iso; find . -type f -print0 | xargs -0 md5sum | grep -v "\./md5sum.txt" > md5sum.txt)
 
@@ -471,22 +477,72 @@ rm iso/casper/filesystem.squashfs.gpg
 
 rm -f sbklive.iso;
 
+# NOTE (mb 2021-11-28): This doesn't generate Joliet SVD
+#
 # build the ISO image using the image itself
 # docker run -it --rm -v "$(pwd):/app" \
 #     ubuntulive:image \
 #     grub-mkrescue -o /app/sbklive.iso /app/iso/ -- -volid UbuntuLive
 
-mkisofs -o sbklive.iso \
-    -b isolinux/isolinux.bin \
-    -c isolinux/boot.cat \
-    -no-emul-boot \
-    -boot-load-size 4 \
-    -J -joliet-long \
-    -boot-info-table iso;
+# Add initial options first
+cat <<EOF >xorriso.conf
+-as mkisofs \\
+-r -J --joliet-long \\
+-V 'SBK Live 2021.1005-beta amd64' \\
+--modification-date='2021020919062600' \\
+-isohybrid-mbr \\
+--interval:local_fs:0s-15s:zero_mbrpt,zero_gpt,zero_apm:'ubuntu-20.04.2.0-desktop-amd64.iso' \\
+-partition_cyl_align on \\
+-partition_offset 0 \\
+-partition_hd_cyl 172 \\
+-partition_sec_hd 32 \\
+--mbr-force-bootable \\
+-apm-block-size 2048 \\
+-iso_mbr_part_type 0x00 \\
+-c '/isolinux/boot.cat' \\
+-b '/isolinux/isolinux.bin' \\
+-no-emul-boot \\
+-boot-load-size 4 \\
+-boot-info-table \\
+-eltorito-alt-boot \\
+-e '/boot/grub/efi.img' \\
+-no-emul-boot \\
+-boot-load-size 8000 \\
+-isohybrid-gpt-basdat \\
+-isohybrid-apm-hfsplus \\
+-o sbklive.iso \\
+iso
+EOF
 
-mv sbklive.iso sbklive_2021.1005-beta.iso
-echo "wrote $BUILD_DIR/sbklive_2021.1005-beta.iso"
+# Use xorriso do the magic of figuring out options
+# used to create original iso, making sure to
+# append backslash to each line as required.
+#
+# xorriso \
+#     -report_about warning \
+#     -indev "${ISO_PATH}" \
+#     -report_system_area as_mkisofs |
+#     sed -e 's|$| \\|'>>xorriso.conf
 
-# echo ""
-# echo "      qemu-system-x86_64 -boot d -cdrom $BUILD_DIR/sbklive_2021.1005-beta.iso -m 2048"
-# echo ""
+# echo 'iso' >>xorriso.conf
+
+# Modify options in xorriso.conf as desired or use as-is
+xorriso -options_from_file xorriso.conf
+
+mv sbklive.iso sbklive_2021.1005-beta-amd64.iso
+echo "wrote $BUILD_DIR/sbklive_2021.1005-beta-amd64.iso"
+
+transmission-create \
+    -t "udp://tracker.openbittorrent.com:6969/announce" \
+    -t "udp://tracker.opentrackr.org:1337/announce" \
+    -o sbklive_2021.1005-beta-amd64.iso.torrent \
+    sbklive_2021.1005-beta-amd64.iso
+
+cp sbklive_2021.1005-beta-amd64.iso.torrent "${SBK_DIR}/landingpage/"
+
+rsync sbklive_2021.1005-beta-amd64.iso.torrent root@vserver:/var/www/html/sbk/
+
+transmission-show -m sbklive_2021.1005-beta-amd64.iso.torrent \
+    > "${SBK_DIR}/landingpage/sbklive_2021.1005-beta-amd64.iso.magnet_link"
+
+sed -i -e "s|<pre>|<pre>\n  <span>$(date --iso-8601) - 2.2GB - sbklive_2021.1005-beta-amd64.iso  </span><a href=\"sbklive_2021.1005-beta.iso.torrent\">torrent link</a>   <a href=\"$(transmission-show -m sbklive_2021.1005-beta-amd64.iso.torrent | sed -e 's|&|\\&|g')\">magnet link</a>\n|" ${SBK_DIR}/landingpage/index.html

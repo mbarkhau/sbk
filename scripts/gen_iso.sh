@@ -542,7 +542,10 @@ cp sbklive_2021.1006-beta-amd64.iso.torrent "${SBK_DIR}/landingpage/"
 
 rsync sbklive_2021.1006-beta-amd64.iso.torrent root@vserver:/var/www/html/sbk/
 
-transmission-show -m sbklive_2021.1006-beta-amd64.iso.torrent \
-    > "${SBK_DIR}/landingpage/sbklive_2021.1006-beta-amd64.iso.magnet_link"
+transmission-show -m sbklive_2021.1006-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
+echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2021.1006-beta-amd64.iso  </span>\
+    <a href=\"sbklive_2021.1006-beta-amd64.iso.torrent\">torrent link</a>   \
+    <a href=\"$(cat .magnet_link)\">magnet link</a>" \
+    > .torrent_html
 
-sed -i -e "s|<pre>|<pre>\n  <span>$(date --iso-8601) - 2.2GB - sbklive_2021.1006-beta-amd64.iso  </span><a href=\"sbklive_2021.1005-beta.iso.torrent\">torrent link</a>   <a href=\"$(transmission-show -m sbklive_2021.1005-beta-amd64.iso.torrent | sed -e 's|&|\\&|g')\">magnet link</a>\n|" ${SBK_DIR}/landingpage/index.html
+sed -i -e "s|<pre>|<pre>\n  $(cat .torrent_html)\n|" ${SBK_DIR}/landingpage/index.html

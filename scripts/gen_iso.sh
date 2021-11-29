@@ -357,10 +357,10 @@ RUN mv /opt/Electrum-4.1.5 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk
-ADD sbk-2021.1006b0-py3-none-any.whl /opt/
-ADD sbk-2021.1006b0.tar.gz /opt/
-RUN mv /opt/sbk-2021.1006b0 /opt/sbk
-RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1006b0-py3-none-any.whl"
+ADD sbk-2021.1007b0-py3-none-any.whl /opt/
+ADD sbk-2021.1007b0.tar.gz /opt/
+RUN mv /opt/sbk-2021.1007b0 /opt/sbk
+RUN bash -c "cd /opt; python3 -m pip install sbk-2021.1007b0-py3-none-any.whl"
 
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp
@@ -467,7 +467,7 @@ stat --printf="%s" iso/casper/filesystem.squashfs > iso/casper/filesystem.size
 cp newfilesystem.manifest iso/casper/filesystem.manifest
 cp grub.cfg iso/boot/grub/grub.cfg
 
-echo 'SBK Live 2021.1006-beta (based on Ubuntu 20.04.2.0 LTS "Focal Fossa" - Release amd64 20210209.1)' > iso/.disk/info
+echo 'SBK Live 2021.1007-beta (based on Ubuntu 20.04.2.0 LTS "Focal Fossa" - Release amd64 20210209.1)' > iso/.disk/info
 
 # update state files
 (cd iso; find . -type f -print0 | xargs -0 md5sum | grep -v "\./md5sum.txt" > md5sum.txt)
@@ -488,7 +488,7 @@ rm -f sbklive.iso;
 cat <<EOF >xorriso.conf
 -as mkisofs \\
 -r -J --joliet-long \\
--V 'SBK Live 2021.1006-beta amd64' \\
+-V 'SBK Live 2021.1007-beta amd64' \\
 --modification-date='2021020919062600' \\
 -isohybrid-mbr \\
 --interval:local_fs:0s-15s:zero_mbrpt,zero_gpt,zero_apm:'ubuntu-20.04.2.0-desktop-amd64.iso' \\
@@ -529,22 +529,22 @@ EOF
 # Modify options in xorriso.conf as desired or use as-is
 xorriso -options_from_file xorriso.conf
 
-mv sbklive.iso sbklive_2021.1006-beta-amd64.iso
-echo "wrote $BUILD_DIR/sbklive_2021.1006-beta-amd64.iso"
+mv sbklive.iso sbklive_2021.1007-beta-amd64.iso
+echo "wrote $BUILD_DIR/sbklive_2021.1007-beta-amd64.iso"
 
 transmission-create \
     -t "udp://tracker.openbittorrent.com:6969/announce" \
     -t "udp://tracker.opentrackr.org:1337/announce" \
-    -o sbklive_2021.1006-beta-amd64.iso.torrent \
-    sbklive_2021.1006-beta-amd64.iso
+    -o sbklive_2021.1007-beta-amd64.iso.torrent \
+    sbklive_2021.1007-beta-amd64.iso
 
-cp sbklive_2021.1006-beta-amd64.iso.torrent "${SBK_DIR}/landingpage/"
+cp sbklive_2021.1007-beta-amd64.iso.torrent "${SBK_DIR}/landingpage/"
 
-rsync sbklive_2021.1006-beta-amd64.iso.torrent root@vserver:/var/www/html/sbk/
+rsync sbklive_2021.1007-beta-amd64.iso.torrent root@vserver:/var/www/html/sbk/
 
-transmission-show -m sbklive_2021.1006-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
-echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2021.1006-beta-amd64.iso  </span>\
-    <a href=\"sbklive_2021.1006-beta-amd64.iso.torrent\">torrent link</a>   \
+transmission-show -m sbklive_2021.1007-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
+echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2021.1007-beta-amd64.iso  </span>\
+    <a href=\"sbklive_2021.1007-beta-amd64.iso.torrent\">torrent link</a>   \
     <a href=\"$(cat .magnet_link)\">magnet link</a>" \
     > .torrent_html
 

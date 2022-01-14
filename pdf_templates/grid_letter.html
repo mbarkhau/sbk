@@ -9,35 +9,48 @@
     e. 10.0mm line spacing
   -->
 <style>
-
   @page {
     padding: 0;
-    margin: 0;
-    size: 279.4mm 215.89999999999998mm;
+    margin: -0.30000000000001137mm 3.9499999999999886mm;
+    size: 215.89999999999998mm 279.4mm;
   }
 
   body {
-    margin: 20mm;
+    margin: 8mm 15mm;
     padding: 0;
     font-size: 8pt;
   }
 
-  .dogtag {
+  .dogtag, .card {
     display: inline-block;
+  }
+
+  .card {
     position: relative;
+    height: 85mm;
+    width: 54mm;
+    margin: 1.0mm 1.5mm;
+    border: 1px dashed grey;
+  }
+
+  .dogtag {
     height: 35mm;
     width: 22mm;
-    margin: 4.0mm 8.0mm;
-    /* border: 1px dashed red; */
+    margin: 5.5mm 0.0mm 0.0mm 4.4mm;
   }
+
   .dogtag div {
     position: absolute;
   }
+  .card > div {
+    position: relative;
+  }
+
   .number {
-    left: -0.7mm;
-    top: 33mm;
-    width: 22.5mm;
     font-family: monospace;
+    left: -0.7mm;
+    top: 31mm;
+    width: 22.5mm;
   }
   .number .left {text-align: left;}
   .number .right {text-align: right;}
@@ -45,7 +58,7 @@
     display: inline-block;
     width: 18mm;
     text-align: center;
-    letter-spacing: -.8mm;
+    letter-spacing: -.6mm;
   }
 
   .vline, .hline {
@@ -64,7 +77,7 @@
     background: white;
     position: absolute;
     height: 2.6mm;
-    width: 24.0mm;
+    width: 22.0mm;
     left: -1mm;
     top: 14.25mm;
   }
@@ -153,462 +166,726 @@
 <title>Grid</title>
 </head>
 <body class="letter">
+ 
+ <div class="card">
   
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">...</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::.</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:::</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">:.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++</span><span class="right">.</span>
+      </div>
+    </div>
+  
+ </div>
  
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+ <div class="card">
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ .</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">++ :</span><span class="right">.</span>
+      </div>
     </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">...</span><span class="right">.</span>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++ :.</span><span class="right">.</span>
+      </div>
     </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+  
+    <div class="dogtag">
+      <div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+        <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
+      </div>
+      <div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+        <div class="vline"></div> <div class="vline"></div>
+      </div>
+       <div class="splitline"></div>
+       <div class="number"><span class="left">.</span><span class="center">+++</span><span class="right">.</span>
+      </div>
     </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::.</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:::</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">...</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::.</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:::</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">.</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">...</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">::.</span><span class="right">.</span>
-    </div>
-   </div>
- 
-  <div class="dogtag">
-    <div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-      <div class="hline"></div> <div class="hline"></div> <div class="hline"></div>
-    </div>
-    <div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-      <div class="vline"></div> <div class="vline"></div>
-    </div>
-     <div class="splitline"></div>
-     <div class="number"><span class="left">.</span><span class="center">:::</span><span class="right">.</span>
-    </div>
-   </div>
+  
+ </div>
  
 </body>
 </html>

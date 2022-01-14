@@ -37,14 +37,13 @@ AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("https://sbk.dev/auth")
 # SHARE_QR_SRC = "data:image/svg+xml;base64," + qr_img_b64("SBK: Split Bitcoin Keys")
 # AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("SBK: Split Bitcoin Keys")
 
-
 CONTEXTS = [
     {'tmpl': "share", 'w': 210, 'h': 297, 'wc': 24, 'fmt': "a4", 'qr_src': SHARE_QR_SRC},
     {'tmpl': "share", 'w': 8.5, 'h': 11 , 'wc': 24, 'fmt': "letter", 'qr_src': SHARE_QR_SRC},
     {'tmpl': "auth", 'w': 210, 'h': 297, 'fmt': "a4", 'qr_src': AUTH_QR_SRC},
     {'tmpl': "auth", 'w': 8.5, 'h': 11, 'fmt': "letter", 'qr_src': AUTH_QR_SRC},
-    {'tmpl': "grid", 'w': 297, 'h': 210, 'fmt': "a4"},
-    {'tmpl': "grid", 'w': 11, 'h': 8.5, 'fmt': "letter"},
+    {'tmpl': "grid", 'w': 210, 'h': 297, 'fmt': "a4"},
+    {'tmpl': "grid", 'w': 8.5, 'h': 11, 'fmt': "letter"},
 ]
 
 

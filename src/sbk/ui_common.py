@@ -1,7 +1,7 @@
 # This file is part of the SBK project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """Common parsing, encoding and formatting functions for CLI and GUI."""
@@ -581,7 +581,7 @@ def parse_kdf_params(
     if time_cost is None:
         # time_cost estimated based on duration
         kdf_pfd_fn = ft.partial(kdf.kdf_params_for_duration, kdf_params, target_duration)
-        return run_with_progress_bar(kdf_pfd_fn, eta_sec=5.5, init_progressbar=init_progressbar)
+        return run_with_progress_bar(kdf_pfd_fn, eta_sec=8.5, init_progressbar=init_progressbar)
     else:
         return kdf_params
 

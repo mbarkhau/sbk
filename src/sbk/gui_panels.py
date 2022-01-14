@@ -2,7 +2,7 @@
 # This file is part of the SBK project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 # messy ui code is messy ...
@@ -137,9 +137,9 @@ class SelectCommandPanel(gpb.Panel):
         self.setLayout(self._layout)
 
     def switch(self) -> None:
-        state = gpb.get_state()
+        state = gpb.get_state(load_sys_info=False)
 
-        self.trace("switch " + str((state['salt'], state['brainkey'], state['params'])))
+        self.trace("switch " + str((state['salt'], state['brainkey'])))
 
         state['panel_index'] = 0
 
@@ -160,7 +160,7 @@ class SelectCommandPanel(gpb.Panel):
             p = self.parent()
 
             if button_id in ('generate', 'open', 'load', 'recover'):
-                state = gpb.get_state()
+                state = gpb.get_state(load_sys_info=False)
                 state['salt'    ] = None
                 state['brainkey'] = None
                 state['shares'  ] = []
@@ -384,14 +384,14 @@ class DocumentationPanel(gpb.NavigablePanel):
         layout_left = qtw.QVBoxLayout()
         layout_left.addWidget(qtw.QLabel("<center>A4</center>"))
         layout_left.addWidget(self.new_pdf_button("Share Template"      , "share_a4.pdf"      ))
-        layout_left.addWidget(self.new_pdf_button("Dogtag Templates"    , "grid_a4.pdf"       ))
+        layout_left.addWidget(self.new_pdf_button("Metal Templates"     , "grid_a4.pdf"       ))
         layout_left.addWidget(self.new_pdf_button("SBK Manual"          , "sbk_a4.pdf"        ))
         layout_left.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_a4.pdf"))
 
         layout_right = qtw.QVBoxLayout()
         layout_right.addWidget(qtw.QLabel("<center>US Letter</center>"))
         layout_right.addWidget(self.new_pdf_button("Share Template"      , "share_letter.pdf"      ))
-        layout_right.addWidget(self.new_pdf_button("Dogtag Templates"    , "grid_letter.pdf"       ))
+        layout_right.addWidget(self.new_pdf_button("Metal Templates"     , "grid_letter.pdf"       ))
         layout_right.addWidget(self.new_pdf_button("SBK Manual"          , "sbk_letter.pdf"        ))
         layout_right.addWidget(self.new_pdf_button("SBK Manual (Booklet)", "sbk_booklet_letter.pdf"))
 

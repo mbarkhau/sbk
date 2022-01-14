@@ -5,7 +5,7 @@
 # This file is part of the sbk project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 """Types used across multiple modules."""
 

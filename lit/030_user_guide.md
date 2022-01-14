@@ -22,12 +22,12 @@ The goal of SBK is to make it more easy for you to bear this burden of responsib
         _ Vault   . Shares
        |s|~~~~~~~~:
        '-'        :     Trustee   Trustee  "Bad Guy"
-        _ Lockbox :     _ .-.     _ .-.      |-|
-       |s|~~~~~~~~:    |s|'-'    |s|'-'      '-'
-       '-'        :    '-'/|\    '-'/|\      /|\
-        _ Bank    :     :  |      :  |        |
-       |s|~~~~~~~~:     : / \     : / \      / \
-       '-'        '~~~~~~~~~~~~~~~'
+        _ Lockbox :    _  .-.    _  .-.      |-|
+       |s|~~~~~~~~:   |s| '-'   |s| '-'      '-'
+       '-'        :   '-' /|\   '-' /|\      /|\
+        _ Bank    :    :   |     :   |        |
+       |s|~~~~~~~~:    :  / \    :  / \      / \
+       '-'        '~~~~~~~~~~~~~~'
 ```
 
 There are four different roles involved with an SBK wallet:

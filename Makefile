@@ -143,5 +143,12 @@ serve_doc:
 
 .PHONY: landingpage_sync
 landingpage_sync:
-	rsync landingpage/static/*.* root@vserver:/var/www/html/sbk/static/
 	rsync landingpage/*.* root@vserver:/var/www/html/sbk/
+
+	ssh root@vserver "mkdir -p /var/www/html/sbk/static/"
+	ssh root@vserver "mkdir -p /var/www/html/sbk/pdf_templates/"
+
+	rsync landingpage/static/*.* root@vserver:/var/www/html/sbk/static/
+	rsync pdf_templates/*.pdf root@vserver:/var/www/html/sbk/pdf_templates/
+
+	ssh root@vserver "chown -R mbarkhau:mbarkhau /var/www/html/sbk/"

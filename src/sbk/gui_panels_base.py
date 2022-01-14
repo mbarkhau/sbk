@@ -2,7 +2,7 @@
 # This file is part of the SBK project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 # messy ui code is messy ...
@@ -85,8 +85,8 @@ shared_panel_state: PanelState = {
     'sys_info'   : None,
     'offline'    : True,
     'wallet_name': "empty",
-    # 'sss_t'          : parameters.DEFAULT_SSS_T,
-    # 'sss_n'          : parameters.DEFAULT_SSS_N,
+    # 'sss_t'        : parameters.DEFAULT_SSS_T,
+    # 'sss_n'        : parameters.DEFAULT_SSS_N,
     'target_memory'  : sys_info.FALLBACK_MEM_MB,
     'target_duration': parameters.DEFAULT_KDF_T_TARGET,
     'max_memory'     : -1,
@@ -97,10 +97,10 @@ def has_secrets() -> bool:
     return bool(shared_panel_state['salt'] and shared_panel_state['brainkey'])
 
 
-def get_state() -> PanelState:
+def get_state(load_sys_info: bool = True) -> PanelState:
     state = shared_panel_state
 
-    if state['sys_info'] is None:
+    if load_sys_info and state['sys_info'] is None:
         _sys_info = sys_info.load_sys_info()
 
         target_memory = _sys_info.usable_mb * parameters.DEFAULT_KDF_M_PERCENT / 100
@@ -109,7 +109,7 @@ def get_state() -> PanelState:
         state['target_memory'] = int(target_memory       / 100) * 100
         state['max_memory'   ] = int(_sys_info.usable_mb / 100) * 100
 
-    if state['params'] is None:
+    if load_sys_info and state['params'] is None:
         state['params'] = parameters.init_parameters(
             kdf_m=state['target_memory'],
             kdf_t=parameters.DEFAULT_KDF_T_TARGET,

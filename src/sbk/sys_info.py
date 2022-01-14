@@ -5,7 +5,7 @@
 # This file is part of the sbk project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 import os
 import re
@@ -140,22 +140,24 @@ def memory_info() -> Tuple[ct.MebiBytes, ct.MebiBytes]:
 
 def _init_sys_info() -> SystemInfo:
     total_mb, avail_mb = memory_info()
-
-    check_mb = avail_mb
-    while check_mb > 100:
-        logger.debug(f"testing check_mb={check_mb}")
-        if _is_usable_kdf_m(check_mb):
-            break
-        else:
-            check_mb = int(check_mb * 0.75)  # try a bit less
-
-    usable_mb = max(check_mb, 100)
-    nfo       = SystemInfo(total_mb, usable_mb)
+    initial_usable_mb = max(100, avail_mb * 0.9)
+    nfo               = SystemInfo(total_mb, initial_usable_mb)
     _dump_sys_info(nfo)
     return nfo
 
 
-def _is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
+def max_usable_memory(avail_mb: int) -> int:
+    check_mb = avail_mb
+    while check_mb > 100:
+        logger.debug(f"testing check_mb={check_mb}")
+        if is_usable_kdf_m(check_mb):
+            break
+        else:
+            check_mb = int(check_mb * 0.75)  # try a bit less
+    return check_mb
+
+
+def is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
     retcode = sp.call([sys.executable, "-m", "sbk.kdf", str(memory_mb)])
     return retcode == 0
 

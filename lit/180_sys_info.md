@@ -172,28 +172,38 @@ def memory_info() -> Tuple[ct.MebiBytes, ct.MebiBytes]:
     return (FALLBACK_MEM_MB, FALLBACK_MEM_MB)
 ```
 
-We could use a binary search approach to determine how much memory we
-can use, but there is a tradeoff with usability here. We don't want
-the memory check take too long, so we start with what the system tells
-us we can use and then only reduce that if there are are any issues.
+We could determine how much memory we can use here, but there is
+a tradeoff with usability. To reduce startup time, we take a best guess
+at the maximum usable memory.
 
 ```python
 # def: impl_init_sys_info
 def _init_sys_info() -> SystemInfo:
     total_mb, avail_mb = memory_info()
+    initial_usable_mb = max(100, avail_mb * 0.9)
+    nfo = SystemInfo(total_mb, initial_usable_mb)
+    _dump_sys_info(nfo)
+    return nfo
+```
 
+We provide a separate function `max_usable_memory` that is used
+by the kdf calibration.
+
+We don't want the memory check take too long, so we start with
+what the system tells us we can use and then only reduce that if
+there are are any issues.
+
+```python
+# def: impl_max_usable_memory
+def max_usable_memory(avail_mb: int) -> int:
     check_mb = avail_mb
     while check_mb > 100:
         logger.debug(f"testing check_mb={check_mb}")
-        if _is_usable_kdf_m(check_mb):
+        if is_usable_kdf_m(check_mb):
             break
         else:
             check_mb = int(check_mb * 0.75)     # try a bit less
-
-    usable_mb = max(check_mb, 100)
-    nfo = SystemInfo(total_mb, usable_mb)
-    _dump_sys_info(nfo)
-    return nfo
+    return check_mb
 ```
 
 Our measurement function invokes a subprocess, as the argon2-cffi will
@@ -203,11 +213,10 @@ memory we can use.
 
 ```python
 # def: impl_measure
-def _is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
+def is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
     retcode = sp.call([sys.executable, "-m", "sbk.kdf", str(memory_mb)])
     return retcode == 0
 ```
-
 
 ## SysInfo Caching
 

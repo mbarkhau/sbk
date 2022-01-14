@@ -2,7 +2,7 @@
 # This file is part of the SBK project
 # https://github.com/mbarkhau/sbk
 #
-# Copyright (c) 2019-2021 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
+# Copyright (c) 2019-2022 Manuel Barkhau (mbarkhau@gmail.com) - MIT License
 # SPDX-License-Identifier: MIT
 
 """CLI/Imperative shell for SBK."""
@@ -35,6 +35,7 @@ import click
 
 from . import cli_io
 from . import shamir
+from . import sys_info
 from . import ui_common
 from . import parameters
 from . import common_types as ct
@@ -235,10 +236,10 @@ def cli(verbose: int = 0) -> None:
 
 
 @cli.command()
-@click.version_option(version="2021.1007-beta")
+@click.version_option(version="2022.1008-beta")
 def version() -> None:
     """Show version number."""
-    echo("SBK version: 2021.1007-beta")
+    echo("SBK version: 2022.1008-beta")
 
 
 @cli.command()
@@ -562,6 +563,12 @@ def qt_gui(verbose: int = 0) -> None:
     from . import gui
 
     _configure_logging(verbose)
+
+    # load sys info before it's needed. This way it's available
+    # by the time it's needed (for wallet creation or settings).
+    runner = ui_common.ThreadRunner(sys_info.load_sys_info)
+    runner.run()
+
     gui.run_gui()  # type: ignore
 
 

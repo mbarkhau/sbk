@@ -17,8 +17,6 @@ and Reed-Solomon
 https://research.swtch.com/field
 """
 
-import os
-import random
 import typing as typ
 import warnings
 import itertools
@@ -42,40 +40,7 @@ from typing import NamedTuple
 
 from . import gf
 from . import gf_lut
-
-
-class DebugRandom:
-
-    _state: int
-
-    def __init__(self) -> None:
-        self._state = 4294967291
-
-    def randrange(self, stop: int):
-        self._state = (self._state + 4294967291) % 2 ** 63
-        return self._state % stop
-
-
-DEBUG_WARN_MSG = "Warning, SBK using debug random! This should only happen when debugging or testing."
-
-_debug_rand = DebugRandom()
-_rand       = random.SystemRandom()
-
-
-def reset_debug_random() -> None:
-    if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
-        _debug_rand._state = 4294967291
-
-
-def randrange(stop: int) -> int:
-    if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
-        warnings.warn(DEBUG_WARN_MSG)
-        result = _debug_rand.randrange(stop)
-    else:
-        result = _rand.randrange(stop)
-    assert isinstance(result, int)
-    return result
-
+from . import sbk_random
 
 Coefficients = List[gf.GF256]
 
@@ -221,7 +186,13 @@ def poly_eval_fn(field: gf.FieldGF256, coeffs: Coefficients) -> Callable[[int], 
     return eval_at
 
 
-def _split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -> Points:
+def _split(
+    field     : gf.FieldGF256,
+    secret    : int,
+    threshold : int,
+    num_shares: int,
+    make_coeff: Callable[[int], int],
+) -> Points:
     # The coefficients of the polynomial are ordered in ascending
     # powers of x, so coeffs = [2, 5, 3] represents 2x° + 5x¹ + 3x²
     #
@@ -232,7 +203,7 @@ def _split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -
     coeffs: Coefficients = [field[secret]]
 
     while len(coeffs) < threshold:
-        raw_coeff = randrange(field.order)
+        raw_coeff = make_coeff(field.order)
         coeffs.append(field[raw_coeff])
 
     eval_at = poly_eval_fn(field, coeffs)
@@ -251,7 +222,13 @@ def _split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -
     return points
 
 
-def split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) -> Points:
+def split(
+    field     : gf.FieldGF256,
+    secret    : int,
+    threshold : int,
+    num_shares: int,
+    make_coeff: Callable[[int], int],
+) -> Points:
     """Generate points of a split secret."""
 
     if num_shares <= 1:
@@ -265,7 +242,13 @@ def split(field: gf.FieldGF256, secret: int, threshold: int, num_shares: int) ->
     elif field.order <= secret:
         raise ValueError("Invalid prime for secret, must be greater than secret.")
     else:
-        return _split(field=field, secret=secret, threshold=threshold, num_shares=num_shares)
+        return _split(
+            field=field,
+            secret=secret,
+            threshold=threshold,
+            num_shares=num_shares,
+            make_coeff=make_coeff,
+        )
 
 
 def join(field: gf.FieldGF256, points: Points, threshold: int) -> int:

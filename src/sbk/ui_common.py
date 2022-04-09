@@ -9,15 +9,15 @@
 import os
 import re
 import pwd
-import math
 import time
+import base64
+import hashlib
 import logging
 import pathlib as pl
 import tempfile
 import functools as ft
 import threading
 import subprocess as sp
-import collections
 from typing import Any
 from typing import Set
 from typing import Dict
@@ -47,6 +47,7 @@ from . import enc_util
 from . import mnemonic
 from . import sys_info
 from . import parameters
+from . import sbk_random
 from . import common_types as ct
 from . import electrum_mnemonic
 
@@ -499,7 +500,7 @@ def derive_seed(
     label           : str,
     wallet_name     : str = DEFAULT_WALLET_NAME,
     init_progressbar: Optional[InitProgressbar] = None,
-) -> ct.SeedData:
+) -> ct.WalletSeed:
     if init_progressbar is None:
         _init_progressbar = fallback_progressbar(label)
     else:
@@ -519,12 +520,12 @@ def derive_seed(
         with _init_progressbar(length=100) as pg_bar:
             digester_fn = ft.partial(digester_fn, progress_cb=pg_bar.update)
             runner      = ThreadRunner[bytes](digester_fn)
-            seed_data   = runner.start_and_join()
+            wallet_seed = runner.start_and_join()
     else:
         # Always the ThreadRunner so that Ctrl-C is not blocked.
-        runner    = ThreadRunner[bytes](digester_fn)
-        seed_data = runner.start_and_join()
-    return ct.SeedData(seed_data)
+        runner      = ThreadRunner[bytes](digester_fn)
+        wallet_seed = runner.start_and_join()
+    return ct.WalletSeed(wallet_seed)
 
 
 def run_with_progress_bar(
@@ -614,49 +615,12 @@ def init_params(
     )
 
 
-def get_entropy_pool_size() -> int:
-    path_linux = pl.Path("/proc/sys/kernel/random/entropy_avail")
-    if path_linux.exists():
-        with path_linux.open() as fobj:
-            return int(fobj.read().strip())
-    return -1
-
-
-def urandom(size: int) -> bytes:
-    if os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
-        # https://xkcd.com/221/
-        return b"4" * size
-    else:
-        return os.urandom(size)
-
-
-# https://stackoverflow.com/a/47348423/62997
-def entropy(data: bytes) -> float:
-    probabilities     = [n_x / len(data) for x, n_x in collections.Counter(data).items()]
-    entropy_fractions = [-p_x * math.log(p_x, 2) for p_x in probabilities]
-    return sum(entropy_fractions)
-
-
-def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
-    salt_min_entropy     = len(raw_salt) * 0.19 + 0.3
-    brainkey_min_entropy = len(brainkey) * 0.19 + 0.3
-
-    if entropy(raw_salt) < salt_min_entropy:
-        entropy_avail = get_entropy_pool_size()
-        errmsg        = f"Entropy check failed for salt. entropy_avail={entropy_avail}"
-        raise AssertionError(errmsg)
-
-    if entropy(brainkey) < brainkey_min_entropy:
-        entropy_avail = get_entropy_pool_size()
-        errmsg        = f"Entropy check failed for brainkey. entropy_avail={entropy_avail}"
-        raise AssertionError(errmsg)
-
-
 def validated_param_data(params: parameters.Parameters) -> bytes:
     # validate encoding round trip before we use params
     params_data    = parameters.params2bytes(params)
     decoded_params = parameters.bytes2params(params_data)
-    checks         = {
+
+    checks = {
         'threshold': params.sss_t   == decoded_params.sss_t,
         'version'  : params.version == decoded_params.version,
         'kdf_p'    : params.kdf_p   == decoded_params.kdf_p,
@@ -685,51 +649,107 @@ def validate_wallet_name(wallet_name: str) -> None:
     raise ValueError(errmsg)
 
 
-def create_secrets(params: parameters.Parameters) -> Tuple[ct.Salt, ct.BrainKey, ct.Shares]:
+def derive_seed_data(preseed: str, data_len: int) -> bytes:
+    out_data = hashlib.sha256(preseed.encode("utf-8")).digest()
+    while len(out_data) < data_len:
+        out_data += hashlib.sha256(out_data).digest()
+
+    return out_data[:data_len]
+
+
+def encode_header_text(params: parameters.Parameters) -> str:
+    params_data = validated_param_data(params)
+    salt_header = params_data[: parameters.SALT_HEADER_LEN]
+    return base64.b16encode(salt_header).decode("ascii")
+
+
+def decode_header_text(header_text: str) -> parameters.Parameters:
+    salt_header = base64.b16decode(header_text.lower().encode("ascii"))
+    return parameters.bytes2params(salt_header)
+
+
+def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
+    salt_min_entropy     = len(raw_salt) * 0.19 + 0.3
+    brainkey_min_entropy = len(brainkey) * 0.19 + 0.3
+
+    if sbk_random.entropy(raw_salt) < salt_min_entropy:
+        entropy_avail = sbk_random.get_entropy_pool_size()
+        errmsg        = f"Entropy check failed for salt. entropy_avail={entropy_avail}"
+        raise AssertionError(errmsg)
+
+    if sbk_random.entropy(brainkey) < brainkey_min_entropy:
+        entropy_avail = sbk_random.get_entropy_pool_size()
+        errmsg        = f"Entropy check failed for brainkey. entropy_avail={entropy_avail}"
+        raise AssertionError(errmsg)
+
+
+class Secrets(NamedTuple):
+
+    salt    : ct.Salt
+    brainkey: ct.BrainKey
+    shares  : ct.Shares
+
+
+def create_secrets(
+    params : parameters.Parameters,
+    preseed: Optional[str] = None,
+    *,
+    gen_shares: bool = True,
+) -> Secrets:
     params_data = validated_param_data(params)
     salt_header = params_data[: parameters.SALT_HEADER_LEN]
 
+    preseed_header = base64.b16encode(salt_header).decode('ascii')
+
     lens = parameters.raw_secret_lens()
 
-    raw_salt = ct.RawSalt(urandom(lens.raw_salt))
-    salt     = ct.Salt(salt_header + raw_salt)
-    brainkey = ct.BrainKey(urandom(lens.brainkey))
-
-    if os.getenv('SBK_DEBUG_RANDOM') is None:
-        _check_entropy(raw_salt, brainkey)
-    elif os.getenv('SBK_DEBUG_RANDOM') == 'DANGER':
-        gf_poly.reset_debug_random()
-
-    shares = list(shamir.split(params, raw_salt, brainkey))
-
-    # test encoding and recovery before we ever give out any secrets
-
-    ic_salt     = bytes2intcodes(salt)
-    ic_brainkey = bytes2intcodes(brainkey)
-    ic_shares   = [bytes2intcodes(share) for share in shares]
-
-    phrase_salt     = " ".join(intcodes2mnemonics(ic_salt    ))
-    phrase_brainkey = " ".join(intcodes2mnemonics(ic_brainkey))
-    phrase_shares   = [" ".join(intcodes2mnemonics(ic_share)) for ic_share in ic_shares]
-
-    raw_salt_recovered, brainkey_recovered = shamir.join(shares)
-
-    is_recovery_ok = (
-        brainkey     == intcodes2bytes(ic_brainkey, lens.brainkey)
-        and salt     == intcodes2bytes(ic_salt    , lens.salt)
-        and shares   == [intcodes2bytes(ic_share, lens.share) for ic_share in ic_shares]
-        and salt     == mnemonic.phrase2bytes(phrase_salt    , lens.salt)
-        and brainkey == mnemonic.phrase2bytes(phrase_brainkey, lens.brainkey)
-        and shares   == [mnemonic.phrase2bytes(phrase_share, lens.share) for phrase_share in phrase_shares]
-        and raw_salt == raw_salt_recovered
-        and brainkey == brainkey_recovered
-    )
-
-    if is_recovery_ok:
-        return (salt, brainkey, shares)
+    if preseed is None:
+        salt_data = sbk_random.urandom(lens.raw_salt)
     else:
-        errmsg = "CRITICAL ERROR - Please report this at sbk.dev"
-        raise ValueError(errmsg)
+        salt_data = derive_seed_data(preseed, lens.raw_salt)
+
+    raw_salt = ct.RawSalt(salt_data)
+    salt     = ct.Salt(salt_header + raw_salt)
+    brainkey = ct.BrainKey(sbk_random.urandom(lens.brainkey))
+
+    if gen_shares:
+        if preseed is None and os.getenv('SBK_DEBUG_RANDOM') is None:
+            _check_entropy(raw_salt, brainkey)
+
+        randrange = sbk_random.init_randrange(raw_salt)
+
+        shares = list(shamir.split(params, raw_salt, brainkey, randrange))
+
+        # test encoding and recovery before we ever give out any secrets
+
+        ic_salt     = bytes2intcodes(salt)
+        ic_brainkey = bytes2intcodes(brainkey)
+        ic_shares   = [bytes2intcodes(share) for share in shares]
+
+        phrase_salt     = " ".join(intcodes2mnemonics(ic_salt    ))
+        phrase_brainkey = " ".join(intcodes2mnemonics(ic_brainkey))
+        phrase_shares   = [" ".join(intcodes2mnemonics(ic_share)) for ic_share in ic_shares]
+
+        raw_salt_recovered, brainkey_recovered = shamir.join(shares)
+
+        is_recovery_ok = (
+            brainkey     == intcodes2bytes(ic_brainkey, lens.brainkey)
+            and salt     == intcodes2bytes(ic_salt    , lens.salt)
+            and shares   == [intcodes2bytes(ic_share, lens.share) for ic_share in ic_shares]
+            and salt     == mnemonic.phrase2bytes(phrase_salt    , lens.salt)
+            and brainkey == mnemonic.phrase2bytes(phrase_brainkey, lens.brainkey)
+            and shares   == [mnemonic.phrase2bytes(phrase_share, lens.share) for phrase_share in phrase_shares]
+            and raw_salt == raw_salt_recovered
+            and brainkey == brainkey_recovered
+        )
+
+        if not is_recovery_ok:
+            errmsg = "CRITICAL ERROR - Please report this at sbk.dev"
+            raise ValueError(errmsg)
+    else:
+        shares = []
+
+    return Secrets(salt, brainkey, shares)
 
 
 def mk_tmp_wallet_fpath() -> pl.Path:
@@ -768,12 +788,12 @@ def clean_wallet(wallet_fpath: pl.Path) -> None:
 Command = List[str]
 
 
-def seed_data2phrase(seed_data: ct.SeedData) -> ct.ElectrumSeed:
-    seed_int = enc_util.bytes2int(seed_data)
+def seed_data2phrase(wallet_seed: ct.WalletSeed) -> ct.ElectrumSeed:
+    seed_int = enc_util.bytes2int(wallet_seed)
     return electrum_mnemonic.raw_seed2phrase(seed_int)
 
 
-def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> Tuple[pl.Path, Command, Command]:
+def wallet_commands(wallet_seed: ct.WalletSeed, offline: bool = True) -> Tuple[pl.Path, Command, Command]:
     wallet_fpath = mk_tmp_wallet_fpath()
 
     restore_cmd = [
@@ -783,7 +803,7 @@ def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> Tuple[pl.Pa
         "--wallet",
         str(wallet_fpath),
         "--offline",
-        seed_data2phrase(seed_data),
+        seed_data2phrase(wallet_seed),
     ]
     load_cmd = ["electrum", "gui", "--forgetconfig", "--wallet", str(wallet_fpath)]
 
@@ -793,8 +813,8 @@ def wallet_commands(seed_data: ct.SeedData, offline: bool = True) -> Tuple[pl.Pa
     return (wallet_fpath, restore_cmd, load_cmd)
 
 
-def load_wallet(seed_data: ct.SeedData, offline: bool = False) -> None:
-    wallet_fpath, restore_cmd, load_cmd = wallet_commands(seed_data, offline)
+def load_wallet(wallet_seed: ct.WalletSeed, offline: bool = False) -> None:
+    wallet_fpath, restore_cmd, load_cmd = wallet_commands(wallet_seed, offline)
     try:
         wallet_fpath.unlink()
         retcode = sp.call(restore_cmd)
@@ -810,31 +830,3 @@ def load_wallet(seed_data: ct.SeedData, offline: bool = False) -> None:
             raise RuntimeError(errmsg)
     finally:
         clean_wallet(wallet_fpath)
-
-
-def _debug_entropy_check() -> None:
-    """Determine constans for ui_common._check_entropy."""
-    print(" N   MIN_E   low_e   headroom")
-
-    a = 0.3
-    b = 0.19
-
-    for n in range(2, 13):
-        min_e    = a + n * b
-        fails    = 0
-        low_e    = entropy(urandom(n))
-        headroom = 999.0
-        for _ in range(10_000):
-            e = entropy(urandom(n))
-            if e < low_e:
-                low_e = (low_e + e) / 2
-            if e < min_e:
-                fails += 1
-
-        headroom = low_e - min_e
-
-        print(f"{n:>2} {min_e:7.3f} {low_e:7.3f} {headroom:7.3f} {fails:>6}")
-
-
-if __name__ == '__main__':
-    _debug_entropy_check()

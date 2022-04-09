@@ -168,9 +168,9 @@ def kdf_params_for_duration(
     target_duration     : ct.Seconds,
     max_measurement_time: ct.Seconds = 5,
 ) -> parameters.KDFParams:
-    kdf_m = sys_info.max_usable_memory(baseline_kdf_params.kdf_m)
-
-    test_kdf_params = parameters.init_kdf_params(kdf_m=kdf_m, kdf_t=1)
+    test_kdf_params = parameters.init_kdf_params(
+        kdf_m=baseline_kdf_params.kdf_m, kdf_t=1
+    )
     digest_kwargs = {
         # we only vary t, the baseline should be chosen to max out the others
         'p': test_kdf_params.kdf_p,

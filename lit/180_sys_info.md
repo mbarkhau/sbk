@@ -172,26 +172,9 @@ def memory_info() -> Tuple[ct.MebiBytes, ct.MebiBytes]:
     return (FALLBACK_MEM_MB, FALLBACK_MEM_MB)
 ```
 
-We could determine how much memory we can use here, but there is
-a tradeoff with usability. To reduce startup time, we take a best guess
-at the maximum usable memory.
-
-```python
-# def: impl_init_sys_info
-def _init_sys_info() -> SystemInfo:
-    total_mb, avail_mb = memory_info()
-    initial_usable_mb = max(100, avail_mb * 0.9)
-    nfo = SystemInfo(total_mb, initial_usable_mb)
-    _dump_sys_info(nfo)
-    return nfo
-```
-
-We provide a separate function `max_usable_memory` that is used
-by the kdf calibration.
-
 We don't want the memory check take too long, so we start with
 what the system tells us we can use and then only reduce that if
-there are are any issues.
+there are any issues.
 
 ```python
 # def: impl_max_usable_memory
@@ -218,6 +201,25 @@ def is_usable_kdf_m(memory_mb: ct.MebiBytes) -> bool:
     return retcode == 0
 ```
 
+We could determine how much memory we can use here, but there is
+a tradeoff with usability.
+
+```python
+# def: impl_init_sys_info
+def _init_sys_info() -> SystemInfo:
+    global _SYS_INFO_LOADING
+
+    try:
+        _SYS_INFO_LOADING = True
+        total_mb, avail_mb = memory_info()
+        usable_mb = max_usable_memory(avail_mb=max(100, int(avail_mb * 0.9)))
+        nfo = SystemInfo(total_mb, usable_mb)
+        _dump_sys_info(nfo)
+        return nfo
+    finally:
+        _SYS_INFO_LOADING = False
+```
+
 ## SysInfo Caching
 
 It can take a few seconds to measure how much memory we can use for
@@ -231,22 +233,27 @@ level caching logic, both within the current process (using
 ```python
 # def: impl_load_sys_info
 def load_sys_info(use_cache: bool = True) -> SystemInfo:
-    if use_cache:
-        cache_path = SYSINFO_CACHE_FPATH
-        if not _SYS_INFO_KW and cache_path.exists():
-            try:
-                with cache_path.open(mode="rb") as fobj:
-                    _SYS_INFO_KW.update(json.load(fobj))
-            except Exception as ex:
-                logger.warning(f"Error reading cache file {cache_path}: {ex}")
+    if not use_cache:
+        return _init_sys_info()
 
-        if _SYS_INFO_KW:
-            return SystemInfo(
-                total_mb=_SYS_INFO_KW['total_mb'],
-                usable_mb=_SYS_INFO_KW['usable_mb'],
-            )
+    while _SYS_INFO_LOADING:
+        time.sleep(0.1)
 
-    return _init_sys_info()
+    cache_path = SYSINFO_CACHE_FPATH
+    if not _SYS_INFO_KW and cache_path.exists():
+        try:
+            with cache_path.open(mode="rb") as fobj:
+                _SYS_INFO_KW.update(json.load(fobj))
+        except Exception as ex:
+            logger.warning(f"Error reading cache file {cache_path}: {ex}")
+
+    if _SYS_INFO_KW:
+        return SystemInfo(
+            total_mb=_SYS_INFO_KW['total_mb'],
+            usable_mb=_SYS_INFO_KW['usable_mb'],
+        )
+    else:
+        return _init_sys_info()
 ```
 
 The serialization logic writes a file in `SBK_APP_DIR` which may be
@@ -256,6 +263,7 @@ happen once).
 
 ```python
 # def: impl_sys_info_dump_cache
+_SYS_INFO_LOADING: bool = False
 _SYS_INFO_KW: Dict[str, int] = {}
 
 def _dump_sys_info(sys_info: SystemInfo) -> None:

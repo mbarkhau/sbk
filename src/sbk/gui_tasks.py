@@ -30,6 +30,7 @@ import PyQt5.QtCore as qtc
 
 from . import ui_common
 from . import parameters
+from . import sbk_random
 from . import common_types as ct
 from . import gui_panels_base as gpb
 
@@ -89,7 +90,7 @@ class SeedGenerationTask(qtc.QThread):
 
         n = 0
         while True:
-            entropy = ui_common.get_entropy_pool_size()
+            entropy = sbk_random.get_entropy_pool_size()
             if entropy < parameters.MIN_ENTROPY and n < parameters.MAX_ENTROPY_WAIT:
                 logger.warning(f"low on entropy ({entropy}), waiting a bit for it to accumulate")
                 time.sleep(1)

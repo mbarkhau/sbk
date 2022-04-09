@@ -56,8 +56,8 @@ from sbk import utils
 from sbk import sys_info
 from sbk import parameters
 
-HASH_LEN                           = 128
-DIGEST_STEPS                       = 10
+HASH_LEN = 128
+DIGEST_STEPS = 10
 MEASUREMENT_SIGNIFICANCE_THRESHOLD = ct.Seconds(2)
 
 
@@ -75,12 +75,12 @@ def _digest(data: bytes, p: ct.Parallelism, m: ct.MebiBytes, t: ct.Iterations) -
 
 
 def digest(
-    data       : bytes,
-    kdf_params : parameters.KDFParams,
-    hash_len   : int,
+    data: bytes,
+    kdf_params: parameters.KDFParams,
+    hash_len: int,
     progress_cb: ct.MaybeProgressCallback = None,
 ) -> bytes:
-    _ps           : Optional[utils.ProgressSmoother]
+    _ps: Optional[utils.ProgressSmoother]
     if progress_cb:
         _ps = utils.ProgressSmoother(progress_cb)
     else:
@@ -92,14 +92,14 @@ def digest(
     progress_per_iter = 100 / kdf_params.kdf_t
 
     constant_kwargs = {
-        'p': kdf_params.kdf_p,
-        'm': kdf_params.kdf_m,
+        "p": kdf_params.kdf_p,
+        "m": kdf_params.kdf_m,
     }
     result = data
 
     while remaining_iters > 0:
         step_iters = max(1, round(remaining_iters / remaining_steps))
-        result     = _digest(result, t=step_iters, **constant_kwargs)
+        result = _digest(result, t=step_iters, **constant_kwargs)
         sys.stdout.flush()
 
         if _ps:
@@ -118,46 +118,48 @@ def digest(
 
 
 def kdf_params_for_duration(
-    baseline_kdf_params : parameters.KDFParams,
-    target_duration     : ct.Seconds,
+    baseline_kdf_params: parameters.KDFParams,
+    target_duration: ct.Seconds,
     max_measurement_time: ct.Seconds = 5,
 ) -> parameters.KDFParams:
-    kdf_m = sys_info.max_usable_memory(baseline_kdf_params.kdf_m)
-
-    test_kdf_params = parameters.init_kdf_params(kdf_m=kdf_m, kdf_t=1)
-    digest_kwargs   = {
+    test_kdf_params = parameters.init_kdf_params(
+        kdf_m=baseline_kdf_params.kdf_m, kdf_t=1
+    )
+    digest_kwargs = {
         # we only vary t, the baseline should be chosen to max out the others
-        'p': test_kdf_params.kdf_p,
-        'm': test_kdf_params.kdf_m,
+        "p": test_kdf_params.kdf_p,
+        "m": test_kdf_params.kdf_m,
     }
 
     tgt_step_duration = target_duration / DIGEST_STEPS
-    total_time        = 0.0
+    total_time = 0.0
 
     while True:
         tzero = time.time()
-        digest_kwargs['t'] = test_kdf_params.kdf_t
+        digest_kwargs["t"] = test_kdf_params.kdf_t
         _digest(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00", **digest_kwargs)
         duration = time.time() - tzero
         total_time += duration
 
         iters_per_sec = test_kdf_params.kdf_t / duration
-        step_iters    = tgt_step_duration * iters_per_sec * 1.25
+        step_iters = tgt_step_duration * iters_per_sec * 1.25
 
         # t = test_kdf_params.kdf_t
         # print(f"< {duration:4.3f} t: {t} i/s: {iters_per_sec} tgt: {step_iters}")
-        is_tgt_exceeded            = duration   > tgt_step_duration
-        is_measurement_significant = duration   > MEASUREMENT_SIGNIFICANCE_THRESHOLD
-        is_enough_already          = total_time > max_measurement_time
+        is_tgt_exceeded = duration > tgt_step_duration
+        is_measurement_significant = duration > MEASUREMENT_SIGNIFICANCE_THRESHOLD
+        is_enough_already = total_time > max_measurement_time
         if is_tgt_exceeded or is_measurement_significant or is_enough_already:
             new_t = round(step_iters * DIGEST_STEPS)
             return parameters.init_kdf_params(kdf_m=test_kdf_params.kdf_m, kdf_t=new_t)
         else:
             # min_iters is used to make sure we're always measuring with a higher value for t
-            min_iters       = math.ceil(test_kdf_params.kdf_t * 1.25)
-            min_t           = round(1.25 * MEASUREMENT_SIGNIFICANCE_THRESHOLD * iters_per_sec)
-            new_t           = max(min_iters, min_t)
-            test_kdf_params = parameters.init_kdf_params(kdf_m=test_kdf_params.kdf_m, kdf_t=new_t)
+            min_iters = math.ceil(test_kdf_params.kdf_t * 1.25)
+            min_t = round(1.25 * MEASUREMENT_SIGNIFICANCE_THRESHOLD * iters_per_sec)
+            new_t = max(min_iters, min_t)
+            test_kdf_params = parameters.init_kdf_params(
+                kdf_m=test_kdf_params.kdf_m, kdf_t=new_t
+            )
 
 
 def main(args: List[str]) -> int:
@@ -170,5 +172,5 @@ def main(args: List[str]) -> int:
         return -1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

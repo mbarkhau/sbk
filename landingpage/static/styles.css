@@ -97,10 +97,41 @@ body {
     margin: 1em auto 10em auto;
     max-width: 48em;
 }
+
 h1 {
-    text-align: center;
     line-height: 1.4em;
+    color: #000F;
 }
+h1 > div {
+    margin: 0 auto;
+}
+h1.fader > div {
+    width: 12em;
+}
+h1.fader span {
+    display: inline-block;
+    white-space: pre;
+}
+
+h1.fader span:nth-child(1) {
+    text-align: right;
+    width: 3em;
+}
+
+h1.fader span:nth-child(2) {
+    width: 8em;
+    text-align: left;
+    transition: color 200ms;
+    white-space: nowrap;
+}
+
+.fadein {
+    color: #000F;
+}
+.fadeout {
+    color: #0000;
+}
+
 h1, h2 {
     margin-top: 1em;
 }

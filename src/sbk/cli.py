@@ -38,6 +38,7 @@ from . import shamir
 from . import sys_info
 from . import ui_common
 from . import parameters
+from . import sbk_random
 from . import common_types as ct
 
 try:
@@ -163,6 +164,7 @@ _opt_kdf_time_cost = click.option(
 
 DEFAULT_SCHEME = f"{parameters.DEFAULT_SSS_T}of{parameters.DEFAULT_SSS_N}"
 
+
 _opt_scheme = click.option(
     '-s',
     '--scheme',
@@ -171,6 +173,16 @@ _opt_scheme = click.option(
     default=DEFAULT_SCHEME,
     show_default=True,
     help="Threshold and total Number of shares (format: TofN)",
+)
+
+
+_opt_preseed = click.option(
+    '--preseed',
+    'preseed',
+    type=str,
+    default=None,
+    show_default=True,
+    help="Seed from which to derive the salt (optional)",
 )
 
 
@@ -371,6 +383,7 @@ def _show_created_data(
 @_opt_kdf_target_duration
 @_opt_kdf_memory_cost
 @_opt_kdf_time_cost
+@_opt_preseed
 @_opt_verbose
 def create(
     scheme_arg     : str        = DEFAULT_SCHEME,
@@ -378,17 +391,18 @@ def create(
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
     memory_cost    : Optional[ct.MebiBytes ] = None,
     time_cost      : Optional[ct.Iterations] = None,
+    preseed        : Optional[str          ] = None,
     verbose        : int = 0,
 ) -> None:
     """Generate a new salt, brainkey and shares."""
 
+    _configure_logging(verbose)
+
     # Considering that SBK may be run as the only software on a
     # on a linux live system, there may be an added risk that the
     # system has collected so little entropy directly after booting,
-    # that the raw_salt and brainkey would be predicatble.
-    _configure_logging(verbose)
-
-    entropy_available = ui_common.get_entropy_pool_size()
+    # that the raw_salt and brainkey would be predictable.
+    entropy_available = sbk_random.get_entropy_pool_size()
     if entropy_available < parameters.MIN_ENTROPY:
         echo(f"Not enough entropy: {entropy_available} < 16 bytes")
         sys.exit(1)
@@ -404,7 +418,7 @@ def create(
     )
 
     try:
-        salt, brainkey, shares = ui_common.create_secrets(params)
+        salt, brainkey, shares = ui_common.create_secrets(params, preseed)
     except ValueError as err:
         if err.args and isinstance(err.args[0], list):
             bad_checks = err.args[0]
@@ -415,11 +429,12 @@ def create(
 
     has_manual_kdf_m = memory_cost is not None
     if has_manual_kdf_m:
-        # Verify that derivation works before we show anything. This is for manually chosen values
-        # of kdf_p and kdf_m, because they may exceed what the system is capable of. If we did not
-        # do this now the user might get an OOM error later when they try to load the wallet.
-        new_t                 = min(1, params.kdf_t)
-        validation_kdf_params = parameters.init_kdf_params(kdf_m=params.kdf_m, kdf_t=new_t)
+        # Verify that derivation works before we show anything.
+        # This is for manually chosen values of kdf_p and kdf_m,
+        # because they may exceed what the system is capable of.
+        # If we did not do this now the user might get an OOM
+        # error later when they try to load the wallet.
+        validation_kdf_params = parameters.init_kdf_params(kdf_m=params.kdf_m, kdf_t=1)
 
         ui_common.derive_seed(validation_kdf_params, salt, brainkey, label="KDF Validation ")
     else:
@@ -565,9 +580,9 @@ def qt_gui(verbose: int = 0) -> None:
     _configure_logging(verbose)
 
     # load sys info before it's needed. This way it's available
-    # by the time it's needed (for wallet creation or settings).
+    # by the time it is needed (for wallet creation or settings).
     runner = ui_common.ThreadRunner(sys_info.load_sys_info)
-    runner.run()
+    runner.start()
 
     gui.run_gui()  # type: ignore
 

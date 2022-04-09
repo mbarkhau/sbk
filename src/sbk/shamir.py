@@ -13,6 +13,7 @@ from typing import Set
 from typing import Dict
 from typing import List
 from typing import Tuple
+from typing import Callable
 from typing import Iterator
 from typing import Sequence
 
@@ -21,6 +22,7 @@ from . import primes
 from . import gf_poly
 from . import enc_util
 from . import parameters
+from . import sbk_random
 from . import common_types as ct
 
 RawShares = Sequence[ct.RawShare]
@@ -39,12 +41,13 @@ def _split_data_gf_p(
     threshold : int,
     num_shares: int,
     prime     : int,
+    make_coeff: Callable[[int], int],
 ) -> Iterator[ct.RawShare]:
     secret_int = enc_util.bytes2int(data)
     assert secret_int < prime
 
     field    = gf.init_field(prime)
-    gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)  # type: ignore
+    gfpoints = gf_poly.split(field, secret_int, threshold, num_shares, make_coeff)  # type: ignore
     for gfpoint in gfpoints:
         # NOTE: for x=0 or x=255 the y value may be the secret, which should not be serialized.
         x = gfpoint.x.val
@@ -81,7 +84,12 @@ XCoord  = int
 YCoords = Dict[Tuple[XCoord, Index], int]
 
 
-def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> Iterator[ct.RawShare]:
+def _split_data_gf_256(
+    data      : bytes,
+    threshold : int,
+    num_shares: int,
+    make_coeff: Callable[[int], int],
+) -> Iterator[ct.RawShare]:
     field = gf.FieldGF256()
 
     y_coords_by_x: YCoords = {}
@@ -90,7 +98,7 @@ def _split_data_gf_256(data: bytes, threshold: int, num_shares: int) -> Iterator
             errmsg = f"Value out of gf bounds {secret_int}"
             raise ValueError(errmsg)
 
-        gfpoints = gf_poly.split(field, secret_int, threshold, num_shares)
+        gfpoints = gf_poly.split(field, secret_int, threshold, num_shares, make_coeff)
         for gfpoint in gfpoints:
             y_coords_by_x[gfpoint.x.val, i] = gfpoint.y.val
 
@@ -129,10 +137,11 @@ def _join_gf_256(raw_shares: RawShares, threshold: int) -> ct.MasterKey:
 
 
 def split(
-    params  : parameters.Parameters,
-    raw_salt: ct.RawSalt,
-    brainkey: ct.BrainKey,
-    use_gf_p: bool = False,
+    params    : parameters.Parameters,
+    raw_salt  : ct.RawSalt,
+    brainkey  : ct.BrainKey,
+    make_coeff: Callable[[int], int] = sbk_random.randrange,
+    use_gf_p  : bool = False,
 ) -> List[ct.Share]:
     lens = parameters.raw_secret_lens()
 
@@ -145,9 +154,9 @@ def split(
 
     if use_gf_p:
         gf_prime   = primes.get_pow2prime(lens.master_key * 8)
-        raw_shares = list(_split_data_gf_p(master_key, params.sss_t, params.sss_n, gf_prime))
+        raw_shares = list(_split_data_gf_p(master_key, params.sss_t, params.sss_n, gf_prime, make_coeff))
     else:
-        raw_shares = list(_split_data_gf_256(master_key, params.sss_t, params.sss_n))
+        raw_shares = list(_split_data_gf_256(master_key, params.sss_t, params.sss_n, make_coeff))
 
     shares: List[ct.Share] = []
     for raw_share in raw_shares:

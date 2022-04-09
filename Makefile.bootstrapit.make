@@ -441,6 +441,7 @@ fmt_isort:
 		src/ test/;
 
 
+
 ## Run code formatter on src/ and test/
 .PHONY: fmt_sjfmt
 fmt_sjfmt:
@@ -448,7 +449,8 @@ fmt_sjfmt:
 		--target-version=py36 \
 		--skip-string-normalization \
 		--line-length=$(MAX_LINE_LEN) \
-		src/ test/;
+		$$(grep --files-without-match "This is a generated file" src/sbk/*.py) \
+		$$(grep --files-without-match "This is a generated file" test/*.py);
 
 
 ## Run code formatters

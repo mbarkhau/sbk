@@ -49,20 +49,20 @@ TypeAlias = Any
 
 import sbk.common_types as ct
 
-logger         = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 SBK_VERSION_V0 = 0
 
 # constrained by f_threshold (3bits)
 MIN_THRESHOLD = 2
 MAX_THRESHOLD = 10
 
-KDF_PARALLELISM       = ct.Parallelism(128)  # hardcoded
-DEFAULT_KDF_T_TARGET  = ct.Seconds(90)
+KDF_PARALLELISM = ct.Parallelism(128)  # hardcoded
+DEFAULT_KDF_T_TARGET = ct.Seconds(90)
 DEFAULT_KDF_M_PERCENT = 100
 
-DEFAULT_SSS_T    = 3
-DEFAULT_SSS_N    = 5
-SALT_HEADER_LEN  = 2
+DEFAULT_SSS_T = 3
+DEFAULT_SSS_N = 5
+SALT_HEADER_LEN = 2
 SHARE_HEADER_LEN = 3
 
 DEFAULT_RAW_SALT_LEN = 13
@@ -71,18 +71,18 @@ DEFAULT_BRAINKEY_LEN = 8
 # DEFAULT_RAW_SALT_LEN  = 5
 # DEFAULT_BRAINKEY_LEN  = 4
 if "SBK_DEBUG_RAW_SALT_LEN" in os.environ:
-    DEFAULT_RAW_SALT_LEN = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
+    DEFAULT_RAW_SALT_LEN = int(os.environ["SBK_DEBUG_RAW_SALT_LEN"])
 
 if "SBK_DEBUG_BRAINKEY_LEN" in os.environ:
-    DEFAULT_BRAINKEY_LEN = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
+    DEFAULT_BRAINKEY_LEN = int(os.environ["SBK_DEBUG_BRAINKEY_LEN"])
 
-MIN_ENTROPY      = int(os.getenv("SBK_MIN_ENTROPY"     , "16"))
+MIN_ENTROPY = int(os.getenv("SBK_MIN_ENTROPY", "16"))
 MAX_ENTROPY_WAIT = int(os.getenv("SBK_MAX_ENTROPY_WAIT", "10"))
 
-DEFAULT_KDF_T_TARGET  = int(os.getenv("SBK_KDF_T_TARGET" ) or DEFAULT_KDF_T_TARGET)
+DEFAULT_KDF_T_TARGET = int(os.getenv("SBK_KDF_T_TARGET") or DEFAULT_KDF_T_TARGET)
 DEFAULT_KDF_M_PERCENT = int(os.getenv("SBK_KDF_M_PERCENT") or DEFAULT_KDF_M_PERCENT)
 
-DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD" ) or DEFAULT_SSS_T)
+DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD") or DEFAULT_SSS_T)
 DEFAULT_SSS_N = int(os.getenv("SBK_NUM_SHARES") or DEFAULT_SSS_N)
 
 
@@ -170,8 +170,8 @@ def params2bytes(params: Parameters) -> bytes:
     kdf_t_enc = param_log(params.kdf_t, 1.125)
 
     assert params.version & 0b0000_1111 == params.version
-    assert kdf_m_enc      & 0b0011_1111 == kdf_m_enc
-    assert kdf_t_enc      & 0b0011_1111 == kdf_t_enc
+    assert kdf_m_enc & 0b0011_1111 == kdf_m_enc
+    assert kdf_t_enc & 0b0011_1111 == kdf_t_enc
 
     if params.sss_x > 0:
         sss_x_enc = params.sss_x - 1
@@ -185,10 +185,10 @@ def params2bytes(params: Parameters) -> bytes:
     encoded_uint = (
         0
         | params.version << 0x00
-        | kdf_m_enc      << 0x04
-        | kdf_t_enc      << 0x0A
-        | sss_x_enc      << 0x10
-        | sss_t_enc      << 0x15
+        | kdf_m_enc << 0x04
+        | kdf_t_enc << 0x0A
+        | sss_x_enc << 0x10
+        | sss_t_enc << 0x15
     )
     encoded_data = struct.pack("<L", encoded_uint)
     assert encoded_data[-1:] == b"\x00", encoded_data[-1:]
@@ -203,7 +203,7 @@ def bytes2params(data: bytes) -> Parameters:
     assert len(data) == 3, len(data)
     (encoded_uint,) = struct.unpack("<L", data + b"\x00")
 
-    version   = (encoded_uint >> 0x00) & 0b0000_1111
+    version = (encoded_uint >> 0x00) & 0b0000_1111
     kdf_m_enc = (encoded_uint >> 0x04) & 0b0011_1111
     kdf_t_enc = (encoded_uint >> 0x0A) & 0b0011_1111
     sss_x_enc = (encoded_uint >> 0x10) & 0b0001_1111
@@ -225,20 +225,20 @@ def bytes2params(data: bytes) -> Parameters:
 
 
 class SecretLens(NamedTuple):
-    raw_salt  : int
-    brainkey  : int
+    raw_salt: int
+    brainkey: int
     master_key: int
-    raw_share : int
-    salt      : int
-    share     : int
+    raw_share: int
+    salt: int
+    share: int
 
 
 def raw_secret_lens() -> SecretLens:
     raw_salt = DEFAULT_RAW_SALT_LEN
     brainkey = DEFAULT_BRAINKEY_LEN
 
-    raw_share  = raw_salt         + brainkey
-    master_key = raw_salt         + brainkey
-    salt       = SALT_HEADER_LEN  + raw_salt
-    share      = SHARE_HEADER_LEN + raw_share
+    raw_share = raw_salt + brainkey
+    master_key = raw_salt + brainkey
+    salt = SALT_HEADER_LEN + raw_salt
+    share = SHARE_HEADER_LEN + raw_share
     return SecretLens(raw_salt, brainkey, master_key, raw_share, salt, share)

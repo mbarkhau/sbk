@@ -47,7 +47,7 @@ from . import ui_common
 from . import parameters
 from . import common_types as ct
 
-GUI_DEBUG_MODE = os.getenv('SBK_GUI_DEBUG_MODE') == "1"
+GUI_DEBUG_MODE = os.getenv('SBK_GUI_DEBUG') == "1"
 
 
 logger = logging.getLogger("sbk.gui_panels")
@@ -57,11 +57,12 @@ PanelState = typext.TypedDict(
     'PanelState',
     {
         'panel_index': int,
+        'preseed'    : Optional[str],
         'salt'       : Optional[ct.Salt],
         'brainkey'   : Optional[ct.BrainKey],
         'shares'     : ct.Shares,
         'params'     : Optional[parameters.Parameters],
-        'seed_data'  : Optional[ct.SeedData],
+        'wallet_seed': Optional[ct.WalletSeed],
         # options
         'sys_info'   : Optional[sys_info.SystemInfo],
         'offline'    : bool,
@@ -76,11 +77,12 @@ PanelState = typext.TypedDict(
 
 shared_panel_state: PanelState = {
     'panel_index': 0,
+    'preseed'    : None,
     'salt'       : None,
     'brainkey'   : None,
     'shares'     : [],
     'params'     : None,
-    'seed_data'  : None,
+    'wallet_seed': None,
     # options
     'sys_info'   : None,
     'offline'    : True,
@@ -119,10 +121,6 @@ def get_state(load_sys_info: bool = True) -> PanelState:
         )
 
     return state
-
-
-def get_params() -> Optional[parameters.Parameters]:
-    return get_state()['params']
 
 
 class CurrentSecret(NamedTuple):
@@ -397,7 +395,12 @@ class MnemonicEdit(qtw.QLineEdit):
         return super().focusInEvent(event)
 
 
-def _label_widget(parent: qtw.QWidget, text: str, bold: bool = False, debug: bool = False) -> qtw.QLabel:
+def _label_widget(
+    parent: qtw.QWidget,
+    text  : str,
+    bold  : bool = False,
+    debug : bool = False,
+) -> qtw.QLabel:
     label = qtw.QLabel(text.strip(), parent)
     label.setAlignment(qtc.Qt.AlignCenter)
     if bold:
@@ -602,9 +605,14 @@ class EnterSecretPanel(NavigablePanel):
         self._layout.addLayout(column_headers(self))
         self._layout.addLayout(self.grid_layout)
 
+        self.add_custom_widgets(self._layout)
+
         self._layout.addStretch(1)
         self._layout.addLayout(self.nav_layout)
         self.setLayout(self._layout)
+
+    def add_custom_widgets(self, grid_layout: qtw.QGridLayout) -> None:
+        pass
 
     def track_focus(self, widget_type: str, widget_index: int) -> None:
         self.trace(f"track_focus {type(self).__name__} {widget_type} {widget_index}")

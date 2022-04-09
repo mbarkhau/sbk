@@ -42,6 +42,7 @@ pdf_templates/%.pdf: \
 
 
 svg2png := inkscape --without-gui --export-area-page --file
+
 res = $(subst .png,,$(subst landingpage/,,$(subst src/sbk/assets/,,$(subst logo_,,$(subst nostroke_,,$(subst favico_,,$@))))))
 
 
@@ -139,6 +140,11 @@ debug_cli:
 .PHONY: serve_doc
 serve_doc:
 	$(DEV_ENV_PY) -m http.server --directory doc/ 8080
+
+
+.PHONY: serve_landingpage
+serve_landingpage:
+	$(DEV_ENV_PY) -m http.server --directory landingpage/ 8080
 
 
 .PHONY: landingpage_sync

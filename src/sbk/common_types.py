@@ -39,7 +39,7 @@ class RawShare(NamedTuple):
 Share : TypeAlias = bytes
 Shares: TypeAlias = Sequence[Share]
 
-SeedData: TypeAlias = bytes
+WalletSeed: TypeAlias = bytes
 
 ElectrumSeed: TypeAlias = str
 

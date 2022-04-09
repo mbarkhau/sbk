@@ -535,7 +535,7 @@ echo "wrote $BUILD_DIR/sbklive_2022.1009-beta-amd64.iso"
 
 chmod u=rw,g=r,o=r *.iso
 
-rsync *.iso root@vserver:/var/www/html/sbk/sbk-live
+rsync --progress *.iso root@vserver:/var/www/html/sbk/sbk-live
 
 mktorrent \
     --piece-length 22 \

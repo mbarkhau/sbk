@@ -158,14 +158,14 @@ build/deps.txt: build/envs.txt requirements/*.txt
 .PHONY: help
 help:
 	@awk '{ \
-			if ($$0 ~ /^.PHONY: [a-zA-Z\-\_0-9]+$$/) { \
+			if ($$0 ~ /^.PHONY: [a-zA-Z\-_0-9]+$$/) { \
 				helpCommand = substr($$0, index($$0, ":") + 2); \
 				if (helpMessage) { \
 					printf "\033[36m%-20s\033[0m %s\n", \
 						helpCommand, helpMessage; \
 					helpMessage = ""; \
 				} \
-			} else if ($$0 ~ /^[a-zA-Z\-\_0-9.\/]+:/) { \
+			} else if ($$0 ~ /^[a-zA-Z\-_0-9.\/]+:/) { \
 				helpCommand = substr($$0, 0, index($$0, ":")); \
 				if (helpMessage) { \
 					printf "\033[36m%-20s\033[0m %s\n", \
@@ -210,14 +210,14 @@ helpverbose:
 	@printf "Available make targets for \033[97m$(PKG_NAME)\033[0m:\n";
 
 	@awk '{ \
-			if ($$0 ~ /^.PHONY: [a-zA-Z\-\_0-9]+$$/) { \
+			if ($$0 ~ /^.PHONY: [a-zA-Z\-_0-9]+$$/) { \
 				helpCommand = substr($$0, index($$0, ":") + 2); \
 				if (helpMessage) { \
 					printf "\033[36m%-20s\033[0m %s\n", \
 						helpCommand, helpMessage; \
 					helpMessage = ""; \
 				} \
-			} else if ($$0 ~ /^[a-zA-Z\-\_0-9.\/]+:/) { \
+			} else if ($$0 ~ /^[a-zA-Z\-_0-9.\/]+:/) { \
 				helpCommand = substr($$0, 0, index($$0, ":")); \
 				if (helpMessage) { \
 					printf "\033[36m%-20s\033[0m %s\n", \

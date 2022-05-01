@@ -50,18 +50,14 @@ TypeAlias = Any
 import sbk.common_types as ct
 
 logger = logging.getLogger(__name__)
-
-
 def hex2bytes(hex_str: str) -> bytes:
     """Convert bytes to a hex string."""
     hex_str = hex_str.upper().zfill(2 * ((len(hex_str) + 1) // 2))
     return base64.b16decode(hex_str.encode('ascii'))
 
-
 def bytes2hex(data: bytes) -> str:
     """Convert bytes to a hex string."""
     return base64.b16encode(data).decode('ascii').lower()
-
 
 def bytes_hex(data: bytes) -> str:
     """Display bytes data in hex form, rather than ascii."""
@@ -69,8 +65,6 @@ def bytes_hex(data: bytes) -> str:
     char_hex        = [bytes2hex(c).lower() for c in chars]
     char_hex_padded = (c + " " if (i + 1) % 2 == 0 else c for i, c in enumerate(char_hex))
     return "".join(char_hex_padded).strip()
-
-
 def bytes2int(data: bytes) -> int:
     r"""Convert bytes to (arbitrary sized) integers.
 
@@ -103,8 +97,6 @@ def int2bytes(num: int, zfill_bytes: int = 1) -> bytes:
         parts.append(b"\x00")
 
     return b"".join(reversed(parts))
-
-
 class ProgressSmoother:
 
     increments: List[float]

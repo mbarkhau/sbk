@@ -359,7 +359,7 @@ Ideally you will have access to enough backup shares so that you. This
 
 It may appear strange that the supposed money of the future requires you to write dozens and dozens of words onto paper. Don't we have printers to save us from this kind of tedious and error prone work?
 
-If you still trust printer manufacturers to create products that perform even the most rudimentary of their advertised functions, namely creating faithful physical copies, then you may find it enlightening to review [some of the work](https://www.youtube.com/watch?v=c0O6UXrOZJo) of [David Kriesel's][href_dkriesel_xerox_fail]. If printer manufacturers cannot even do this job right, how much confidence should we place in their ability to create devices that cannot be exploited while being connected to a network.
+If you still trust printer manufacturers to create products that perform even the most rudimentary of their advertised functions, namely creating faithful physical copies, then you may find it enlightening to review [some of the work](https://www.youtube.com/watch?v=c0O6UXrOZJo) of [David Kriesel's][href_dkriesel_xerox_fail]. If printer manufacturers cannot even do this job right, how much confidence should we place in their ability to create devices that cannot be exploited while being connected to a network?
 
 Suffice it to say, I recommend you do not trust your printer farther than you can throw it. SBK provides templates in [A4 format][href_share_template_a4] and [US-Letter format][href_share_template_usletter] for you to print, but these do not contain any secret information and are only to make it easier for you to create shares. You will have to manually write down all of the data for your `salt` and `shares`.
 

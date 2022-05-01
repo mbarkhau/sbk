@@ -124,6 +124,19 @@ def anykey_confirm(message: str) -> bool:
     return False
 
 
+def get_validated_salt_phrase(salt_phrase: Optional[str]) -> bytes:
+    if salt_phrase is None:
+        salt_phrase1 = click.prompt("Enter your Salt passphrase"  , hide_input=True)
+        salt_phrase2 = click.prompt("Confirm your Salt passphrase", hide_input=True)
+        if salt_phrase1 == salt_phrase2:
+            return salt_phrase1.strip()
+        else:
+            echo(f"Mismatch of Salt passphrases")
+            sys.exit(1)
+    else:
+        return salt_phrase.strip()
+
+
 SHARE_TITLE = r"Step 1 of 4: Copy Share {share_no}/{num_shares}"
 
 SALT_TITLE = r"Step 2 of 4: Copy Salt"
@@ -176,13 +189,26 @@ _opt_scheme = click.option(
 )
 
 
-_opt_preseed = click.option(
-    '--preseed',
-    'preseed',
+_opt_salt = click.option(
+    '--salt',
+    'salt_phrase',
     type=str,
     default=None,
     show_default=True,
-    help="Seed from which to derive the salt (optional)",
+    help="User chosen salt phrase",
+)
+
+
+DEFAULT_SHARESET = 1
+
+
+_opt_shareset = click.option(
+    '--shareset',
+    'shareset',
+    type=int,
+    default=DEFAULT_SHARESET,
+    show_default=True,
+    help="Name for a set of shares",
 )
 
 
@@ -301,13 +327,9 @@ def _validate_data(header_text: str, data: bytes, secret_type: str) -> None:
 
 def _validate_copies(
     params  : parameters.Parameters,
-    salt    : ct.Salt,
     brainkey: ct.BrainKey,
     shares  : ct.Shares,
 ) -> bool:
-    header_text = "Validation for Salt"
-    _validate_data(header_text, salt, cli_io.SECRET_TYPE_SALT)
-
     header_text = "Validation for Brainkey"
     _validate_data(header_text, brainkey, cli_io.SECRET_TYPE_BRAINKEY)
 
@@ -322,7 +344,6 @@ def _validate_copies(
 def _show_created_data(
     yes_all : bool,
     params  : parameters.Parameters,
-    salt    : ct.Salt,
     brainkey: ct.BrainKey,
     shares  : ct.Shares,
 ) -> None:
@@ -351,18 +372,6 @@ def _show_created_data(
         # ui_common.share_data_to_text(params, share_data, share_no)
         yes_all or anykey_confirm(share_prompt)
 
-    # Salt
-    yes_all or clear()
-
-    echo(SALT_TITLE)
-    echo()
-
-    echo(ui_common.SALT_INFO_TEXT)
-
-    _show_secret("Salt", cli_io.SECRET_TYPE_SALT, salt)
-
-    yes_all or anykey_confirm(SALT_PROMPT)
-
     # Brainkey
     yes_all or clear()
     echo(BRAINKEY_TITLE.strip())
@@ -378,23 +387,25 @@ def _show_created_data(
 
 
 @cli.command()
+@_opt_salt
 @_opt_scheme
+@_opt_shareset
 @_opt_yes_all
 @_opt_kdf_target_duration
 @_opt_kdf_memory_cost
 @_opt_kdf_time_cost
-@_opt_preseed
 @_opt_verbose
 def create(
+    salt_phrase    : Optional[str] = None,
     scheme_arg     : str        = DEFAULT_SCHEME,
+    shareset       : int        = DEFAULT_SHARESET,
     yes_all        : bool       = False,
     target_duration: ct.Seconds = parameters.DEFAULT_KDF_T_TARGET,
     memory_cost    : Optional[ct.MebiBytes ] = None,
     time_cost      : Optional[ct.Iterations] = None,
-    preseed        : Optional[str          ] = None,
     verbose        : int = 0,
 ) -> None:
-    """Generate a new salt, brainkey and shares."""
+    """Generate a brainkey and shares."""
 
     _configure_logging(verbose)
 
@@ -407,7 +418,8 @@ def create(
         echo(f"Not enough entropy: {entropy_available} < 16 bytes")
         sys.exit(1)
 
-    scheme = ui_common.parse_scheme(scheme_arg)
+    scheme                = ui_common.parse_scheme(scheme_arg)
+    validated_salt_phrase = get_validated_salt_phrase(salt_phrase)
 
     params = ui_common.init_params(
         target_duration=target_duration,
@@ -418,7 +430,11 @@ def create(
     )
 
     try:
-        salt, brainkey, shares = ui_common.create_secrets(params, preseed)
+        brainkey, salt, shares = ui_common.create_secrets(
+            params=params,
+            salt_phrase=validated_salt_phrase,
+            shareset=shareset,
+        )
     except ValueError as err:
         if err.args and isinstance(err.args[0], list):
             bad_checks = err.args[0]
@@ -436,32 +452,43 @@ def create(
         # error later when they try to load the wallet.
         validation_kdf_params = parameters.init_kdf_params(kdf_m=params.kdf_m, kdf_t=1)
 
-        ui_common.derive_seed(validation_kdf_params, salt, brainkey, label="KDF Validation ")
+        ui_common.derive_seed(validation_kdf_params, brainkey, salt, label="KDF Validation ")
     else:
         # valid values for kdf_m and kdf_p were already tested as part of "KDF Calibration"
         pass
 
-    _show_created_data(yes_all, params, salt, brainkey, shares)
+    _show_created_data(yes_all, params, brainkey, shares)
 
-    yes_all or _validate_copies(params, salt, brainkey, shares)
+    yes_all or _validate_copies(params, brainkey, salt, shares)
 
 
 @cli.command()
+@_opt_salt
+@_opt_scheme
+@_opt_shareset
 @_opt_verbose
-def recover_salt(verbose: int = 0) -> None:
-    """Recover a partially readable Salt."""
-    _configure_logging(verbose)
-    salt_data   = cli_io.prompt(cli_io.SECRET_TYPE_SALT)
-    params_data = salt_data[: parameters.SALT_HEADER_LEN]
-    params      = parameters.bytes2params(params_data)
+def backup(
+    salt_phrase: Optional[str] = None,
+    scheme_arg : str = DEFAULT_SCHEME,
+    shareset   : int = DEFAULT_SHARESET,
+    verbose    : int = 0,
+) -> None:
+    """Generate shares from a salt, brainkey."""
 
-    echo()
-    echo("Decoded parameters".center(35))
-    echo()
-    echo(f"    threshold      : {params.sss_t}")
-    echo(f"    kdf parallelism: {params.kdf_p}")
-    echo(f"    kdf memory cost: {params.kdf_m} MiB")
-    echo(f"    kdf time cost  : {params.kdf_t} Iterations")
+    _configure_logging(verbose)
+
+    scheme                = ui_common.parse_scheme(scheme_arg)
+    validated_salt_phrase = get_validated_salt_phrase(salt_phrase)
+
+    salt = ui_common.derive_salt(validated_salt_phrase)
+    brainkey, params = get_validated_brainkey()
+
+    params = params._replace(sss_t=scheme.threshold, sss_n=scheme.num_shares)
+    shares = ui_common.derive_shares(params, salt, brainkey, shareset)
+
+    brainkey_recovered, raw_salt_recovered = shamir.join(shares)
+
+    _show_created_data(True, params, brainkey, shares)
 
 
 @cli.command()
@@ -512,20 +539,32 @@ def recover(verbose: int = 0) -> None:
     echo("\n".join(brainkey_lines))
 
 
+def get_validated_brainkey() -> tuple[ct.BrainKey, parameters.Parameters]:
+    header_text  = "Enter Brainkey"
+    raw_brainkey = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
+    brainkey     = ct.BrainKey(raw_brainkey)
+
+    params_data = brainkey[: parameters.BRANKEY_HEADER_LEN]
+    params      = parameters.bytes2params(params_data)
+    return (brainkey, params)
+
+
 @cli.command()
+@_opt_salt
 @_opt_wallet_name
 @_opt_show_seed
 @_opt_online_mode
 @_opt_yes_all
 @_opt_verbose
 def load_wallet(
+    salt_phrase: Optional[str] = None,
     wallet_name: str  = ui_common.DEFAULT_WALLET_NAME,
     show_seed  : bool = False,
     online     : bool = False,
     yes_all    : bool = False,
     verbose    : int  = 0,
 ) -> None:
-    """Open wallet using Salt+Brainkey."""
+    """Open wallet using Brainkey and Salt."""
     _configure_logging(verbose)
     offline = not online
 
@@ -540,20 +579,16 @@ def load_wallet(
     yes_all or echo(text.strip())
     yes_all or anykey_confirm("Press enter to continue")
 
-    header_text = "Enter Salt"
-    salt        = cli_io.prompt(cli_io.SECRET_TYPE_SALT, header_text=header_text)
-    params_data = salt[: parameters.SALT_HEADER_LEN]
-    params      = parameters.bytes2params(params_data)
-    # raw_salt  = salt[parameters.SALT_HEADER_LEN:]
+    validated_salt_phrase = get_validated_salt_phrase(salt_phrase)
 
-    header_text = "Enter Brainkey"
-    brainkey    = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
+    salt = ui_common.derive_salt(validated_salt_phrase)
+    brainkey, params = get_validated_brainkey()
 
     yes_all or echo()
     seed_data = ui_common.derive_seed(
         params,
-        ct.Salt(salt),
-        ct.BrainKey(brainkey),
+        brainkey,
+        salt,
         wallet_name=wallet_name,
         label="Deriving Wallet Seed",
     )

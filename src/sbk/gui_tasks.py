@@ -77,7 +77,7 @@ class SeedGenerationTask(qtc.QThread):
 
     def run(self) -> None:
         try:
-            ui_common.validated_param_data(self.params)
+            parameters.validated_param_data(self.params)
         except ValueError as err:
             if err.args and isinstance(err.args[0], list):
                 bad_checks = err.args[0]
@@ -104,7 +104,9 @@ class SeedGenerationTask(qtc.QThread):
             self.finished.emit(errmsg)
             return
 
-        salt, brainkey, shares = ui_common.create_secrets(self.params)
+        salt, brainkey, shares = ui_common.create_secrets(
+            self.params, salt_phrase=salt_phrase, shareset=shareset
+        )
 
         # NOTE (mb 2021-07-09): We could do this later in theory, but
         #   if the derivation of seed_data fails, the user would have
@@ -145,7 +147,7 @@ class SeedDerivationTask(qtc.QThread):
     def run(self) -> None:
         try:
             # provoke error for invalid data
-            ui_common.validated_param_data(self.params)
+            parameters.validated_param_data(self.params)
         except ValueError as err:
             if err.args and isinstance(err.args[0], list):
                 bad_checks = err.args[0]

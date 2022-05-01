@@ -158,3 +158,36 @@ landingpage_sync:
 	rsync pdf_templates/*.pdf root@vserver:/var/www/html/sbk/pdf_templates/
 
 	ssh root@vserver "chown -R mbarkhau:mbarkhau /var/www/html/sbk/"
+
+
+tmp_doc/html_build.marker: lit/*.md
+	rm -f tmp_doc/*.html
+	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --html tmp_doc/
+	cp -rf tmp_doc/* doc/
+	touch tmp_doc/html_build.marker
+
+
+tmp_doc/pdf_build.marker: lit/*.md
+	rm -f tmp_doc/*.pdf
+	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --pdf tmp_doc/
+	cp -rf tmp_doc/* doc/
+	touch tmp_doc/pdf_build.marker
+
+
+tmp_doc/lit_build.marker: lit/*.md
+	rm -f tmp_doc/*.pdf
+	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md
+	cp -rf tmp_doc/* doc/
+	touch tmp_doc/lit_build.marker
+
+
+.PHONY: build_html
+build_html: tmp_doc/html_build.marker
+
+
+.PHONY: build_pdf
+build_pdf: tmp_doc/pdf_build.marker
+
+
+.PHONY: build
+build: tmp_doc/lit_build.marker

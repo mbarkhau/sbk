@@ -91,11 +91,12 @@ TypeAlias = Any
 
 ```python
 # def: types
-RawSalt: TypeAlias = bytes
+RawBrainKey: TypeAlias = bytes
+RawSalt    : TypeAlias = bytes
 
 # ParamConfig data + RawSalt
-Salt     : TypeAlias = bytes
 BrainKey : TypeAlias = bytes
+Salt     : TypeAlias = bytes
 MasterKey: TypeAlias = bytes
 
 class RawShare(NamedTuple):

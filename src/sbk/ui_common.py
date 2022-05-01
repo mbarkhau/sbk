@@ -495,8 +495,8 @@ def fallback_progressbar(label: str) -> InitProgressbar:
 
 def derive_seed(
     kdf_params      : Union[parameters.Parameters, parameters.KDFParams],
-    salt            : ct.Salt,
     brainkey        : ct.BrainKey,
+    salt            : ct.Salt,
     label           : str,
     wallet_name     : str = DEFAULT_WALLET_NAME,
     init_progressbar: Optional[InitProgressbar] = None,
@@ -572,9 +572,9 @@ def parse_kdf_params(
     init_progressbar: InitProgressbar,
 ) -> parameters.KDFParams:
     nfo           = sys_info.load_sys_info()
-    target_memory = nfo.usable_mb * parameters.DEFAULT_KDF_M_PERCENT / 100
+    target_memory = nfo.usable_mb * parameters.DEFAULT_KDF_M_PERCENT / 1500
 
-    kdf_m = int((memory_cost or target_memory) / 100) * 100
+    kdf_m = int((memory_cost or target_memory) / 1500) * 1500
     kdf_t = time_cost or 1
 
     kdf_params = parameters.init_kdf_params(kdf_m=kdf_m, kdf_t=kdf_t)
@@ -615,25 +615,6 @@ def init_params(
     )
 
 
-def validated_param_data(params: parameters.Parameters) -> bytes:
-    # validate encoding round trip before we use params
-    params_data    = parameters.params2bytes(params)
-    decoded_params = parameters.bytes2params(params_data)
-
-    checks = {
-        'threshold': params.sss_t   == decoded_params.sss_t,
-        'version'  : params.version == decoded_params.version,
-        'kdf_p'    : params.kdf_p   == decoded_params.kdf_p,
-        'kdf_m'    : params.kdf_m   == decoded_params.kdf_m,
-        'kdf_t'    : params.kdf_t   == decoded_params.kdf_t,
-    }
-    bad_checks = [name for name, is_ok in checks.items() if not is_ok]
-    if any(bad_checks):
-        raise ValueError(bad_checks)
-    else:
-        return params_data
-
-
 def validate_wallet_name(wallet_name: str) -> None:
     invalid_char_match = re.search(r"[^a-z0-9\-]", wallet_name)
     if invalid_char_match is None:
@@ -649,23 +630,15 @@ def validate_wallet_name(wallet_name: str) -> None:
     raise ValueError(errmsg)
 
 
-def derive_seed_data(preseed: str, data_len: int) -> bytes:
-    out_data = hashlib.sha256(preseed.encode("utf-8")).digest()
-    while len(out_data) < data_len:
-        out_data += hashlib.sha256(out_data).digest()
-
-    return out_data[:data_len]
-
-
 def encode_header_text(params: parameters.Parameters) -> str:
-    params_data = validated_param_data(params)
-    salt_header = params_data[: parameters.SALT_HEADER_LEN]
-    return base64.b16encode(salt_header).decode("ascii")
+    params_data = parameters.validated_param_data(params)
+    bk_header   = params_data[: parameters.BRANKEY_HEADER_LEN]
+    return base64.b16encode(bk_header).decode("ascii")
 
 
 def decode_header_text(header_text: str) -> parameters.Parameters:
-    salt_header = base64.b16decode(header_text.lower().encode("ascii"))
-    return parameters.bytes2params(salt_header)
+    bk_header = base64.b16decode(header_text.lower().encode("ascii"))
+    return parameters.bytes2params(bk_header)
 
 
 def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
@@ -685,71 +658,87 @@ def _check_entropy(raw_salt: bytes, brainkey: bytes) -> None:
 
 class Secrets(NamedTuple):
 
-    salt    : ct.Salt
     brainkey: ct.BrainKey
-    shares  : ct.Shares
+    salt    : ct.Salt
+    shares  : List[ct.Share]
+
+
+def derive_salt(salt_phrase: str) -> ct.Salt:
+    salt_data = sbk_random.argon2digest(
+        salt_phrase.encode("utf-8"),
+        hash_len=parameters.DEFAULT_RAW_SALT_LEN,
+    )
+    return ct.Salt(salt_data)
+
+
+def derive_shares(
+    params  : parameters.Parameters,
+    salt    : ct.Salt,
+    brainkey: ct.BrainKey,
+    shareset: int,
+) -> List[ct.Share]:
+    shareset_data          = str(shareset).encode("ascii")
+    shares_coeff_seed      = salt + shareset_data
+    shares_coeff_generator = sbk_random.init_randrange(shares_coeff_seed)
+
+    lens   = parameters.raw_secret_lens()
+    raw_bk = brainkey[parameters.BRANKEY_HEADER_LEN :]
+
+    shares = list(shamir.split(params, raw_bk, salt, make_coeff=shares_coeff_generator))
+
+    brainkey_recovered, raw_salt_recovered = shamir.join(shares)
+
+    # test encoding and recovery before we display secrets
+
+    ic_brainkey = bytes2intcodes(brainkey)
+    ic_shares   = [bytes2intcodes(share) for share in shares]
+
+    phrase_brainkey = " ".join(intcodes2mnemonics(ic_brainkey))
+    phrase_shares   = [" ".join(intcodes2mnemonics(ic_share)) for ic_share in ic_shares]
+
+    checks = [
+        brainkey == intcodes2bytes(ic_brainkey, lens.brainkey),
+        brainkey == mnemonic.phrase2bytes(phrase_brainkey, lens.brainkey),
+        brainkey == brainkey_recovered,
+        salt     == raw_salt_recovered,
+        shares   == [intcodes2bytes(ic_share, lens.share) for ic_share in ic_shares],
+        shares   == [mnemonic.phrase2bytes(phrase_share, lens.share) for phrase_share in phrase_shares],
+    ]
+
+    is_recovery_ok = all(checks)
+
+    if is_recovery_ok:
+        return shares
+    else:
+        errmsg = "CRITICAL ERROR - Please report this at sbk.dev"
+        raise ValueError(errmsg)
 
 
 def create_secrets(
-    params : parameters.Parameters,
-    preseed: Optional[str] = None,
+    params     : parameters.Parameters,
+    salt_phrase: str,
+    shareset   : int,
     *,
     gen_shares: bool = True,
 ) -> Secrets:
-    params_data = validated_param_data(params)
-    salt_header = params_data[: parameters.SALT_HEADER_LEN]
+    params_data    = parameters.validated_param_data(params)
+    bk_header_data = params_data[: parameters.BRANKEY_HEADER_LEN]
 
-    preseed_header = base64.b16encode(salt_header).decode('ascii')
+    bk_header = base64.b16encode(bk_header_data).decode('ascii')
 
     lens = parameters.raw_secret_lens()
 
-    if preseed is None:
-        salt_data = sbk_random.urandom(lens.raw_salt)
-    else:
-        salt_data = derive_seed_data(preseed, lens.raw_salt)
+    raw_bk   = sbk_random.urandom(lens.raw_brainkey)
+    brainkey = ct.BrainKey(bk_header_data + raw_bk)
 
-    raw_salt = ct.RawSalt(salt_data)
-    salt     = ct.Salt(salt_header + raw_salt)
-    brainkey = ct.BrainKey(sbk_random.urandom(lens.brainkey))
+    salt = derive_salt(salt_phrase)
 
     if gen_shares:
-        if preseed is None and os.getenv('SBK_DEBUG_RANDOM') is None:
-            _check_entropy(raw_salt, brainkey)
-
-        randrange = sbk_random.init_randrange(raw_salt)
-
-        shares = list(shamir.split(params, raw_salt, brainkey, randrange))
-
-        # test encoding and recovery before we ever give out any secrets
-
-        ic_salt     = bytes2intcodes(salt)
-        ic_brainkey = bytes2intcodes(brainkey)
-        ic_shares   = [bytes2intcodes(share) for share in shares]
-
-        phrase_salt     = " ".join(intcodes2mnemonics(ic_salt    ))
-        phrase_brainkey = " ".join(intcodes2mnemonics(ic_brainkey))
-        phrase_shares   = [" ".join(intcodes2mnemonics(ic_share)) for ic_share in ic_shares]
-
-        raw_salt_recovered, brainkey_recovered = shamir.join(shares)
-
-        is_recovery_ok = (
-            brainkey     == intcodes2bytes(ic_brainkey, lens.brainkey)
-            and salt     == intcodes2bytes(ic_salt    , lens.salt)
-            and shares   == [intcodes2bytes(ic_share, lens.share) for ic_share in ic_shares]
-            and salt     == mnemonic.phrase2bytes(phrase_salt    , lens.salt)
-            and brainkey == mnemonic.phrase2bytes(phrase_brainkey, lens.brainkey)
-            and shares   == [mnemonic.phrase2bytes(phrase_share, lens.share) for phrase_share in phrase_shares]
-            and raw_salt == raw_salt_recovered
-            and brainkey == brainkey_recovered
-        )
-
-        if not is_recovery_ok:
-            errmsg = "CRITICAL ERROR - Please report this at sbk.dev"
-            raise ValueError(errmsg)
+        shares = derive_shares(params, salt, brainkey, shareset)
     else:
         shares = []
 
-    return Secrets(salt, brainkey, shares)
+    return Secrets(brainkey, salt, shares)
 
 
 def mk_tmp_wallet_fpath() -> pl.Path:

@@ -6,7 +6,7 @@ repo_url     = "https://github.com/mbarkhau/sbk"
 authors       = [
     "Manuel Barkhau <mbarkhau@gmail.com>"
 ]
-description  = "SBK - Keep your Coins Safe and Secure."
+description  = "SBK - Bitcoin Key Generation and Backup tool."
 keywords     = "Bitcoin,Wallet,Electrum,Shamir,Crypto"
 docs_url     = "https://sbk.dev/docs"
 

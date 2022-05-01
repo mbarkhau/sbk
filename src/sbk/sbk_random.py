@@ -10,9 +10,9 @@ from typing import Callable
 from typing import Optional
 from typing import Protocol
 
-from . import common_types as ct
-
 import argon2
+
+from . import common_types as ct
 
 
 def urandom(size: int) -> bytes:
@@ -62,33 +62,77 @@ def randrange(stop: int) -> int:
 
 
 class PseudoRandRange:
-
     def __init__(self, data: bytes):
         assert len(data) >= 256
 
         self.values_state: List[int] = list(data)
-        self.position: int = 0
-        self.step: int = 0
+        self.position    : int = 0
+        self.step        : int = 0
 
     def __call__(self, stop: int) -> int:
-        val = 0
+        val        = 0
         num_values = stop / 256
 
         for _ in range(int(num_values + 1)):
             self.step = self.step + 127
-            offset = self.values_state[self.position % len(self.values_state)]
-            new_pos = self.position + offset + self.step
+            offset    = self.values_state[self.position % len(self.values_state)]
+            new_pos   = self.position + offset + self.step
             val += self.values_state[new_pos % len(self.values_state)]
             self.position = new_pos % (2 ** 31)
 
         return val % stop
 
 
-class Argon2RandRange:
+def argon2digest(data: bytes, hash_len: int = 1024) -> bytes:
+    if len(data) < 8:
+        data += b"\x00" * (8 - len(data))
 
-    def __init__(self, data: bytes) -> None:
-        assert len(data) >= 256
+    return argon2.low_level.hash_secret_raw(
+        secret=data,
+        salt=data,
+        hash_len=hash_len,
+        parallelism=16,
+        memory_cost=512,
+        time_cost=10,
+        type=argon2.low_level.Type.ID,
+    )
 
+
+def sha256digest(data: bytes) -> bytes:
+    return hashlib.sha256(data).digest()
+
+
+class CryptoRandom:
+    def __init__(self, data: bytes, hashfn=argon2digest) -> None:
+        self.data   = data
+        self.state  = b""
+        self.hashfn = hashfn
+
+    def randbytes(self, n: int) -> bytes:
+        while len(self.state) < max(n, 32):
+            self.state += self.hashfn(self.state[-32:] + self.data)
+        result     = self.state[:n]
+        self.state = self.state[n:]
+        return result
+
+    def randrange(self, startstop, stop=None, step=1) -> int:
+        if stop is None:
+            start = 0
+            stop  = startstop
+        else:
+            start = startstop
+
+        mod = stop - start
+
+        result = 0
+        while result < mod:
+            result = result << 8
+            result = result ^ self.randbytes(1)[0]
+
+        return start + (result % mod)
+
+    def randint(self, a, b) -> int:
+        return self.randrange(a, b + 1)
 
 
 # https://stackoverflow.com/a/47348423/62997
@@ -113,7 +157,7 @@ def init_randrange(raw_salt: Optional[ct.RawSalt] = None) -> RandRanger:
 
         return randrange
     else:
-        return random.Random(raw_salt).randrange
+        return CryptoRandom(raw_salt).randrange
 
 
 def _debug_entropy_check() -> None:
@@ -144,9 +188,10 @@ if __name__ == '__main__':
     # _debug_entropy_check()
     rand = random.Random(0)
     data = rand.randbytes(256)
-    prr  = random.Random(data).randrange
 
-    vals = [prr(10000000) for _ in range(200)]
+    # prr  = random.Random(0).randrange
+    prr  = CryptoRandom(data, hashfn=argon2digest).randrange
+    vals = [prr(10000000) for _ in range(72)]
 
     for i, val in enumerate(vals):
         print(f"{val:07}", end=" ")
@@ -165,3 +210,18 @@ if __name__ == '__main__':
         if (i + 1) % 16 == 0:
             print()
     print()
+
+    stats = collections.Counter()
+    for _ in range(100_000):
+        stats[prr(256)] += 1
+
+    minval, maxval = min(stats.values()), max(stats.values())
+    valrange = maxval - minval
+    scale    = 30 / valrange
+
+    for num, count in sorted(stats.items()):
+        print(f"{num:>3}", ("." * round((count - minval) * scale)).ljust(32), end="")
+        if (num + 1) % 4 == 0:
+            print()
+
+    print("##", minval, maxval)

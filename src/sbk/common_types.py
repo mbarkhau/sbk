@@ -22,21 +22,20 @@ from typing import NamedTuple
 
 # from typing import TypeAlias
 TypeAlias = Any
-RawSalt: TypeAlias = bytes
+RawBrainKey: TypeAlias = bytes
+RawSalt    : TypeAlias = bytes
 
 # ParamConfig data + RawSalt
-Salt     : TypeAlias = bytes
 BrainKey : TypeAlias = bytes
+Salt     : TypeAlias = bytes
 MasterKey: TypeAlias = bytes
-
 
 class RawShare(NamedTuple):
     x_coord: int
     data   : bytes  # only the encoded GFPoint.y values
 
-
 # ParamConfig data + RawShare.data
-Share : TypeAlias = bytes
+Share: TypeAlias  = bytes
 Shares: TypeAlias = Sequence[Share]
 
 WalletSeed: TypeAlias = bytes
@@ -49,7 +48,8 @@ ProgressIncrement    : TypeAlias = float
 ProgressCallback     : TypeAlias = Callable[[ProgressIncrement], None]
 MaybeProgressCallback: TypeAlias = Optional[ProgressCallback]
 
-Parallelism: TypeAlias = int
-MebiBytes  : TypeAlias = int
-Iterations : TypeAlias = int
-Seconds    : TypeAlias = float
+Parallelism : TypeAlias = int
+MebiBytes   : TypeAlias = int
+Iterations  : TypeAlias = int
+Seconds     : TypeAlias = float
+

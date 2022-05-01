@@ -71,3 +71,10 @@ SBK has similarities to [warp wallet][href_warp_wallet], except that it has an a
 TODO
 
 [^fnote_disclaimer_satoshilabs]: The SBK project is not associated with SatoshiLabs s.r.o.
+
+
+## Witchhunt
+
+Perhaps witch hunting will find a cultural pendant to bring some balance into civil discourse, so that nobody must fear for their livelyhood when they publicly state what they believe to be right. In the meantime, Bitcoin offers a last resort of protection for everybody to fall back on. When your wealth is ultimately protected by your will, and the will of those you trust, rather than by an army of faceless burocrats, who mindlessly execute the supposed "will of the people" or who are just "doing their job" as they declare decades of your lifes work to be null and void or now the property of people that are deemed to be more deserving, then Bitcoin can be the groundswell for a rising tide of soverign people. Bitcoin will be the catalyst for new societies based on networks rather than heirarchies, on the exchange of value for value, rather than on debt and servitude, on competent individuals with natural authority, rather than Moloch and its army of mindless drones with meaningless titles.
+
+You have no greater freedom than the freedom of your thoughts. Move your wealth into your mind and you will be more free than any human in history.

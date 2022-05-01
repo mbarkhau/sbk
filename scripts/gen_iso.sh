@@ -37,17 +37,21 @@ if [[ ! -f $ISO_PATH ]]; then
         | shasum -a 256 --check;
 fi
 
-ELECTRUM_PATH=Electrum-4.1.5.tar.gz
+ELECTRUM_VERSION="4.2.1"
+
+ELECTRUM_PATH="Electrum-${ELECTRUM_VERSION}.tar.gz"
+
 if [[ ! -f $ELECTRUM_PATH ]]; then
-    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz -O $ELECTRUM_PATH
-    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.ThomasV.asc
-    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.sombernight_releasekey.asc
-    wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz.Emzy.asc
+    wget "https://download.electrum.org/${ELECTRUM_VERSION}/Electrum-${ELECTRUM_VERSION}.tar.gz" \
+        -O $ELECTRUM_PATH
+    wget "https://download.electrum.org/${ELECTRUM_VERSION}/Electrum-${ELECTRUM_VERSION}.tar.gz.ThomasV.asc"
+    wget "https://download.electrum.org/${ELECTRUM_VERSION}/Electrum-${ELECTRUM_VERSION}.tar.gz.sombernight_releasekey.asc"
+    wget "https://download.electrum.org/${ELECTRUM_VERSION}/Electrum-${ELECTRUM_VERSION}.tar.gz.Emzy.asc"
 fi
 
-gpg --verify Electrum-4.1.5.tar.gz.ThomasV.asc $ELECTRUM_PATH
-gpg --verify Electrum-4.1.5.tar.gz.sombernight_releasekey.asc $ELECTRUM_PATH
-gpg --verify Electrum-4.1.5.tar.gz.Emzy.asc $ELECTRUM_PATH
+gpg --verify "Electrum-${ELECTRUM_VERSION}.tar.gz.ThomasV.asc" ${ELECTRUM_PATH}
+gpg --verify "Electrum-${ELECTRUM_VERSION}.tar.gz.sombernight_releasekey.asc" ${ELECTRUM_PATH}
+gpg --verify "Electrum-${ELECTRUM_VERSION}.tar.gz.Emzy.asc" ${ELECTRUM_PATH}
 
 # create a directory to build the ISO from
 rm -rf iso
@@ -353,8 +357,8 @@ RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-p
 RUN python3 -m pip install argon2-cffi
 
 # install electrum
-ADD Electrum-4.1.5.tar.gz /opt/
-RUN mv /opt/Electrum-4.1.5 /opt/electrum
+ADD Electrum-4.2.1.tar.gz /opt/
+RUN mv /opt/Electrum-4.2.1 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk

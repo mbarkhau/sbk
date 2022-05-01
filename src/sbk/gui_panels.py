@@ -759,11 +759,11 @@ class OpenWalletPanel(EnterSaltAndBrainkeyPanel):
             lens   = parameters.raw_secret_lens()
             if state['panel_index'] == 0:
                 assert len(recovered_data) == lens.salt
-                header = recovered_data[: parameters.SALT_HEADER_LEN]
-                state['params'] = parameters.bytes2params(header)
-                state['salt'  ] = ct.Salt(recovered_data)
+                state['salt'] = ct.Salt(recovered_data)
             else:
                 assert len(recovered_data) == lens.brainkey
+                header = recovered_data[: parameters.BRANKEY_HEADER_LEN]
+                state['params'  ] = parameters.bytes2params(header)
                 state['brainkey'] = ct.BrainKey(recovered_data)
 
             params   = state['params']
@@ -771,7 +771,7 @@ class OpenWalletPanel(EnterSaltAndBrainkeyPanel):
             brainkey = state['brainkey']
 
             if params and salt and brainkey:
-                salt_data = bytes(salt)[parameters.SALT_HEADER_LEN :]
+                salt_data = bytes(salt)
                 raw_salt  = ct.RawSalt(salt_data)
                 randrange = sbk_random.init_randrange(raw_salt)
                 shares    = shamir.split(params, raw_salt, brainkey, randrange)

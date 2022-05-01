@@ -22,7 +22,10 @@ def test_panel(qtbot):
     state['target_duration'  ] = 1
     state['memory_per_thread'] = 10
 
-    salt, brainkey, shares = ui_common.create_secrets(params)
+    salt_phrase = "test-salt-phrase"
+    shareset    = "1"
+
+    salt, brainkey, shares = ui_common.create_secrets(params, salt_phrase=salt_phrase, shareset=shareset)
 
     # NOTE (mb 2021-07-09): We could do this later in theory, but
     #   if the derivation of seed_data fails, the user would have

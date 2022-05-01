@@ -1,32 +1,49 @@
 # Implementation Overview
 
+!!! info "Literate Program"
+
+    This book aims to both document and also implement SBK. A
+    copy of this book should allow a competent programmer to
+    verify the implementation and also to re-implement it,
+    should sbk.dev become inaccessible.
+
 !!! aside "Aside"
+
     If you are doing code review, please be aware that some portions of the implementation, which might otherwise be deleted, are preserved for future didactic use while I rewrite SBK into a literate program. This relates in particular to the [Luby Transform][href_wiki_ltcodes] based ECC in `sbk/ecc_lt.py` and the $`GF(p)`$ arithmetic in `sbk/gf.py`.
 
 [href_wiki_ltcodes]: https://en.wikipedia.org/wiki/Luby_transform_code
 
+[href_bitcoin_key_management]: https://arxiv.org/pdf/1802.04351.pdf
 
-## High Level Overview: Create, Join and Load
 
-
-<!-- TODO: alt="SBK Data-flow Diagram" -->
+## High Level Overview
 
 ```bob
-                        +------+------+
- +---------+            |   Generate  |     .---------------.
- |   Split +-----.      +------+------+     |  "Wallet Name"|
- +----+----+     |             |            '-------O-------'
-      |          |             V                    |
-      V          |     .---------------.            |
-.-----------.    |  .--O      Salt     O--.     +---+----+
-|   "Shares"+-.  '--+  +---------------+  +-----+  "KDF" |
-'-+---O-----' |     '--O    Brainkey   O--'     +---+----+
-  '---+-O-----'        '---------------'            |
-      | |                      ^                    |
-      V V                      |                    V
- +---------+                   |             .-------------.
- |   Join  +-------------------'             |    Wallet   |
- +---------+                                 '-------------'
+         "Unique"
+         "to you" .-------------.     "Both in"
+            '~~~~~|  Salt       |~.   "your Brain"
+                  +-------------+ +~~~~~'
+            .~~~~~|  Brainkey   |~'
+         Randomly '-------+-----'
+         Generated        |
+                          V
+                     +----+----+
+                     |  "KDF"  |
+                     +----+----+      Join
+                          |        .-------+---.
+                          V        |       |   |
+    .--------------. .----------.  | .-----+--+++-.
+    |  "Passphrase"| |  "Wallet"|<-' | Shares | | |
+    |  "(optional)"| |  "Seed"  +--. '-+------+-+-'
+    '------+-------' '----+-----'  |       ^   ^ ^
+           |              |        |       |   | |
+           '-------+------+        '-------+---+-'
+                   |                  Split
+                   V
+             +----------+
+             |  Bitcoin |
+             |  Wallet  |
+             +----------+
 ```
 
 This diagram can only tell so much of course (some of the boxes might as well be labeled with "magic"). The next few sections explain in a little more detail how each step works.
@@ -244,15 +261,7 @@ For those keeping track, by default the total entropy used to generate the walle
 
 ### Parameters
 
-Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hard-coded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hard-coded. Instead they are encoded as a prefix of the `salt` and of every `share`. The downside of this is that there is more data that you have to manually copy and enter. This is why the encoding is kept as compact as possible (4 bytes == 4words == 2 x 6 digits).
-
-Here is the data layout of these 4 bytes:
-
-```
-offset  0     3 4     7 8    11 12       17 18       23 24            31
-        [ ver ] [thres] [kdf_p] [ kdf_mem ] [ kdf_time] [   share_no   ]
-         4bit    4bit    4bit      6bit        6bit          8bit
-```
+Any change in the parameters used to derive the wallet seed would result in a different wallet seed. This means that the parameters are just as important to keep safe as the `salt` itself. So we must either encode the parameters and keep them together with the `salt`, or we have to make them hard-coded constants in SBK itself. The latter would not allow you to choose a difficulty that is appropriate to your machine and level of paranoia, so parameters are not hard-coded. Instead they are encoded as a prefix of the `salt` and of every `share`. The downside of this is that there is more data that you have to manually copy and enter. This is why the encoding is kept as compact as possible (2 bytes == 2words == 6 digits).
 
 > Aside: The `salt_len` is not an encoded parameter. Instead it is hard-coded to 12 bytes (96 bits). The brainkey adds another 32 bits of entropy.
 >

@@ -180,7 +180,7 @@ there are any issues.
 # def: impl_max_usable_memory
 def max_usable_memory(avail_mb: int) -> int:
     check_mb = avail_mb
-    while check_mb > 100:
+    while check_mb > parameters.V0_KDF_M_UNIT:
         logger.debug(f"testing check_mb={check_mb}")
         if is_usable_kdf_m(check_mb):
             break
@@ -212,7 +212,8 @@ def _init_sys_info() -> SystemInfo:
     try:
         _SYS_INFO_LOADING = True
         total_mb, avail_mb = memory_info()
-        usable_mb = max_usable_memory(avail_mb=max(100, int(avail_mb * 0.9)))
+        avail_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
+        usable_mb = max_usable_memory(avail_mb=avail_mb)
         nfo = SystemInfo(total_mb, usable_mb)
         _dump_sys_info(nfo)
         return nfo

@@ -138,17 +138,17 @@ def _join_gf_256(raw_shares: RawShares, threshold: int) -> ct.MasterKey:
 
 def split(
     params    : parameters.Parameters,
-    raw_salt  : ct.RawSalt,
-    brainkey  : ct.BrainKey,
+    raw_bk    : ct.RawBrainKey,
+    salt      : ct.Salt,
     make_coeff: Callable[[int], int] = sbk_random.randrange,
     use_gf_p  : bool = False,
 ) -> List[ct.Share]:
     lens = parameters.raw_secret_lens()
 
-    assert len(raw_salt) == lens.raw_salt
-    assert len(brainkey) == lens.brainkey
+    assert len(raw_bk) == lens.raw_brainkey
+    assert len(salt  ) == lens.salt
 
-    master_key = raw_salt + brainkey
+    master_key = raw_bk + salt
 
     assert len(master_key) == lens.master_key
 
@@ -170,12 +170,12 @@ def split(
 
 
 def join(shares: List[ct.Shares], use_gf_p: bool = False) -> Tuple[ct.RawSalt, ct.BrainKey]:
-    # strip off params
     raw_shares      : List[ct.RawShare          ] = []
     all_share_params: List[parameters.Parameters] = []
     for share in shares:
-        params_data  = share[: parameters.SHARE_HEADER_LEN]
+        # strip off params
         share_data   = share[parameters.SHARE_HEADER_LEN :]
+        params_data  = share[: parameters.SHARE_HEADER_LEN]
         share_params = parameters.bytes2params(params_data)
 
         raw_shares.append(ct.RawShare(share_params.sss_x, share_data))
@@ -203,9 +203,10 @@ def join(shares: List[ct.Shares], use_gf_p: bool = False) -> Tuple[ct.RawSalt, c
     else:
         master_key = _join_gf_256(raw_shares, params.sss_t)
 
-    assert len(master_key) == lens.master_key
+    bk_params = shares[0][: parameters.BRANKEY_HEADER_LEN]
 
-    return (
-        ct.RawSalt(bytes(master_key)[: lens.raw_salt]),
-        ct.BrainKey(bytes(master_key)[lens.raw_salt :]),
-    )
+    assert len(master_key) == lens.master_key
+    raw_bk = master_key[: lens.raw_brainkey]
+    salt   = master_key[lens.raw_brainkey :]
+
+    return (ct.BrainKey(bk_params + raw_bk), ct.Salt(salt))

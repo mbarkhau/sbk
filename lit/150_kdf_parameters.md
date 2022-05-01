@@ -1,14 +1,16 @@
 # KDF Parameter Investigation
 
-As the KDF parameters are encoded in the salt (and shares), we want to
-have an encoding that is compact. This means, where possible, we
-should make parameters either static or implicit. Where not, the
-primary purpose of variable parameters is to support future hardware
-configurations, so that brute-force attacks continue to be infeasible.
+As the KDF parameters are encoded in the brainkey, we
+want to have an encoding that is compact. This means, where
+possible, we should make parameters either static or implicit.
+Where not, the primary purpose of variable parameters is to
+support future hardware configurations, so that brute-force
+attacks for a known salt are infeasible for at least a decade.
 
-The first two bytes of the salt are for parameter encoding, of which
-the first 3bits are for a version number. There is an upgrade path
-open if we want to use a more different approch to parameter encoding.
+The first byte of the brainkey is for parameter encoding, of
+which the first 2bits are for a version number. This gives us an
+upgrade path if we want to use a different approch to parameter
+encoding.
 
 The parameters we're looking at are these:
 
@@ -150,7 +152,7 @@ Encoded:	$argon2id$v=19$m=131072,t=3,p=1$c29tZXNhbHQ$mKtFTe5acsEv/wtRdOwuOxxX2Qm
 # exit: 0
 ```
 
-With these settings the implementations seem comparable, let's try
+With these settings the implementations seem comparable. Let's try
 with a higher degree of parallelism.
 
 ```bash
@@ -177,10 +179,10 @@ cores, where the cli implementation does not.
 
 ## Cost of Threading
 
-If we can establish that `-p=1024` parallel lanes contributes
-insignificant overhead compared to just `-p=1` (given large enough
-value for `-m`), then perhaps we won't have to encode the parameter `p`
-in the salt.
+If we can establish that `-p=1024` parallel lanes causes only
+insignificant overhead compared to just `-p=1` (given large
+enough value for `-m`), then perhaps we won't have to encode the
+parameter `p`.
 
 ```bash
 # run: python3 scripts/argon2cffi_test.py -t 3 -m 20 -p 8 -l 24 -y 2
@@ -220,10 +222,10 @@ computation as a given, we should prefer to spend it on further
 iterations rather than on concurrency overhead, that can perhaps be
 mitigated by differen hardware choices.
 
-At least for `-p=128` however, the overhead is quite low. Since users
-of SBK are unlikely to use hardware which will be underutilized with
-such a large value, it should be a fair trade-off to hard-code
-`-p=128` for `version=0`.
+At least for `-p=128` however, the overhead on a 2018 x64 machine
+is quite low. Since users of SBK are unlikely to use hardware
+which will be underutilized with such a large value, it should be
+a fair trade-off to hard-code `-p=128` for `version=0`.
 
 !!! note "Feedback Welcome"
 
@@ -236,26 +238,34 @@ such a large value, it should be a fair trade-off to hard-code
 !!! note "Memory Swapping"
 
     On systems with swap the, behaviour of argon2 appears to be that
-    it will exit with status: 137. At least on the systems we have
+    it will exit with status: 137. At least on the systems I have
     tested it does not appear to use swap. Regardless, SBK Live does
     not create a swap partition.
 
-For `version=0`, if we would like to protect against brute force As an
-arbitary choice for the lowest value for `-m`, a lower bound of 100
-Mebibyte and `1.125` as a base. Systems which support such a small
-value have been readilly available for over a decade, so this choice
-is already quite low.
-$`100 \space MB \times 8 \times 1.125^{63} \approx 1300 \space GB`$
+We would like to protect against brute force attacks and not have
+to wait on seed derivation too long, if our use case doesn't
+require it. The encoding places limits how large the range of
+parameters can be, so we want to make reasonable choices to allow
+for both.
+
+The machine with the least memory I have access to (in 2022) has
+8GB of DDR3 memory. I think it is reasonable to
+
+For `version=0`, the trade For I have chose an arbitary choice for the lowest value for `-m`, a
+lower bound of 500 Mebibyte and `1.125` as a base. Systems which
+support such a small value have been readilly available for over
+a decade, so this choice is already quite low. $`100 \space MB
+\times 8 \times 1.125^{63} \approx 1300 \space GB`$
 
 For the parameter `-t` (number of iterations) we have a lower bound
 simply of 1 and use `1.125` as a base, which gives us an upper bound
 of $`5 \times 1.125^{63} \approx 134k`$ iterations.
 
 ```bash
-# run: python3 scripts/argon2cffi_test.py -t 1000 -m 16.6 -p 8 -l 24 -y 2
+# run: python3 scripts/argon2cffi_test.py -t 1000 -m 16.6 -p 128 -l 24 -y 2
 # timeout: 100
-Encoded:	$argon2id$v=19$m=99334,t=1000,p=8$c29tZXNhbHQ$yXZeXaquxQcv/bLPKtfccNQyBZN/64rM
-22.545 seconds
+Encoded:	$argon2id$v=19$m=99334,t=1000,p=128$c29tZXNhbHQ$Y3tdpSb09mKdKMzyRvJoeSKEhbrHaHKA
+91.412 seconds
 # exit: 0
 ```
 

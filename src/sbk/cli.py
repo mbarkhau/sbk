@@ -306,11 +306,11 @@ def kdf_test(
     echo(f"Using KDF Parameters: -m={params.kdf_m:<5} -t={params.kdf_t:<4}")
     echo()
 
-    dummy_salt     = ct.Salt(b"\x00" * lens.raw_salt)
     dummy_brainkey = ct.BrainKey(b"\x00" * lens.brainkey)
+    dummy_salt     = ct.Salt(b"\x00" * lens.salt)
 
     tzero = time.time()
-    ui_common.derive_seed(params, dummy_salt, dummy_brainkey, label="kdf-test")
+    ui_common.derive_seed(params, dummy_brainkey, dummy_salt, label="kdf-test")
     duration = time.time() - tzero
     echo(f"Duration   : {round(duration):>4} sec")
 
@@ -462,6 +462,16 @@ def create(
     yes_all or _validate_copies(params, brainkey, salt, shares)
 
 
+def get_validated_brainkey() -> tuple[ct.BrainKey, parameters.Parameters]:
+    header_text  = "Enter Brainkey"
+    raw_brainkey = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
+    brainkey     = ct.BrainKey(raw_brainkey)
+
+    params_data = brainkey[: parameters.BRANKEY_HEADER_LEN]
+    params      = parameters.bytes2params(params_data)
+    return (brainkey, params)
+
+
 @cli.command()
 @_opt_salt
 @_opt_scheme
@@ -473,7 +483,7 @@ def backup(
     shareset   : int = DEFAULT_SHARESET,
     verbose    : int = 0,
 ) -> None:
-    """Generate shares from a salt, brainkey."""
+    """Generate new shares from a salt, brainkey."""
 
     _configure_logging(verbose)
 
@@ -491,100 +501,16 @@ def backup(
     _show_created_data(True, params, brainkey, shares)
 
 
-@cli.command()
-@_opt_verbose
-def recover(verbose: int = 0) -> None:
-    """Recover Salt and BrainKey by combining Shares."""
-    _configure_logging(verbose)
-    params: Optional[parameters.Parameters] = None
-    shares: List[ct.Share] = []
-
-    while params is None or len(shares) < params.sss_t:
-        share_num = len(shares) + 1
-
-        if params is None:
-            header_text = f"Enter Share {share_num}."
-        else:
-            header_text = f"Enter Share {share_num} of {params.sss_t}."
-
-        share = cli_io.prompt(cli_io.SECRET_TYPE_SHARE, header_text=header_text)
-        shares.append(ct.Share(share))
-
-        params_data = share[: parameters.SHARE_HEADER_LEN]
-        cur_params  = parameters.bytes2params(params_data)
-        if params is None:
-            params = cur_params
-        elif params != cur_params:
-            echo("Invalid share. Shares are perhaps for different wallets.")
-            raise click.Abort()
-
-    assert params is not None
-
-    raw_salt, brainkey = shamir.join(shares)
-    salt = params_data + raw_salt
-
-    salt_lines     = cli_io.format_secret_lines(cli_io.SECRET_TYPE_SALT    , salt)
-    brainkey_lines = cli_io.format_secret_lines(cli_io.SECRET_TYPE_BRAINKEY, brainkey)
-
-    clear()
-    echo("RECOVERED SECRETS".center(50))
-    echo()
-    echo("Salt".center(50))
-    echo()
-    echo("\n".join(salt_lines))
-
-    echo()
-    echo("Brainkey".center(50))
-    echo()
-    echo("\n".join(brainkey_lines))
-
-
-def get_validated_brainkey() -> tuple[ct.BrainKey, parameters.Parameters]:
-    header_text  = "Enter Brainkey"
-    raw_brainkey = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
-    brainkey     = ct.BrainKey(raw_brainkey)
-
-    params_data = brainkey[: parameters.BRANKEY_HEADER_LEN]
-    params      = parameters.bytes2params(params_data)
-    return (brainkey, params)
-
-
-@cli.command()
-@_opt_salt
-@_opt_wallet_name
-@_opt_show_seed
-@_opt_online_mode
-@_opt_yes_all
-@_opt_verbose
-def load_wallet(
-    salt_phrase: Optional[str] = None,
-    wallet_name: str  = ui_common.DEFAULT_WALLET_NAME,
-    show_seed  : bool = False,
-    online     : bool = False,
-    yes_all    : bool = False,
-    verbose    : int  = 0,
+def _load_wallet(
+    params     : parameters.Parameters,
+    brainkey   : bytes,
+    salt       : bytes,
+    wallet_name: str,
+    show_seed  : bool,
+    online     : bool,
 ) -> None:
-    """Open wallet using Brainkey and Salt."""
-    _configure_logging(verbose)
     offline = not online
 
-    try:
-        ui_common.validate_wallet_name(wallet_name)
-    except ValueError as err:
-        echo(err.args[0])
-        raise click.Abort()
-
-    text = ui_common.SECURITY_WARNING_TEXT + ui_common.SECURITY_WARNING_QR_CODES
-    yes_all or clear()
-    yes_all or echo(text.strip())
-    yes_all or anykey_confirm("Press enter to continue")
-
-    validated_salt_phrase = get_validated_salt_phrase(salt_phrase)
-
-    salt = ui_common.derive_salt(validated_salt_phrase)
-    brainkey, params = get_validated_brainkey()
-
-    yes_all or echo()
     seed_data = ui_common.derive_seed(
         params,
         brainkey,
@@ -604,6 +530,86 @@ def load_wallet(
         echo("Electrum wallet seed: " + ui_common.seed_data2phrase(seed_data))
     else:
         ui_common.load_wallet(seed_data, offline)
+
+
+@cli.command()
+@_opt_wallet_name
+@_opt_show_seed
+@_opt_online_mode
+@_opt_verbose
+def recover(
+    wallet_name: str  = ui_common.DEFAULT_WALLET_NAME,
+    show_seed  : bool = False,
+    online     : bool = False,
+    verbose    : int  = 0,
+) -> None:
+    """Recover Wallet from Shares."""
+    _configure_logging(verbose)
+    params: Optional[parameters.Parameters] = None
+    shares: List[ct.Share] = []
+
+    while params is None or len(shares) < params.sss_t:
+        share_num = len(shares) + 1
+
+        if params is None:
+            header_text = f"Enter Share {share_num}."
+        else:
+            header_text = f"Enter Share {share_num} of {params.sss_t}."
+
+        share = cli_io.prompt(cli_io.SECRET_TYPE_SHARE, header_text=header_text)
+        shares.append(ct.Share(share))
+
+        params_data = share[: parameters.SHARE_HEADER_LEN]
+        cur_params  = parameters.bytes2params(params_data)
+
+        if params is None:
+            params = cur_params
+        elif params._replace(sss_x=0) != cur_params._replace(sss_x=0):
+            echo("Invalid share. Shares are perhaps for different wallets.")
+            raise click.Abort()
+
+    assert params is not None
+
+    brainkey, salt = shamir.join(shares)
+    _load_wallet(params, brainkey, salt, wallet_name, show_seed, online)
+
+
+@cli.command()
+@_opt_salt
+@_opt_wallet_name
+@_opt_show_seed
+@_opt_online_mode
+@_opt_yes_all
+@_opt_verbose
+def load_wallet(
+    salt_phrase: Optional[str] = None,
+    wallet_name: str  = ui_common.DEFAULT_WALLET_NAME,
+    show_seed  : bool = False,
+    online     : bool = False,
+    yes_all    : bool = False,
+    verbose    : int  = 0,
+) -> None:
+    """Open wallet using Brainkey and Salt."""
+    _configure_logging(verbose)
+
+    try:
+        ui_common.validate_wallet_name(wallet_name)
+    except ValueError as err:
+        echo(err.args[0])
+        raise click.Abort()
+
+    text = ui_common.SECURITY_WARNING_TEXT + ui_common.SECURITY_WARNING_QR_CODES
+    yes_all or clear()
+    yes_all or echo(text.strip())
+    yes_all or anykey_confirm("Press enter to continue")
+
+    validated_salt_phrase = get_validated_salt_phrase(salt_phrase)
+
+    salt = ui_common.derive_salt(validated_salt_phrase)
+    brainkey, params = get_validated_brainkey()
+
+    yes_all or echo()
+    _load_wallet(params, brainkey, salt, wallet_name, show_seed, online)
 
 
 @cli.command()

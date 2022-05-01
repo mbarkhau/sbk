@@ -52,5 +52,5 @@ weasyprint
 
 markdown-katex
 markdown-svgbob~=202104.0
-litprog
+litprog==2022.1007a0
 terminaltables

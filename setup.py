@@ -27,12 +27,6 @@ install_requires = [
 
 long_description = "\n\n".join((read("README.md"), read("CHANGELOG.md")))
 
-# try:
-#     import lib3to6
-#     distclass = lib3to6.Distribution
-# except ImportError:
-#     distclass = setuptools.dist.Distribution
-
 
 setuptools.setup(
     name="sbk",
@@ -51,8 +45,6 @@ setuptools.setup(
     include_package_data=True,
     python_requires=">=3.8",
     install_requires=install_requires,
-    # setup_requires=['lib3to6>=202110.1050b0'],
-    # distclass=distclass,
     entry_points="""
         [console_scripts]
         sbk=sbk.cli:cli

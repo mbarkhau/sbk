@@ -269,7 +269,7 @@ _opt_verbose = click.option(
 @click.group(context_settings={'help_option_names': ["-h", "--help"]})
 @_opt_verbose
 def cli(verbose: int = 0) -> None:
-    """CLI for SBK v201906.0001-alpha."""
+    """CLI for SBK 2022.1011-beta."""
     _configure_logging(verbose)
 
 

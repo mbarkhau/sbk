@@ -15,8 +15,8 @@ which xorriso
 rm -f $BUILD_DIR/sbk*.tar.gz
 rm -f $BUILD_DIR/sbk*.whl
 
-cp dist/sbk-2022.1012b0-py3-none-any.whl $BUILD_DIR/
-cp dist/sbk-2022.1012b0.tar.gz $BUILD_DIR/
+cp dist/sbk-2022.1013b0-py3-none-any.whl $BUILD_DIR/
+cp dist/sbk-2022.1013b0.tar.gz $BUILD_DIR/
 cp pdf_templates/*.pdf $BUILD_DIR
 cp sbk-live-data/* $BUILD_DIR
 cp src/sbk/assets/* $BUILD_DIR
@@ -362,10 +362,10 @@ RUN mv /opt/Electrum-4.2.1 /opt/electrum
 RUN bash -c "cd /opt/electrum; python3 -m pip install .[gui]"
 
 # install sbk
-ADD sbk-2022.1012b0-py3-none-any.whl /opt/
-ADD sbk-2022.1012b0.tar.gz /opt/
-RUN mv /opt/sbk-2022.1012b0 /opt/sbk
-RUN bash -c "cd /opt; python3 -m pip install sbk-2022.1012b0-py3-none-any.whl"
+ADD sbk-2022.1013b0-py3-none-any.whl /opt/
+ADD sbk-2022.1013b0.tar.gz /opt/
+RUN mv /opt/sbk-2022.1013b0 /opt/sbk
+RUN bash -c "cd /opt; python3 -m pip install sbk-2022.1013b0-py3-none-any.whl"
 
 # cleanup clutter from the desktop
 RUN apt-get remove -y --purge thunderbird* firefox* libreoffice* hunspell* mythes* hyphen* ubiquity* rhythmbox* totem* remmina* gnome-font-viewer gnome-todo gnome-mahjongg gnome-sudoku gnome-mines aisleriot gnome-user-docs* gnome-getting-started-docs* transmission* yelp
@@ -472,7 +472,7 @@ stat --printf="%s" iso/casper/filesystem.squashfs > iso/casper/filesystem.size
 cp newfilesystem.manifest iso/casper/filesystem.manifest
 cp grub.cfg iso/boot/grub/grub.cfg
 
-echo 'SBK Live 2022.1012-beta (based on Ubuntu 20.04.2.0 LTS "Focal Fossa" - Release amd64 20210209.1)' > iso/.disk/info
+echo 'SBK Live 2022.1013-beta (based on Ubuntu 20.04.2.0 LTS "Focal Fossa" - Release amd64 20210209.1)' > iso/.disk/info
 
 # update state files
 (cd iso; find . -type f -print0 | xargs -0 md5sum | grep -v "\./md5sum.txt" > md5sum.txt)
@@ -493,7 +493,7 @@ rm -f sbklive.iso;
 cat <<EOF >xorriso.conf
 -as mkisofs \\
 -r -J --joliet-long \\
--V 'SBK Live 2022.1012-beta amd64' \\
+-V 'SBK Live 2022.1013-beta amd64' \\
 --modification-date='2021020919062600' \\
 -isohybrid-mbr \\
 --interval:local_fs:0s-15s:zero_mbrpt,zero_gpt,zero_apm:'ubuntu-20.04.2.0-desktop-amd64.iso' \\
@@ -534,20 +534,20 @@ EOF
 # Modify options in xorriso.conf as desired or use as-is
 xorriso -options_from_file xorriso.conf
 
-mv sbklive.iso sbklive_2022.1012-beta-amd64.iso
-echo "wrote $BUILD_DIR/sbklive_2022.1012-beta-amd64.iso"
+mv sbklive.iso sbklive_2022.1013-beta-amd64.iso
+echo "wrote $BUILD_DIR/sbklive_2022.1013-beta-amd64.iso"
 
 chmod u=rw,g=r,o=r *.iso
 
-rsync --progress sbklive_2022.1012-beta-amd64.iso root@vserver:/var/www/html/sbk/sbk-live
+rsync --progress sbklive_2022.1013-beta-amd64.iso root@vserver:/var/www/html/sbk/sbk-live
 
 mktorrent \
     --piece-length 22 \
     --announce "udp://tracker.openbittorrent.com:6969/announce" \
     --announce "udp://tracker.opentrackr.org:1337/announce" \
-    --web-seed "https://sbk.dev/sbk-live/sbklive_2022.1012-beta-amd64.iso" \
-    --output sbklive_2022.1012-beta-amd64.iso.torrent \
-    sbklive_2022.1012-beta-amd64.iso
+    --web-seed "https://sbk.dev/sbk-live/sbklive_2022.1013-beta-amd64.iso" \
+    --output sbklive_2022.1013-beta-amd64.iso.torrent \
+    sbklive_2022.1013-beta-amd64.iso
 
 chmod u=rw,g=r,o=r *.torrent
 
@@ -555,9 +555,9 @@ cp *.torrent "${SBK_DIR}/landingpage/sbk-live/"
 
 rsync --progress *.torrent mbarkhau@vserver:/var/www/html/sbk/sbk-live/
 
-transmission-show -m sbklive_2022.1012-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
-echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2022.1012-beta-amd64.iso  </span>\
-    <a href=\"sbk-live/sbklive_2022.1012-beta-amd64.iso.torrent\">torrent</a> \
+transmission-show -m sbklive_2022.1013-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
+echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2022.1013-beta-amd64.iso  </span>\
+    <a href=\"sbk-live/sbklive_2022.1013-beta-amd64.iso.torrent\">torrent</a> \
     <a href=\"$(cat .magnet_link)\">magnet</a>" \
     > .torrent_html
 

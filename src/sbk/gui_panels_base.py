@@ -57,7 +57,7 @@ PanelState = typext.TypedDict(
     'PanelState',
     {
         'panel_index': int,
-        'preseed'    : Optional[str],
+        'salt_phrase': Optional[str],
         'salt'       : Optional[ct.Salt],
         'brainkey'   : Optional[ct.BrainKey],
         'shares'     : ct.Shares,
@@ -77,7 +77,7 @@ PanelState = typext.TypedDict(
 
 shared_panel_state: PanelState = {
     'panel_index': 0,
-    'preseed'    : None,
+    'salt_phrase': None,
     'salt'       : None,
     'brainkey'   : None,
     'shares'     : [],
@@ -147,13 +147,13 @@ def get_secret(secret_type: str, share_index: int = -1) -> CurrentSecret:
 
     if secret_type == 'share':
         return CurrentSecret(
-            secret_len=lens.raw_share + parameters.SHARE_HEADER_LEN,
+            secret_len=lens.share,
             secret_type=cli_io.SECRET_TYPE_SHARE,
             secret_data=shared_panel_state['shares'][share_index],
         )
     elif secret_type == 'salt':
         return CurrentSecret(
-            secret_len=lens.raw_salt + parameters.SALT_HEADER_LEN,
+            secret_len=lens.salt,
             secret_type=cli_io.SECRET_TYPE_SALT,
             secret_data=shared_panel_state['salt'],  # type: ignore
         )

@@ -7,6 +7,7 @@ import jinja2
 import qrcode
 import weasyprint
 import qrcode.image.svg
+import pdfrw
 
 
 TEMPLATES_DIR = pl.Path(__file__).parent.absolute()
@@ -38,8 +39,8 @@ AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("https://sbk.dev/auth")
 # AUTH_QR_SRC  = "data:image/svg+xml;base64," + qr_img_b64("SBK: Split Bitcoin Keys")
 
 CONTEXTS = [
-    {'tmpl': "share", 'w': 210, 'h': 297, 'wc': 24, 'fmt': "a4", 'qr_src': SHARE_QR_SRC},
-    {'tmpl': "share", 'w': 8.5, 'h': 11 , 'wc': 24, 'fmt': "letter", 'qr_src': SHARE_QR_SRC},
+    {'tmpl': "share", 'w': 210, 'h': 297, 'wc': 18, 'fmt': "a4", 'qr_src': SHARE_QR_SRC},
+    {'tmpl': "share", 'w': 8.5, 'h': 11 , 'wc': 18, 'fmt': "letter", 'qr_src': SHARE_QR_SRC},
     {'tmpl': "auth", 'w': 210, 'h': 297, 'fmt': "a4", 'qr_src': AUTH_QR_SRC},
     {'tmpl': "auth", 'w': 8.5, 'h': 11, 'fmt': "letter", 'qr_src': AUTH_QR_SRC},
     {'tmpl': "grid", 'w': 210, 'h': 297, 'fmt': "a4"},
@@ -55,7 +56,8 @@ def main() -> int:
             ctx['h'] *= 25.4
 
         out_path_html = TEMPLATES_DIR / "{tmpl}_{fmt}.html".format(**ctx)
-        out_path_pdf = TEMPLATES_DIR / "{tmpl}_{fmt}.pdf".format(**ctx)
+        out_path_pdf  = TEMPLATES_DIR / "{tmpl}_{fmt}.pdf".format(**ctx)
+        dual_path_pdf = TEMPLATES_DIR / "{tmpl}_{fmt}_dual.pdf".format(**ctx)
 
         if out_paths and out_path_pdf not in out_paths:
             continue
@@ -70,6 +72,29 @@ def main() -> int:
         with out_path_pdf.open(mode="wb") as fobj:
             wp_ctx.write_pdf(fobj)
         print("wrote", str(out_path_pdf.absolute()))
+
+        # in_pdf   = pdfrw.PdfReader(str(out_path_pdf))
+        # pdf_page = in_pdf.pages[0]
+
+        # _x0, _y0, w, h = map(float, pdf_page["/MediaBox"])
+        # assert _x0 == 0
+        # assert _y0 == 0
+
+        # class PageMerge(pdfrw.PageMerge):
+        #     @property
+        #     def xobj_box(self):
+        #         return pdfrw.PdfArray((0, 0, w * 2, h))
+
+        # result = PageMerge()
+        # result.add(pdf_page)
+        # result.add(pdf_page)
+        # result[-1].x = w
+
+        # out_pdf = pdfrw.PdfWriter(dual_path_pdf)
+        # out_pdf = out_pdf.addpages([result.render()])
+        # out_pdf.write()
+        # print("wrote", str(dual_path_pdf.absolute()))
+
     return 0
 
 

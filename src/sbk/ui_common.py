@@ -151,31 +151,14 @@ for them to keep safe. A trustee must trustworthy in two senses:
   2. You must trust that they are competent to keep this "Share" safe and secure.
 """
 
-# NOTE (mb 2021-05-14): Probably not needed now that we have docs
-RECOVERY_TEXT = r"""
-Your Master Key is recovered by collecting a minimum of
-{threshold} shares.
-
-                 Split Master Key
-             Split                 . Join
-                   \.-> Share 1 -./
-        Master Key -O-> Share 2  +-> Master Key
-                    +-> Share 3 -|
-                    +-> Share 4 -'
-                    '-> Share 5
-
-   argon2_kdf(Master Key, Wallet Name) -> Wallet
-"""
-
-
 SHARE_PROMPT_TMPL = """
 When you have copied Share {share_no}/{num_shares}, press enter to continue.
 """
 
 BRAINKEY_INFO_TEXT = """
 Your Salt and Brainkey are combined to produce your wallet seed.
-As long as you have access to your Salt and as long as you can
-remember your Brainkey, you will can recover your wallet.
+As long as you remember Salt and Brainkey, you will can recover
+your wallet.
 
 It is important that you:
  - MEMORIZE YOUR BRAINKEY.

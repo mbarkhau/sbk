@@ -112,10 +112,10 @@ def clear() -> bool:
 
 def confirm(msg: str) -> bool:
     res = click.prompt(msg.strip() + " [y/N]")
-    if "y" not in res.lower():
+    if "y" in res.lower():
+        return True
+    else:
         raise click.Abort()
-
-    return True
 
 
 def anykey_confirm(message: str) -> bool:

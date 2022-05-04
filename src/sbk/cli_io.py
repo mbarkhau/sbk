@@ -124,6 +124,8 @@ def _init_blank_inputs(secret_type: str) -> Inputs:
 def _newline_mod(num_lines: int) -> int:
     if num_lines in (12, 16):
         newline_mod = 4
+    elif num_lines in (9, 15):
+        newline_mod = 3
     elif num_lines in (6, 8, 10, 14):
         newline_mod = (num_lines + 1) // 2
     else:

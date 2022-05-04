@@ -318,7 +318,9 @@ lint_fmt:
 		--skip-string-normalization \
 		--line-length=$(MAX_LINE_LEN) \
 		--check \
-		src/ test/ 2>&1 | sed "/All done/d" | sed "/left unchanged/d"
+		$$(grep --files-without-match "This is a generated file" src/sbk/*.py) \
+		$$(grep --files-without-match "This is a generated file" test/*.py) \
+		2>&1 | sed "/All done/d" | sed "/left unchanged/d"
 	@printf "\e[1F\e[9C ok\n"
 
 

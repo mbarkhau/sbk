@@ -107,10 +107,10 @@ class SelectCommandPanel(gpb.Panel):
             self._layout.addWidget(button)
             return button
 
-        add_button("&Create New Wallet"   , 'generate').setDefault(True)
-        add_button("&Open Existing Wallet", 'open')
-        # add_button("&Show Shares"        , 'show-shares')
-        add_button("&Recover Wallet from Shares", 'recover')
+        add_button("&Create Wallet", 'create').setDefault(True)
+        add_button("&Open Wallet"  , 'open')
+        # add_button("&Backup"        , 'backup')
+        add_button("&Recover Wallet", 'recover')
 
         self._layout.addStretch(1)
 
@@ -162,19 +162,19 @@ class SelectCommandPanel(gpb.Panel):
             self.trace(f"handle button {button_id=} {args} {kwargs}")
             p = self.parent()
 
-            if button_id in ('generate', 'open', 'show-shares', 'load', 'recover'):
+            if button_id in ('create', 'open', 'show-shares', 'load', 'recover'):
                 state = gpb.get_state(load_sys_info=False)
                 state['salt'    ] = None
                 state['brainkey'] = None
                 state['shares'  ] = []
                 # state['params'  ] = None
 
-            if button_id == 'generate':
-                p.get_or_init_panel(GenerateSaltPanelPanel).switch()
+            if button_id == 'create':
+                p.get_or_init_panel(CreateWalletEnterSaltPanel).switch()
             elif button_id == 'open':
                 p.get_or_init_panel(EnterSaltPanel).switch()
-            elif button_id == 'show-shares':
-                p.get_or_init_panel(ShowSharesPanel).switch()
+            elif button_id == 'backup':
+                p.get_or_init_panel(BackupPanel).switch()
             elif button_id == 'recover':
                 p.get_or_init_panel(RecoverKeysPanel).switch()
             # elif button_id == 'load':
@@ -293,6 +293,37 @@ class SettingsPanel(gpb.NavigablePanel):
             super_handler()
 
         return handler
+
+
+class CreateWalletEnterSaltPanel(gpb.NavigablePanel):
+
+    def __init__(self, index: int):
+        self.title = "Create Wallet"
+        self.back_panel_clazz = SelectCommandPanel
+        self.next_panel_clazz = SelectCommandPanel
+
+        super().__init__(index)
+
+        # self.next_button.setEnabled(True)
+        # self.next_button.setVisible(True)
+        # self.prev_button.setEnabled(True)
+        # self.prev_button.setVisible(True)
+
+        self._layout = qtw.QGridLayout(self)
+
+        self.salt_phrase_edit = qtw.QLineEdit()
+        self.entropy_edit     = qtw.QTextEdit()
+        self.use_urandom = qtw.QCheckBox()
+        self.use_urandom.setCheckState(qtc.Qt.Checked)
+
+        self._layout.addWidget(qtw.QLabel("Salt Phrase"), 0, 0)
+        self._layout.addWidget(self.salt_phrase_edit, 0, 1)
+        self._layout.addWidget(qtw.QLabel("Use System Randomness"), 1, 0)
+        self._layout.addWidget(self.use_urandom, 1, 1)
+        self._layout.addWidget(qtw.QLabel("Entropy Pool"), 2, 0)
+        self._layout.addWidget(self.entropy_edit, 2, 1)
+
+        self.setLayout(self._layout)
 
 
 class WalletSeedGenerationPanel(gpb.Panel):
@@ -441,7 +472,7 @@ class DocumentationPanel(gpb.NavigablePanel):
 #     def __init__(self, index: int):
 #         self.title            = "Create New Wallet"
 #         self.back_panel_clazz = SelectCommandPanel
-#         self.next_panel_clazz = GenerateSaltPanelPanel
+#         self.next_panel_clazz = OldCreateWalletPanel
 
 #         super().__init__(index)
 
@@ -555,12 +586,12 @@ class CreateKeysShowPanel(gpb.EnterSecretPanel):
             return SelectCommandPanel
         else:
             state['panel_index'] = max(state['panel_index'] - 1, 0)
-            return GenerateSaltPanelPanel
+            return OldCreateWalletPanel
 
     @property
     def next_panel_clazz(self) -> Type[gpb.Panel]:
         self.trace(f"next show {gpb.shared_panel_state['panel_index']}")
-        return GenerateSaltPanelPanel
+        return OldCreateWalletPanel
 
 
 MaybeBytes = Union[bytes, None]
@@ -780,7 +811,7 @@ class OpenWalletPanel(EnterSaltAndBrainkeyPanel):
         super().destroy_panel()
 
 
-class ShowSharesPanel(gpb.EnterSecretPanel):
+class BackupPanel(gpb.EnterSecretPanel):
     def __init__(self, index: int):
         self.title = "Show Shares"
         super().__init__(index)
@@ -968,7 +999,7 @@ class RecoverKeysPanel(gpb.EnterSecretPanel):
         return len(gpb.shared_panel_state['shares']) >= params.sss_n
 
 
-class GenerateSaltPanelPanel(ShowKeysPanel):
+class OldCreateWalletPanel(ShowKeysPanel):
     def __init__(self, index: int):
         self.title = "Create New Wallet"
         super().__init__(index)
@@ -984,7 +1015,7 @@ class GenerateSaltPanelPanel(ShowKeysPanel):
             return SelectCommandPanel
         else:
             state['panel_index'] -= 1
-            return GenerateSaltPanelPanel
+            return OldCreateWalletPanel
 
     @property
     def next_panel_clazz(self) -> Type[gpb.Panel]:
@@ -992,7 +1023,7 @@ class GenerateSaltPanelPanel(ShowKeysPanel):
         self.trace(f"next show {state['panel_index']}")
         if state['panel_index'] + 1 < len(state['shares']) + 2:
             state['panel_index'] += 1
-            return GenerateSaltPanelPanel
+            return OldCreateWalletPanel
         else:
             return SelectCommandPanel
 

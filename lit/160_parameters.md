@@ -150,8 +150,8 @@ ot be the only person who knows the salt. Should they reveal the
 salt by accident, they will still have time to transfer their
 funds to a safe wallet.
 
-The resulting total entropy is on the order of ``9 + 5 = 14byte =
-112bit``, depending on how well the user chose their salt. The
+The resulting total entropy is on the order of ``11 + 5 = 16byte =
+128bit``, depending on how well the user chose their salt. The
 header is not completely random, so we cannot count them as part
 of the entropy.
 
@@ -160,7 +160,6 @@ of the entropy.
 BRANKEY_HEADER_LEN = 1
 SHARE_HEADER_LEN   = 2
 
-DEFAULT_RAW_SALT_LEN = 17
-DEFAULT_RAW_SALT_LEN = 9
+DEFAULT_RAW_SALT_LEN = 11
 DEFAULT_BRAINKEY_LEN = 5
 ```

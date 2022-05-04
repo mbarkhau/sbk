@@ -59,9 +59,9 @@ mkdir -p iso
 rm -f ubuntulive.iso
 rm -f newfilesystem*
 
-# rm -f filesystem.squashfs
-# 7z e -o. "$ISO_PATH" casper/filesystem.squashfs
-# sqfs2tar filesystem.squashfs | docker import - "ubuntulive:base"
+rm -f filesystem.squashfs
+7z e -o. "$ISO_PATH" casper/filesystem.squashfs
+sqfs2tar filesystem.squashfs | docker import - "ubuntulive:base"
 
 
 cat <<'EOF' > 10_ubuntu-settings.gschema.override
@@ -539,7 +539,7 @@ echo "wrote $BUILD_DIR/sbklive_2022.1011-beta-amd64.iso"
 
 chmod u=rw,g=r,o=r *.iso
 
-rsync --progress *.iso root@vserver:/var/www/html/sbk/sbk-live
+rsync --progress sbklive_2022.1011-beta-amd64.iso root@vserver:/var/www/html/sbk/sbk-live
 
 mktorrent \
     --piece-length 22 \

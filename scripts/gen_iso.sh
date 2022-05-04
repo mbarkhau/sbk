@@ -15,8 +15,8 @@ which xorriso
 rm -f $BUILD_DIR/sbk*.tar.gz
 rm -f $BUILD_DIR/sbk*.whl
 
-cp dist/*.tar.gz $BUILD_DIR
-cp dist/*.whl $BUILD_DIR
+cp dist/sbk-2022.1011b0-py3-none-any.whl $BUILD_DIR/
+cp dist/sbk-2022.1011b0.tar.gz $BUILD_DIR/
 cp pdf_templates/*.pdf $BUILD_DIR
 cp sbk-live-data/* $BUILD_DIR
 cp src/sbk/assets/* $BUILD_DIR

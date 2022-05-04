@@ -462,7 +462,7 @@ def create(
     yes_all or _validate_copies(params, brainkey, salt, shares)
 
 
-def get_validated_brainkey() -> tuple[ct.BrainKey, parameters.Parameters]:
+def get_validated_brainkey() -> Tuple[ct.BrainKey, parameters.Parameters]:
     header_text  = "Enter Brainkey"
     raw_brainkey = cli_io.prompt(cli_io.SECRET_TYPE_BRAINKEY, header_text=header_text)
     brainkey     = ct.BrainKey(raw_brainkey)

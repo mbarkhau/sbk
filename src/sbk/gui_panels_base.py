@@ -891,7 +891,7 @@ class EnterSecretPanel(NavigablePanel):
 
     def _parse_datas(
         self, recovered_datas: Sequence[MaybeBytes]
-    ) -> tuple[Optional[parameters.Parameters], List[Optional[str]], List[Optional[str]]]:
+    ) -> Tuple[Optional[parameters.Parameters], List[Optional[str]], List[Optional[str]]]:
         maybe_share_header    = recovered_datas[:3]
         maybe_brainkey_header = recovered_datas[:2]
 

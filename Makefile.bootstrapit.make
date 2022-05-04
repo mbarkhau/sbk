@@ -580,6 +580,7 @@ bump_version:
 ## Create python sdist and bdist_wheel files
 .PHONY: dist_build
 dist_build:
+	@rm -rf build/
 	$(DEV_ENV_PY) setup.py sdist;
 	$(DEV_ENV_PY) setup.py bdist_wheel --python-tag=$(BDIST_WHEEL_PYTHON_TAG);
 	@rm -rf src/*.egg-info

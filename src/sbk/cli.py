@@ -459,7 +459,7 @@ def create(
 
     _show_created_data(yes_all, params, brainkey, shares)
 
-    yes_all or _validate_copies(params, brainkey, salt, shares)
+    yes_all or _validate_copies(params, brainkey, shares)
 
 
 def get_validated_brainkey() -> Tuple[ct.BrainKey, parameters.Parameters]:

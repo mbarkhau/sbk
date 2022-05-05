@@ -556,9 +556,9 @@ cp *.torrent "${SBK_DIR}/landingpage/sbk-live/"
 rsync --progress *.torrent mbarkhau@vserver:/var/www/html/sbk/sbk-live/
 
 transmission-show -m sbklive_2022.1015-beta-amd64.iso.torrent | sed -e 's|&|\\&|g' > .magnet_link
-echo "<span>$(date --iso-8601) - 2.2GB - sbklive_2022.1015-beta-amd64.iso  </span>\
+echo "<li><pre>$(date --iso-8601) - 2.2GB - sbklive_2022.1015-beta-amd64.iso  \
     <a href=\"sbk-live/sbklive_2022.1015-beta-amd64.iso.torrent\">torrent</a> \
-    <a href=\"$(cat .magnet_link)\">magnet</a>" \
+    <a href=\"$(cat .magnet_link)\">magnet</a><pre></li>" \
     > .torrent_html
 
-sed -i -e "s|<pre>|<pre>\n  $(cat .torrent_html)\n|" ${SBK_DIR}/landingpage/index.html
+sed -i -e "s|<ul id=downloads>|<ul id=downloads>\n    $(cat .torrent_html)|" ${SBK_DIR}/sbk/landingpage/index.html

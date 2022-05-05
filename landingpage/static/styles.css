@@ -93,6 +93,10 @@ body {
     overflow: hidden;
 }
 
+#downloads {
+    list-style: none;
+}
+
 #content {
     margin: 1em auto 10em auto;
     max-width: 48em;

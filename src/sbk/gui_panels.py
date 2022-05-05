@@ -296,9 +296,8 @@ class SettingsPanel(gpb.NavigablePanel):
 
 
 class CreateWalletEnterSaltPanel(gpb.NavigablePanel):
-
     def __init__(self, index: int):
-        self.title = "Create Wallet"
+        self.title            = "Create Wallet"
         self.back_panel_clazz = SelectCommandPanel
         self.next_panel_clazz = SelectCommandPanel
 
@@ -313,7 +312,7 @@ class CreateWalletEnterSaltPanel(gpb.NavigablePanel):
 
         self.salt_phrase_edit = qtw.QLineEdit()
         self.entropy_edit     = qtw.QTextEdit()
-        self.use_urandom = qtw.QCheckBox()
+        self.use_urandom      = qtw.QCheckBox()
         self.use_urandom.setCheckState(qtc.Qt.Checked)
 
         self._layout.addWidget(qtw.QLabel("Salt Phrase"), 0, 0)

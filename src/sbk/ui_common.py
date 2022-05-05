@@ -477,10 +477,10 @@ def fallback_progressbar(label: str) -> InitProgressbar:
 
 
 def derive_seed(
+    label           : str,
     kdf_params      : Union[parameters.Parameters, parameters.KDFParams],
     brainkey        : ct.BrainKey,
     salt            : ct.Salt,
-    label           : str,
     wallet_name     : str = DEFAULT_WALLET_NAME,
     init_progressbar: Optional[InitProgressbar] = None,
 ) -> ct.WalletSeed:

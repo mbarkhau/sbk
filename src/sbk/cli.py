@@ -310,7 +310,7 @@ def kdf_test(
     dummy_salt     = ct.Salt(b"\x00" * lens.salt)
 
     tzero = time.time()
-    ui_common.derive_seed(params, dummy_brainkey, dummy_salt, label="kdf-test")
+    ui_common.derive_seed("kdf-test", params, brainkey=dummy_brainkey, salt=dummy_salt)
     duration = time.time() - tzero
     echo(f"Duration   : {round(duration):>4} sec")
 
@@ -452,7 +452,7 @@ def create(
         # error later when they try to load the wallet.
         validation_kdf_params = parameters.init_kdf_params(kdf_m=params.kdf_m, kdf_t=1)
 
-        ui_common.derive_seed(validation_kdf_params, brainkey, salt, label="KDF Validation ")
+        ui_common.derive_seed("KDF Validation ", validation_kdf_params, brainkey, salt)
     else:
         # valid values for kdf_m and kdf_p were already tested as part of "KDF Calibration"
         pass
@@ -512,11 +512,11 @@ def _load_wallet(
     offline = not online
 
     seed_data = ui_common.derive_seed(
+        "Deriving Wallet Seed",
         params,
-        brainkey,
-        salt,
+        brainkey=brainkey,
+        salt=salt,
         wallet_name=wallet_name,
-        label="Deriving Wallet Seed",
     )
 
     if show_seed:
@@ -571,7 +571,14 @@ def recover(
     assert params is not None
 
     brainkey, salt = shamir.join(shares)
-    _load_wallet(params, brainkey, salt, wallet_name, show_seed, online)
+    _load_wallet(
+        params=params,
+        brainkey=brainkey,
+        salt=salt,
+        wallet_name=wallet_name,
+        show_seed=show_seed,
+        online=online,
+    )
 
 
 @cli.command()
@@ -609,7 +616,14 @@ def load_wallet(
     brainkey, params = get_validated_brainkey()
 
     yes_all or echo()
-    _load_wallet(params, brainkey, salt, wallet_name, show_seed, online)
+    _load_wallet(
+        params=params,
+        brainkey=brainkey,
+        salt=salt,
+        wallet_name=wallet_name,
+        show_seed=show_seed,
+        online=online,
+    )
 
 
 @cli.command()

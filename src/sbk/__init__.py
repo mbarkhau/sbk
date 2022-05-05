@@ -8,4 +8,4 @@
 A cli app and library to generate, split and recombine secret keys.
 """
 
-__version__ = "2022.1014-beta"
+__version__ = "2022.1015-beta"

@@ -23,7 +23,7 @@ GIT_REPO_NAMESPACE="mbarkhau"
 PACKAGE_NAME="sbk"
 MODULE_NAME="sbk"
 
-PACKAGE_VERSION="2022.1013-beta"
+PACKAGE_VERSION="2022.1014-beta"
 # PACKAGE_VERSION="v0.1.0"
 
 # These must be valid (space separated) conda package names.

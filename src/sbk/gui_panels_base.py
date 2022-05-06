@@ -530,19 +530,21 @@ def init_grid(
     for row, (i1, m1, m2, i2) in enumerate(all_row_widgets):
         grid_row = row + row // 4
 
-        row_num_left  = (row * 2) + 1
-        row_num_right = row_num_left + 1
+        row_idx_left  = row * 2
+        row_idx_right = row_idx_left + 1
+        char_left     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[row_idx_left]
+        char_right    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[row_idx_right]
 
         row_widgets = [
             _label_widget(parent, ""),  # 0
-            _label_widget(parent, f"{row_num_left:02}:"),  # 1
+            _label_widget(parent, f"{char_left}:"),  # 1
             i1,  # 2
             _label_widget(parent, ""),  # 3
             m1,  # 4
             _label_widget(parent, ""),  # 5
             m2,  # 6
             _label_widget(parent, ""),  # 7
-            _label_widget(parent, f"{row_num_right:02}:"),  # 8
+            _label_widget(parent, f"{char_right}:"),  # 8
             i2,  # 9
             _label_widget(parent, ""),  # 10
         ]

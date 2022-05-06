@@ -162,9 +162,9 @@ class PromptState:
         self.accepted = _accepted
 
     def line_marker(self, idx: int) -> str:
-        offset     = int(idx * 2 / len(self.inputs)) + 1
-        marker_num = ((idx * 2) % len(self.inputs)) + offset
-        return f"{marker_num:02}"
+        offset     = int(idx * 2 / len(self.inputs))
+        marker_idx = ((idx * 2) % len(self.inputs)) + offset
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[marker_idx]
 
     @property
     def is_cursor_at_ecc(self) -> bool:
@@ -254,7 +254,7 @@ class PromptState:
             yield prefix + line + suffix
 
     def formatted_input_lines(self, show_cursor: bool = True) -> List[str]:
-        header = f"       {'Data':^7}   {'Mnemonic':^18}        {'ECC':^7}"
+        header = f"      {'Data':^7}   {'Mnemonic':^18}      {'ECC':^7}"
         return [header] + list(self._iter_out_lines(show_cursor))
 
     def _copy(self, **overrides) -> 'PromptState':

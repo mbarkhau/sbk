@@ -244,10 +244,10 @@
   </div>
 </div>
 <div class="wordlist left">
-  {% for i in range(0, wc, 2) %}<code>{{ "%02d" % (i + 1) }}: </code><span></span>{% endfor %}
+  {% for i in range(0, wc, 2) %}<code>{{ "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] }}: </code><span></span>{% endfor %}
 </div>
 <div class="wordlist right">
-  {% for i in range(1, wc, 2) %}<code>{{ "%02d" % (i + 1) }}: </code>{% endfor %}
+  {% for i in range(1, wc, 2) %}<code>{{ "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] }}: </code>{% endfor %}
 </div>
 </body>
 </html>

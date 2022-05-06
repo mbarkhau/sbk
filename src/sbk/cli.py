@@ -479,8 +479,10 @@ def get_validated_brainkey() -> Tuple[ct.BrainKey, parameters.Parameters]:
 @_opt_verbose
 def backup(
     salt_phrase: Optional[str] = None,
+    bk_phrase  : Optional[str] = None,
     scheme_arg : str = DEFAULT_SCHEME,
     shareset   : int = DEFAULT_SHARESET,
+    share_num  : Optional[int] = None,
     verbose    : int = 0,
 ) -> None:
     """Generate new shares from a salt, brainkey."""
@@ -492,6 +494,7 @@ def backup(
 
     salt = ui_common.derive_salt(validated_salt_phrase)
     brainkey, params = get_validated_brainkey()
+    # brainkey, params = get_validated_brainkey(bk_phrase)
 
     params = params._replace(sss_t=scheme.threshold, sss_n=scheme.num_shares)
     shares = ui_common.derive_shares(params, salt, brainkey, shareset)

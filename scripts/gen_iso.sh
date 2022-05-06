@@ -352,7 +352,7 @@ RUN add-apt-repository "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) 
 RUN apt-get install -y grub2-common grub-pc-bin grub-efi-amd64-bin grub-efi-amd64-signed mtools xorriso
 
 # install electrum dependencies
-RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-pyqt5
+RUN apt-get install -y libsecp256k1-0 python3-cryptography python3-pip python3-pyqt5 zbar-tools
 
 RUN python3 -m pip install argon2-cffi
 
@@ -561,4 +561,4 @@ echo "<li><pre>$(date --iso-8601) - 2.2GB - sbklive_2022.1015-beta-amd64.iso  \
     <a href=\"$(cat .magnet_link)\">magnet</a><pre></li>" \
     > .torrent_html
 
-sed -i -e "s|<ul id=downloads>|<ul id=downloads>\n    $(cat .torrent_html)|" ${SBK_DIR}/sbk/landingpage/index.html
+sed -i -e "s|<ul id=downloads>|<ul id=downloads>\n    $(cat .torrent_html)|" ${SBK_DIR}/landingpage/index.html

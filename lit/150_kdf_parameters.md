@@ -68,9 +68,11 @@ Encoded:	$argon2i$v=19$m=65536,t=2,p=4$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJ
 # exit: 0
 ```
 
-This can be compared to the output of the reference implementation [gh/argon2][href_gh_phc_argon2].
+We can compare this output of the reference implementation [gh/argon2][href_gh_phc_argon2] to the output of our python implementation [argon2-cffi][href_pypi_argon2cffi].
 
 [href_gh_phc_argon2]: https://github.com/P-H-C/phc-winner-argon2#command-line-utility
+
+[href_pypi_argon2cffi]: https://pypi.org/project/argon2-cffi/
 
 ```python
 # file: scripts/argon2cffi_test.py
@@ -131,8 +133,6 @@ cli invokation overhead or due to multithreadding. As we care about
 performance on the order of at least a few seconds, we measure a more
 expensive call and also limit parallelism to 1, to make sure that both
 implementations only use one core.
-
-[href_pypi_argon2cffi]: https://pypi.org/project/argon2-cffi/
 
 ```bash
 # run: bash scripts/argon2cli_test.sh -t 3 -m 17 -p 1 -l 24 -id

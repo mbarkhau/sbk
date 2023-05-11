@@ -160,8 +160,14 @@ def _init_sys_info() -> SystemInfo:
     try:
         _SYS_INFO_LOADING = True
         total_mb, avail_mb = memory_info()
-        avail_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
-        usable_mb = max_usable_memory(avail_mb=avail_mb)
+
+        # NOTE (mb 2022-07-02): This is too slow for initial
+        #       boot, so we hardcode a value and deal with
+        #       OOM issues later.
+        # initial_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
+        # usable_mb = max_usable_memory(avail_mb=initial_mb)
+
+        usable_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
         nfo = SystemInfo(total_mb, usable_mb)
         _dump_sys_info(nfo)
         return nfo

@@ -131,7 +131,7 @@ def get_validated_salt_phrase(salt_phrase: Optional[str]) -> bytes:
         if salt_phrase1 == salt_phrase2:
             return salt_phrase1.strip()
         else:
-            echo(f"Mismatch of Salt passphrases")
+            echo("Mismatch of Salt passphrases")
             sys.exit(1)
     else:
         return salt_phrase.strip()

@@ -107,9 +107,12 @@ class SelectCommandPanel(gpb.Panel):
             self._layout.addWidget(button)
             return button
 
-        add_button("&Create Wallet", 'create').setDefault(True)
-        add_button("&Open Wallet"  , 'open')
-        # add_button("&Backup"        , 'backup')
+        add_button("&Open Wallet", 'open').setDefault(True)
+
+        self._layout.addStretch(1)
+
+        add_button("&New Wallet", 'new')
+        add_button("&Backup Keys", 'backup')
         add_button("&Recover Wallet", 'recover')
 
         self._layout.addStretch(1)
@@ -162,15 +165,15 @@ class SelectCommandPanel(gpb.Panel):
             self.trace(f"handle button {button_id=} {args} {kwargs}")
             p = self.parent()
 
-            if button_id in ('create', 'open', 'show-shares', 'load', 'recover'):
+            if button_id in ('new', 'open', 'show-shares', 'load', 'recover'):
                 state = gpb.get_state(load_sys_info=False)
                 state['salt'    ] = None
                 state['brainkey'] = None
                 state['shares'  ] = []
                 # state['params'  ] = None
 
-            if button_id == 'create':
-                p.get_or_init_panel(CreateWalletEnterSaltPanel).switch()
+            if button_id == 'new':
+                p.get_or_init_panel(NewWalletSaltPanel).switch()
             elif button_id == 'open':
                 p.get_or_init_panel(EnterSaltPanel).switch()
             elif button_id == 'backup':
@@ -295,34 +298,74 @@ class SettingsPanel(gpb.NavigablePanel):
         return handler
 
 
-class CreateWalletEnterSaltPanel(gpb.NavigablePanel):
+class __CreateWalletEntropyPanel(gpb.NavigablePanel):
     def __init__(self, index: int):
-        self.title            = "Create Wallet"
+        self.title            = "Create New Wallet"
         self.back_panel_clazz = SelectCommandPanel
-        self.next_panel_clazz = SelectCommandPanel
+        self.next_panel_clazz = NewWalletSaltPanel
 
         super().__init__(index)
 
-        # self.next_button.setEnabled(True)
-        # self.next_button.setVisible(True)
-        # self.prev_button.setEnabled(True)
-        # self.prev_button.setVisible(True)
+        self.entropy_edit = qtw.QTextEdit()
+        # self.entropy_edit.setEchoMode(qtw.QLineEdit.Password)
 
-        self._layout = qtw.QGridLayout(self)
+        self._layout = qtw.QVBoxLayout(self)
+        self.grid_layout = qtw.QGridLayout()
 
-        self.salt_phrase_edit = qtw.QLineEdit()
-        self.entropy_edit     = qtw.QTextEdit()
-        self.use_urandom      = qtw.QCheckBox()
-        self.use_urandom.setCheckState(qtc.Qt.Checked)
+        self.grid_layout.addWidget(qtw.QLabel("Entropy Pool"), 0, 0)
+        self.grid_layout.addWidget(self.entropy_edit, 0, 1)
 
-        self._layout.addWidget(qtw.QLabel("Salt Phrase"), 0, 0)
-        self._layout.addWidget(self.salt_phrase_edit, 0, 1)
-        self._layout.addWidget(qtw.QLabel("Use System Randomness"), 1, 0)
-        self._layout.addWidget(self.use_urandom, 1, 1)
-        self._layout.addWidget(qtw.QLabel("Entropy Pool"), 2, 0)
-        self._layout.addWidget(self.entropy_edit, 2, 1)
+        button = qtw.QPushButton("Update Entropy")
+        button.clicked.connect(self._update_entropy)
+        button.setEnabled(True)
+        self.grid_layout.addWidget(button)
+
+        self._layout.addLayout(self.grid_layout)
+        self._layout.addStretch(1)
+        self._layout.addLayout(self.nav_layout)
+
+        self.next_button.setEnabled(True)
+        self.next_button.setVisible(True)
+        self.back_button.setEnabled(True)
+        self.back_button.setVisible(True)
 
         self.setLayout(self._layout)
+
+    def _update_entropy(self, *args, **kwargs) -> None:
+        print("update entropy", *args, **kwargs)
+
+
+
+
+class NewWalletSaltPanel(gpb.NavigablePanel):
+    def __init__(self, index: int):
+        self.title            = "Create Wallet - Enter Personal"
+        self.back_panel_clazz = NewWalletSaltPanel
+        self.next_panel_clazz = NewWalletBrainkeyPanel
+
+        super().__init__(index)
+
+        self.salt_phrase_edit = qtw.QLineEdit()
+        self.salt_phrase_edit.setEchoMode(qtw.QLineEdit.Password)
+        self.advanced_mode = qtw.QCheckBox()
+        self.advanced_mode.setCheckState(qtc.Qt.Unchecked)
+
+        self._layout = qtw.QVBoxLayout(self)
+        self.grid_layout = qtw.QGridLayout()
+
+        self.grid_layout.addWidget(qtw.QLabel("Personal Secret (Salt)"), 2, 0)
+        self.grid_layout.addWidget(self.salt_phrase_edit, 2, 1)
+
+        self._layout.addLayout(self.grid_layout)
+        self._layout.addStretch(1)
+        self._layout.addLayout(self.nav_layout)
+
+        self.setLayout(self._layout)
+
+
+class NewWalletBrainkeyPanel(gpb.NavigablePanel):
+    def __init__(self, index: int):
+        pass
 
 
 class WalletSeedGenerationPanel(gpb.Panel):
@@ -654,7 +697,7 @@ class EnterSaltPanel(gpb.EnterSecretPanel):
         super().__init__(index)
 
     def add_custom_widgets(self, grid_layout: qtw.QGridLayout) -> None:
-        params = gpb.get_state()['params']
+        # params = gpb.get_state()['params']
 
         self._header_text  = ""
         self._preseed_text = ""

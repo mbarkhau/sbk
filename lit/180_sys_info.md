@@ -52,9 +52,9 @@ if __name__ == '__main__':
 # run: python -m sbk.sys_info
 # options: {"timeout": 90, "capture_file": "captures/sys_info.json"}
 lang:  en
-Mem Info: (15886, 13722)
-Memory Info (uncached): SystemInfo(total_mb=15886, usable_mb=10291)
-Memory Info (cached)  : SystemInfo(total_mb=15886, usable_mb=10291)
+Mem Info: (15878, 5298)
+Memory Info (uncached): SystemInfo(total_mb=15878, usable_mb=4768)
+Memory Info (cached)  : SystemInfo(total_mb=15878, usable_mb=4768)
 # exit: 0
 ```
 
@@ -212,8 +212,14 @@ def _init_sys_info() -> SystemInfo:
     try:
         _SYS_INFO_LOADING = True
         total_mb, avail_mb = memory_info()
-        avail_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
-        usable_mb = max_usable_memory(avail_mb=avail_mb)
+
+        # NOTE (mb 2022-07-02): This is too slow for initial
+        #       boot, so we hardcode a value and deal with
+        #       OOM issues later.
+        # initial_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
+        # usable_mb = max_usable_memory(avail_mb=initial_mb)
+
+        usable_mb = max(parameters.V0_KDF_M_UNIT, int(avail_mb * 0.9))
         nfo = SystemInfo(total_mb, usable_mb)
         _dump_sys_info(nfo)
         return nfo

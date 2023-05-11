@@ -707,8 +707,6 @@ def create_secrets(
     params_data    = parameters.validated_param_data(params)
     bk_header_data = params_data[: parameters.BRANKEY_HEADER_LEN]
 
-    bk_header = base64.b16encode(bk_header_data).decode('ascii')
-
     lens = parameters.raw_secret_lens()
 
     raw_bk   = sbk_random.urandom(lens.raw_brainkey)

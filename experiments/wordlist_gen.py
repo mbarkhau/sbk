@@ -1047,6 +1047,7 @@ def read_wordlist(filepath):
 ALL_WORDS2 = read_wordlist("wordlists/en_wordlist.txt")
 # _pretty_wordlist(sorted(set(ALL_WORDS2)), "all words")
 
+
 def show_candidates():
     candidates = read_wordlist("wordlists/shitlist.txt")
 

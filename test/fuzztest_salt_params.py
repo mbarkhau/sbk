@@ -85,20 +85,20 @@ SHARE_HEADER_LEN   = 2
 
 DEFAULT_RAW_SALT_LEN = 18
 DEFAULT_BRAINKEY_LEN = 5
-if 'SBK_DEBUG_RAW_SALT_LEN' in os.environ:
+if "SBK_DEBUG_RAW_SALT_LEN" in os.environ:
     DEFAULT_RAW_SALT_LEN = int(os.environ['SBK_DEBUG_RAW_SALT_LEN'])
 
-if 'SBK_DEBUG_BRAINKEY_LEN' in os.environ:
+if "SBK_DEBUG_BRAINKEY_LEN" in os.environ:
     DEFAULT_BRAINKEY_LEN = int(os.environ['SBK_DEBUG_BRAINKEY_LEN'])
 
-MIN_ENTROPY      = int(os.getenv('SBK_MIN_ENTROPY'     , "16"))
-MAX_ENTROPY_WAIT = int(os.getenv('SBK_MAX_ENTROPY_WAIT', "10"))
+MIN_ENTROPY      = int(os.getenv("SBK_MIN_ENTROPY"     , "16"))
+MAX_ENTROPY_WAIT = int(os.getenv("SBK_MAX_ENTROPY_WAIT", "10"))
 
-DEFAULT_KDF_T_TARGET  = int(os.getenv('SBK_KDF_T_TARGET' ) or DEFAULT_KDF_T_TARGET)
-DEFAULT_KDF_M_PERCENT = int(os.getenv('SBK_KDF_M_PERCENT') or DEFAULT_KDF_M_PERCENT)
+DEFAULT_KDF_T_TARGET  = int(os.getenv("SBK_KDF_T_TARGET" ) or DEFAULT_KDF_T_TARGET)
+DEFAULT_KDF_M_PERCENT = int(os.getenv("SBK_KDF_M_PERCENT") or DEFAULT_KDF_M_PERCENT)
 
-DEFAULT_SSS_T = int(os.getenv('SBK_THRESHOLD' ) or DEFAULT_SSS_T)
-DEFAULT_SSS_N = int(os.getenv('SBK_NUM_SHARES') or DEFAULT_SSS_N)
+DEFAULT_SSS_T = int(os.getenv("SBK_THRESHOLD" ) or DEFAULT_SSS_T)
+DEFAULT_SSS_N = int(os.getenv("SBK_NUM_SHARES") or DEFAULT_SSS_N)
 
 
 def param_coeffs(b: float) -> Tuple[int, int]:
@@ -241,12 +241,12 @@ def raw_secret_lens() -> SecretLens:
 def hex2bytes(hex_str: str) -> bytes:
     """Convert bytes to a hex string."""
     hex_str = hex_str.upper().zfill(2 * ((len(hex_str) + 1) // 2))
-    return base64.b16decode(hex_str.encode('ascii'))
+    return base64.b16decode(hex_str.encode("ascii"))
 
 
 def bytes2hex(data: bytes) -> str:
     """Convert bytes to a hex string."""
-    return base64.b16encode(data).decode('ascii').lower()
+    return base64.b16encode(data).decode("ascii").lower()
 
 
 def bytes_hex(data: bytes) -> str:

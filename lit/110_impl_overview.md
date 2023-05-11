@@ -509,7 +509,7 @@ The technical criteria for the wordlist are:
  - All words must be at least 5 characters long.
  - All words must be at most 8 characters long.
  - All words must have a unique 3 character prefix.
- - The 3 character prefix of a word may not be a part of may other word.
+ - The 3 character prefix of a word must not be a part of any other word.
  - The damerau levenshtein edit distance of any two words must be at least 3.
 
 The wordlist is composed only of commonly used concrete nouns such as animals, creatures, famous people, characters, physical objects, materials, substances and well known places/organizations. The wordlist does not contain any abstract words, adjectives, adverbs. Consider that the very first word humans ever spoke may have been have been the equivalent of "mother" or "snake", rather than words for abstract concepts such as "agency" or "ambition".

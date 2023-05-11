@@ -1,0 +1,28 @@
+adelaide   adviser    airman     alabama    albania    alberta    album      algiers
+andes      antwerp    atlanta    bagle      bangkok    banner     barbados   beach
+bedroom    beirut     belize     biscuit    board          bordeaux   botswana
+brick      bristol    britain    bronx      brooklyn   brother    brownie    bulgaria
+burgundy   burma      burqa      burrito    cabinet    calgary    cambodia   camel
+campus     canberra   cancer     canon      capella    cardiff    carolina   carpet
+cartoon    cashier    chain      chairman   chechnya   cheese     chemist    chicken
+chile      china      cisco         clerk      cocktail   cologne    columbia
+company    cornell    cornwall   court      denmark    denver     disney     donegal
+earth      england    europe     fairfax    field      floor      florida    fujitsu
+galway     gambia     gamepad    garden     ground     hanoi      harbor     hawking
+honda            houston    hungary    impala     indiana    ithaca
+jackson    jersey     kansas        kenya      kinshasa   kolkata    krakow
+lappland   lunatic    lychee     machine    madrid     mallorca   malta      mandela
+marshal    maryland   meadow     mecca      medicine   memphis    merchant   michigan
+midwest         money      monitor    monster        montreal   mountain
+munich     museum     musician       newport    norfolk    norwich
+ocean      officer    oregon     pacific    packet     peach      pearl      peasant
+phantom    pillow     plant      plasma     plastic    plate         potter
+priest     punjab     quebec     rafael     ramses     redmond
+sanyo      saturn     scotland   serbia     sergent    sheet      shelve     shenzhen
+sherlock   sirius     sixties    slovakia   space      spain      spinach    square
+stadium    staff      stage      stanford   station    store      studio     sussex
+table      tacoma     tobago     toledo     tolkien    toulouse   trailer    truck
+turban     turin      turnip     ulysses    unesco     unicef        valet
+villa      vinyl            walkman    wallet     warsaw     wicklow    zagreb
+zanzibar
+

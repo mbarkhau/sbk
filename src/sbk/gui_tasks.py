@@ -104,6 +104,8 @@ class SeedGenerationTask(qtc.QThread):
             self.finished.emit(errmsg)
             return
 
+        salt_phrase = "TODO"
+        shareset    = "TODO"
         salt, brainkey, shares = ui_common.create_secrets(
             self.params, salt_phrase=salt_phrase, shareset=shareset
         )

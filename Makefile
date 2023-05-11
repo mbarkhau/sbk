@@ -162,21 +162,24 @@ landingpage_sync:
 
 tmp_doc/html_build.marker: lit/*.md
 	rm -f tmp_doc/*.html
-	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --html tmp_doc/
+	PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --html tmp_doc/
 	cp -rf tmp_doc/* doc/
 	touch tmp_doc/html_build.marker
 
 
 tmp_doc/pdf_build.marker: lit/*.md
 	rm -f tmp_doc/*.pdf
-	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --pdf tmp_doc/
+	PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md --pdf tmp_doc/
 	cp -rf tmp_doc/* doc/
 	touch tmp_doc/pdf_build.marker
 
 
 tmp_doc/lit_build.marker: lit/*.md
 	rm -f tmp_doc/*.pdf
-	$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md
+	PYTHONPATH=src/:vendor/:$$PYTHONPATH \
+		$(DEV_ENV_PY) -m litprog build -n 1 -vie lit/*.md
 	cp -rf tmp_doc/* doc/
 	touch tmp_doc/lit_build.marker
 

@@ -73,27 +73,28 @@ def main() -> int:
             wp_ctx.write_pdf(fobj)
         print("wrote", str(out_path_pdf.absolute()))
 
-        in_pdf   = pdfrw.PdfReader(str(out_path_pdf))
-        pdf_page = in_pdf.pages[0]
+        if dual_path_pdf in out_paths:
+            in_pdf   = pdfrw.PdfReader(str(out_path_pdf))
+            pdf_page = in_pdf.pages[0]
 
-        _x0, _y0, w, h = map(float, pdf_page["/MediaBox"])
-        assert _x0 == 0
-        assert _y0 == 0
+            _x0, _y0, w, h = map(float, pdf_page["/MediaBox"])
+            assert _x0 == 0
+            assert _y0 == 0
 
-        class PageMerge(pdfrw.PageMerge):
-            @property
-            def xobj_box(self):
-                return pdfrw.PdfArray((0, 0, w * 2, h))
+            class PageMerge(pdfrw.PageMerge):
+                @property
+                def xobj_box(self):
+                    return pdfrw.PdfArray((0, 0, w * 2, h))
 
-        result = PageMerge()
-        result.add(pdf_page)
-        result.add(pdf_page)
-        result[-1].x = w
+            result = PageMerge()
+            result.add(pdf_page)
+            result.add(pdf_page)
+            result[-1].x = w
 
-        out_pdf = pdfrw.PdfWriter(dual_path_pdf)
-        out_pdf = out_pdf.addpages([result.render()])
-        out_pdf.write()
-        print("wrote", str(dual_path_pdf.absolute()))
+            out_pdf = pdfrw.PdfWriter(dual_path_pdf)
+            out_pdf = out_pdf.addpages([result.render()])
+            out_pdf.write()
+            print("wrote", str(dual_path_pdf.absolute()))
 
     return 0
 

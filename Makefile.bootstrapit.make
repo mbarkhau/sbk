@@ -345,15 +345,41 @@ lint_flake8:
 	@printf "\e[1F\e[9C ok\n"
 
 
+## Run flake8 (only check errors)
+.PHONY: errlint_flake8
+errlint_flake8:
+	@rm -f reports/flake8*;
+	@mkdir -p "reports/";
+
+	@printf "flake8 ..\n"
+	@$(DEV_ENV)/bin/flake8 src/ --select='F,E9,W6' --tee --output-file reports/flake8.txt || exit 0;
+	@$(DEV_ENV)/bin/flake8_junit reports/flake8.txt reports/flake8.xml >> /dev/null;
+	@$(DEV_ENV_PY) scripts/exit_0_if_empty.py reports/flake8.txt;
+
+	@printf "\e[1F\e[9C ok\n"
+
+
 ## Run pylint.
 .PHONY: lint_pylint
 lint_pylint:
 	@mkdir -p "reports/";
 
 	@printf "pylint ..\n";
+	@$(DEV_ENV)/bin/pylint-ignore --rcfile=setup.cfg \
+		src/ test/
+	@printf "\e[1F\e[9C ok\n"
+
+
+## Run pylint (only check errors).
+.PHONY: errlint_pylint
+errlint_pylint:
+	@mkdir -p "reports/";
+
+	@printf "pylint ..\n";
 	@$(DEV_ENV)/bin/pylint-ignore --errors-only --rcfile=setup.cfg \
 		src/ test/
 	@printf "\e[1F\e[9C ok\n"
+
 
 
 ## Run pylint-ignore --update-ignorefile.
@@ -366,6 +392,11 @@ pylint_ignore:
 ## Run flake8 linter and check for fmt
 .PHONY: lint
 lint: lint_isort lint_fmt lint_flake8 lint_pylint
+
+
+## Run flake8 linter and check for fmt
+.PHONY: errlint
+errlint: errlint_flake8 errlint_pylint
 
 
 ## Run mypy type checker
@@ -440,7 +471,8 @@ fmt_isort:
 	@$(DEV_ENV)/bin/isort \
 		--line-width=$(MAX_LINE_LEN) \
 		--project $(MODULE_NAME) \
-		src/ test/;
+		$$(grep --files-without-match "This is a generated file" src/sbk/*.py) \
+		$$(grep --files-without-match "This is a generated file" test/*.py);
 
 
 

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nostr PoW Client</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Nostr-tools library -->
+    <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.1.2/lib/nostr.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Custom scrollbar for notes list */
+        .notes-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .notes-container::-webkit-scrollbar-track {
+            background: #e5e7eb; /* Lighter gray */
+            border-radius: 10px;
+        }
+        .notes-container::-webkit-scrollbar-thumb {
+            background: #9ca3af; /* Gray */
+            border-radius: 10px;
+        }
+        .notes-container::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* Darker gray */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+
+    <div class="w-full max-w-4xl bg-white p-6 rounded-lg shadow-xl border border-gray-200">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Nostr PoW Client</h1>
+
+        <!-- Connection Status -->
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-3">Relay Connections</h2>
+            <div id="relay-status" class="flex flex-wrap gap-2 text-sm text-gray-600">
+                <!-- Relay status will be inserted here by JavaScript -->
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
+                    Connecting...
+                </span>
+            </div>
+        </div>
+
+        <!-- Notes Display Section -->
+        <div>
+            <h2 class="text-xl font-semibold text-gray-700 mb-3">Notes (Sorted by PoW)</h2>
+            <div id="notesContainer" class="notes-container space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                <!-- Notes will be inserted here by JavaScript -->
+                <p class="text-center text-gray-500 py-8" id="initial-loading-message">Loading notes from relays...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Configuration
+        const RELAYS = [
+            // pow relays according to https://nostr.watch/relays
+            'wss://labour.fiatjaf.com',
+            'wss://shu01.shugur.net',
+            'wss://nostr-relay.app',
+            // other relays
+            'wss://nostr.einundzwanzig.space',
+            'wss://h.codingarena.top/outbox',
+            'wss://relay.damus.io',
+            'wss://purplepag.es', // Additional relay for better coverage
+        ];
+        const KIND_TEXT_NOTE = 1; // Standard text note kind
+        const MAX_NOTES_DISPLAY = 100; // Limit the number of notes displayed to improve performance
+
+        // Global state
+        // Map to store connected relay objects: { url: { ws: WebSocket, status: string, responseTime: number|null, connectStartTime: number|null } }
+        const connectedRelays = new Map();
+        let notes = []; // Array to hold fetched notes
+
+        // DOM Elements
+        const relayStatusDiv = document.getElementById('relay-status');
+        const notesContainer = document.getElementById('notesContainer');
+        let initialLoadingMessage = document.getElementById('initial-loading-message');
+
+        // Source: https://nips.nostr.com/13
+        // hex should be a hexadecimal string (with no 0x prefix)
+        function countLeadingZeroes(hex) {
+            let count = 0;
+
+            for (let i = 0; i < hex.length; i++) {
+                const nibble = parseInt(hex[i], 16);
+                if (nibble === 0) {
+                    count += 4;
+                } else {
+                    count += Math.clz32(nibble) - 28;
+                    break;
+                }
+            }
+
+            return count;
+        }
+
+        /**
+         * Updates the relay connection status display.
+         */
+        function updateRelayStatus() {
+            relayStatusDiv.innerHTML = ''; // Clear existing status
+            RELAYS.forEach(url => {
+                const relayInfo = connectedRelays.get(url) || { status: 'Disconnected', responseTime: null };
+                let statusText = relayInfo.status;
+                let colorClass = 'bg-gray-200 text-gray-800'; // Default for connecting/unknown
+
+                if (relayInfo.status === 'Connected') {
+                    colorClass = 'bg-green-100 text-green-700';
+                    if (relayInfo.responseTime !== null) {
+                        statusText += ` (${relayInfo.responseTime} ms)`;
+                    }
+                } else if (relayInfo.status === 'Disconnected' || relayInfo.status === 'Error') {
+                    colorClass = 'bg-red-100 text-red-700';
+                }
+
+                relayStatusDiv.innerHTML += `
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${colorClass}">
+                        ${url.replace('wss://', '')}: ${statusText}
+                    </span>
+                `;
+            });
+        }
+
+        /**
+         * Renders the list of notes, sorted by PoW.
+         */
+        function renderNotes() {
+            notesContainer.innerHTML = ''; // Clear existing notes
+            if (notes.length === 0) {
+                notesContainer.innerHTML = '<p class="text-center text-gray-500 py-8">No notes received yet.</p>';
+                return;
+            }
+
+            // Sort notes by PoW (descending)
+            const sortedNotes = [...notes].sort((a, b) => countLeadingZeroes(b.event.id) - countLeadingZeroes(a.event.id));
+
+            // Display a limited number of notes
+            sortedNotes.slice(0, MAX_NOTES_DISPLAY).forEach(note => {
+                const isoTS = new Date(note.event.created_at * 1000).toISOString();
+                const nonceTag = note.event.tags.find(tag => tag[0] === 'nonce');
+                const leadingZeros = countLeadingZeroes(note.event.id)
+
+                notesContainer.innerHTML += `
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-100">
+                        <p class="text-gray-800 text-base mb-2">${note.event.content}</p>
+                        <div class="text-xs font-mono text-gray-500">
+                            <pre>Timestamp : ${isoTS}</pre>
+                            <pre>Public Key: ${note.event.pubkey}</pre>
+                            <pre>Event ID  : ${note.event.id}</pre>
+                            <pre>Leading Zero Bits: <span class="font-bold text-blue-600">${leadingZeros}</span></pre>
+                            <pre>Nonce Tag: <span class="font-bold text-blue-600">${nonceTag ? JSON.stringify(nonceTag) : 'N/A'}</span></pre>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        /**
+         * Initializes relay websocket
+         * @param {string} url - The URL of the relay.
+         */
+        function initRelayWS(url) {
+            const ws = new WebSocket(url);
+            connectedRelays.set(url, { ws: ws, status: 'Connecting', responseTime: null, connectStartTime: Date.now() });
+
+            ws.onopen = () => {
+                const relayInfo = connectedRelays.get(url);
+                relayInfo.status = 'Connected';
+                // The responseTime will be calculated on the first message
+                connectedRelays.set(url, relayInfo); // Update map
+                console.log(`Connected to ${url}`);
+                updateRelayStatus();
+                // Subscribe to text notes (kind 1)
+                ws.send(JSON.stringify(["REQ", "nostr-pow-client-sub", { kinds: [KIND_TEXT_NOTE], limit: 50 }]));
+            };
+
+            ws.onmessage = (message) => {
+                const data = JSON.parse(message.data);
+                const relayInfo = connectedRelays.get(url);
+
+                if (relayInfo.responseTime === null) { // Record time to first message
+                    relayInfo.responseTime = Date.now() - relayInfo.connectStartTime;
+                    connectedRelays.set(url, relayInfo); // Update map
+                    updateRelayStatus(); // Re-render status to show response time
+                }
+
+                if (data[0] === "EVENT") {
+                    const event = data[2];
+                    // Add event only if it's not a duplicate
+                    if (!notes.some(n => n.event.id === event.id)) {
+                        notes.push({event});
+                        // Ensure initial loading message is removed once notes start coming in
+                        if (initialLoadingMessage) {
+                            initialLoadingMessage.remove();
+                            initialLoadingMessage = null; // Clear reference
+                        }
+                        renderNotes(); // Re-render notes on new event
+                    }
+                } else if (data[0] === "EOSE") {
+                    console.log(`End of stored events from ${url}`);
+                }
+            };
+
+            ws.onclose = () => {
+                const relayInfo = connectedRelays.get(url);
+                if (relayInfo) { // Check if relayInfo still exists (it might have been deleted on error)
+                    relayInfo.status = 'Disconnected';
+                    connectedRelays.set(url, relayInfo); // Update map
+                }
+                console.log(`Disconnected from ${url}`);
+                updateRelayStatus();
+                // Attempt to reconnect after a delay
+                setTimeout(() => connectToRelay(url), 5000);
+            };
+
+            ws.onerror = (error) => {
+                const relayInfo = connectedRelays.get(url);
+                if (relayInfo) {
+                    relayInfo.status = 'Error';
+                    connectedRelays.set(url, relayInfo); // Update map
+                }
+                console.error(`WebSocket Error on ${url}:`, error);
+                ws.close(); // Force close on error to trigger reconnect
+            };
+
+            return ws;
+        }
+
+        /**
+         * Connects to a single Nostr relay.
+         * @param {string} url - The URL of the relay.
+         */
+        function connectToRelay(url) {
+            try {
+                initRelayWS(url);
+            } catch (error) {
+                console.error(`Failed to connect to ${url}:`, error);
+                connectedRelays.delete(url); // Ensure it's marked as disconnected
+                updateRelayStatus();
+                setTimeout(() => connectToRelay(url), 5000); // Retry
+            }
+        }
+
+        // Initialize connections to relays on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            RELAYS.forEach(url => connectToRelay(url));
+            updateRelayStatus(); // Initial status display
+        });
+    </script>
+</body>
+</html>
